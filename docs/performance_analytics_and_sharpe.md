@@ -51,6 +51,11 @@ This chapter is the reference for Sharpe ratios. The full column catalogue is in
 conventions are defined in [notation and conventions](notation_and_conventions.md) and
 [returns, NAVs and excess returns](returns_and_navs.md).
 
+For explicitly declared families of mean, regression-alpha or paired Sharpe hypotheses, see
+[factor and backtest significance](factor_and_backtest_significance.md). Its new family
+interfaces are source-only development functionality, not new top-level exports; their
+finite-sample qualification remains incomplete. The existing paired test below is unchanged.
+
 <a id="data-and-calculation-contract"></a>
 
 ## Inputs, notation, and assumptions
@@ -987,7 +992,7 @@ assert np.isclose(information_ratio.iloc[0], 0.301, atol=5e-4)
 | Tracking error and information ratio | $\sqrt{\mathrm{af}}\,s(r_p-r_b)$; $\sqrt{\mathrm{af}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | t-statistic of the mean | $\sqrt{T}\,\bar x/s(x)$ | `qis.compute_desc_table(..., is_add_tstat=True)` |
 | Arithmetic helper | $\sqrt{\mathrm{af}}\,\bar x/s(x)$ | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic` |
-| Standard errors, PSR, DSR | See Sampling uncertainty | Not implemented; reader calculation |
+| Single-series Sharpe SE, PSR, DSR | See Sampling uncertainty | Not implemented; reader calculation |
 
 The block below shows the contract of `PerfParams.sharpe_convention` on two synthetic assets:
 the performance table is identical under the three conventions, while the regime-conditional
@@ -1062,7 +1067,10 @@ and [ex-post tracking error](https://github.com/ArturSepp/QuantInvestStrats/blob
   Sharpe ratios are comparable only when all four agree.
 - A Sharpe ratio carries a standard error of about $1/\sqrt{Y}$. Differences between two
   Sharpe ratios of correlated strategies over the same period need a paired test (Opdyke 2007),
-  which qis does not provide.
+  provided by `qis.sharpe_difference_test` with the HAC delta-method convention above. A
+  development adapter for several candidates versus one fixed benchmark is documented in
+  [factor and backtest significance](factor_and_backtest_significance.md); it does not change
+  that existing paired calculation or provide an all-pairs research-search correction.
 - The best of many backtests is biased upwards. The deflated Sharpe ratio of Bailey and
   López de Prado (2014) is the standard correction; qis does not compute it.
 - Square-root annualisation assumes serially uncorrelated returns; smoothed or illiquid returns
@@ -1088,6 +1096,7 @@ and [ex-post tracking error](https://github.com/ArturSepp/QuantInvestStrats/blob
 - [Performance statistics and reporting frequency](frequency_convention_note.md)
 - [Serial dependence and autocorrelation](serial_dependence.md)
 - [Regression and HAC inference](regression_and_hac.md)
+- [Factor and backtest significance: development family interfaces](factor_and_backtest_significance.md)
 - [Exponentially weighted estimators](ewm_estimators.md)
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md)
 - [Signal diagnostics: information coefficient and information ratio](signal_diagnostics.md)

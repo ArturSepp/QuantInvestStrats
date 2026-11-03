@@ -120,6 +120,8 @@ the [bibliography](bibliography.md).
   their standard errors and lagged betas.
 - [Regression and HAC inference](regression_and_hac.md): OLS and EWMA regressions with
   heteroskedasticity- and autocorrelation-consistent standard errors.
+- [Factor and backtest significance](factor_and_backtest_significance.md): source-only mean,
+  alpha and paired Sharpe families, Holm/BHY corrections, bootstrap p-values and qualification limits.
 - [Resampling and the bootstrap](reproducibility.md): IID, block and stationary bootstraps, and
   what an unstated sampling convention costs.
 - [Private-asset unsmoothing](private_asset_unsmoothing.md):
@@ -257,6 +259,7 @@ ewm_estimators
 covariance_correlation_pca
 serial_dependence
 regression_and_hac
+factor_and_backtest_significance
 Resampling and the bootstrap <reproducibility>
 Private-asset unsmoothing <private_asset_unsmoothing>
 ```

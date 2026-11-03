@@ -41,6 +41,7 @@ LEGACY_NOTATION = (
     (re.compile(r'(?<!\\)\b(?:Sigma_|sqrt\()'), 'Write formulas as TeX, not plain text.'),
 )
 METHODOLOGY_PAGES = frozenset({
+    'factor_and_backtest_significance.md',
     'reference_currency_excess_returns.md',
     'gaussian_var.md',
     'unhedged_index_replication.md',
@@ -67,6 +68,7 @@ UTILITY_PAGES = frozenset({
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
+    'factor_and_backtest_significance.md',
     'reference_currency_excess_returns.md',
     'gaussian_var.md',
     'risk_monitoring.md',

@@ -64,9 +64,11 @@ page. Remove the mark once it has.
 ## Estimation and resampling
 
 - Andrews, D. W. K. (1991). Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimation. *Econometrica*, 59(3), 817–858. [DOI: 10.2307/2938229](https://doi.org/10.2307/2938229). [pending publisher check]
+- Benjamini, Y., and Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. *The Annals of Statistics*, 29(4), 1165–1188. [DOI: 10.1214/aos/1013699998](https://doi.org/10.1214/aos/1013699998).
 - D'Agostino, R., and Pearson, E. S. (1973). Tests for Departure from Normality. Empirical Results for the Distributions of b2 and √b1. *Biometrika*, 60(3), 613–622. [DOI: 10.1093/biomet/60.3.613](https://doi.org/10.1093/biomet/60.3.613). [pending publisher check]
 - Efron, B. (1979). Bootstrap Methods: Another Look at the Jackknife. *The Annals of Statistics*, 7(1), 1–26. [DOI: 10.1214/aos/1176344552](https://doi.org/10.1214/aos/1176344552). [pending publisher check]
 - Fama, E. F., and MacBeth, J. D. (1973). Risk, Return, and Equilibrium: Empirical Tests. *Journal of Political Economy*, 81(3), 607–636. [DOI: 10.1086/260061](https://doi.org/10.1086/260061). [pending publisher check]
+- Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. *Scandinavian Journal of Statistics*, 6(2), 65–70. [Publisher archive](https://www.jstor.org/stable/4615733).
 - J.P. Morgan and Reuters (1996). *RiskMetrics — Technical Document*, 4th edition. J.P. Morgan. [pending publisher check]
 - Joanes, D. N., and Gill, C. A. (1998). Comparing Measures of Sample Skewness and Kurtosis. *Journal of the Royal Statistical Society: Series D (The Statistician)*, 47(1), 183–189. [DOI: 10.1111/1467-9884.00122](https://doi.org/10.1111/1467-9884.00122). [pending publisher check]
 - Jolliffe, I. T. (2002). *Principal Component Analysis*, 2nd edition. Springer. [pending publisher check]
