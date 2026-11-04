@@ -224,7 +224,7 @@ def plot_family_summary(mean_table: pd.DataFrame, alpha_table: pd.DataFrame) -> 
 
 
 def run_local(
-        local: Locals = Locals.ANALYTIC,
+        local: Locals,
         output_path: Union[str, Path, None] = None,
 ) -> Dict[str, SignificanceResult]:
     """Print the walkthrough, show the figure and optionally export tables and figure.

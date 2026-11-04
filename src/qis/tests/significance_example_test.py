@@ -63,7 +63,7 @@ def test_analytic_example_matches_independent_references(example, capsys, monkey
         raise AssertionError('Default analytic mode must not resolve/write output')
 
     monkeypatch.setattr(example.local_path, 'get_output_path', refuse_output)
-    results = example.run_local()
+    results = example.run_local(example.Locals.ANALYTIC)
     returns, benchmark = example.load_example_returns()
     assert returns.shape == (251, 9) and not returns.isna().any().any()
     assert 'SEQ_EM' not in returns and benchmark.index.equals(returns.index)
