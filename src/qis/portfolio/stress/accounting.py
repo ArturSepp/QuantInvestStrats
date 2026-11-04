@@ -96,7 +96,9 @@ class PortfolioAccounting:
         if (p.empty or not p.index.is_unique or p.index.hasnans
                 or not p.columns.is_unique or not {"mtm", "role"}.issubset(p)):
             raise ValueError("accounting requires unique position IDs and mtm/role columns")
-        if not np.isfinite(p.mtm).all() or not p.role.map(
+        # Nullable reductions skip NA, which could falsely reconcile an incomplete ledger.
+        # Reject missing marks explicitly rather than treating unknown balances as zero.
+        if p.mtm.isna().any() or not np.isfinite(p.mtm).all() or not p.role.map(
                 lambda value: isinstance(value, PositionRole)).all():
             raise ValueError("finite marks and explicit PositionRole values required")
         if (not isinstance(self.reporting_basis, ReportingBasis)
