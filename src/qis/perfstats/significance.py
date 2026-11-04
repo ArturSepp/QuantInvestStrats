@@ -14,12 +14,18 @@ calls delegate to ``sharpe_difference_test`` on the same complete sample for eve
 versus one fixed benchmark, preserving its uncorrected HAC and sqrt(af) display convention.
 Annual display leaves statistics and p-values unchanged. This module does not select factors,
 estimate cross-sectional prices of risk, or correct an unrecorded research search.
+
+``InterceptInference`` selects the intercept standard error of the mean and alpha tests:
+the equal-weight Bartlett sandwich (default) or the AR(1)-prewhitened Bartlett variance of
+``qis.utils.hac_intercept_prewhitening``, which adds a ``rho`` column. The paired Sharpe
+test has no such switch.
 """
 
 # packages
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
+from enum import Enum
 from numbers import Integral, Real
 from typing import Dict, Optional
 from scipy.stats import norm
@@ -28,10 +34,21 @@ from scipy.stats import norm
 from qis.perfstats import multiple_testing, sharpe_inference
 from qis.perfstats.multiple_testing import MultipleTestingMethod
 from qis.utils import regression
+from qis.utils.hac_intercept_prewhitening import DEGENERACY_RTOL, estimate_prewhitened_intercepts
 from qis.utils.rolling_regression import _validate_calendar
 
 
-DEGENERACY_RTOL = 1.0e-12  # Relative to each response's maximum absolute observation.
+class InterceptInference(Enum):
+    """Standard-error estimator for mean and alpha (intercept) hypotheses.
+
+    Attributes:
+        BARTLETT_HAC: Equal-weight Bartlett sandwich with the T/(T-k) correction.
+        PREWHITENED_AR1: Scalar AR(1) prewhitening of each intercept influence series with
+            a recoloured Bartlett variance; requires hac_lags <= T-2 and reports rho.
+    """
+
+    BARTLETT_HAC = 'bartlett_hac'
+    PREWHITENED_AR1 = 'prewhitened_ar1'
 
 
 @dataclass(frozen=True)
@@ -45,10 +62,11 @@ class SignificanceResult:
             change with annual display. Table attrs label units and pointwise intervals.
             Sharpe tables also include sharpe_candidate and sharpe_benchmark, with estimate
             equal to candidate minus benchmark (subject to the paired test's zero convention).
+            Prewhitened mean/alpha tables add the fitted AR(1) coefficient rho.
         metadata: Family/correction settings; test, zero null and alternative; normal
-            reference; sample dates and size; calendar; factor columns; HAC lags and
-            confidence level; simple-return/funding/cost descriptions; af and output
-            units. Sharpe tables record the fixed benchmark name and population-moment
+            reference; sample dates and size; calendar; factor columns; HAC lags,
+            inference and confidence level; simple-return/funding/cost descriptions; af
+            and output units. Sharpe tables record the fixed benchmark name and population-moment
             convention. A custom expected_index is copied, not inferred from observations.
     """
 
@@ -107,8 +125,12 @@ def _compute_intercept_significance(
         method: MultipleTestingMethod,
         significance_level: float,
         af: Optional[float],
+        inference: InterceptInference,
 ) -> SignificanceResult:
     """Validate a common sample, fit once, and assemble its intercept hypothesis family."""
+    if not isinstance(inference, InterceptInference):
+        raise ValueError(f'inference must be an InterceptInference member, got {inference!r}')
+    prewhitened = inference is InterceptInference.PREWHITENED_AR1
     for name, value in (('return_basis', return_basis), ('cost_basis', cost_basis)):
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f'{name} must be a nonblank description, got {value!r}')
@@ -164,23 +186,40 @@ def _compute_intercept_significance(
     # Evaluate the fitted residuals only; estimation and covariance stay in the shared core.
     residuals = normalized_y.to_numpy() - design @ fit.coefficients.to_numpy()
     residual_rms = np.sqrt(np.mean(np.square(residuals), axis=0))
+    coefficients = fit.coefficients.loc['Intercept'].to_numpy()
     standard_errors = fit.hac_se.loc['Intercept'].to_numpy()
+    probabilities = fit.pvalues.loc['Intercept'].to_numpy()
+    interval_lower = fit.confidence_lower.loc['Intercept'].to_numpy()
+    interval_upper = fit.confidence_upper.loc['Intercept'].to_numpy()
+    rho = None
+    if prewhitened:
+        # The normalized responses have unit scale, so these SEs share the fit's units.
+        try:
+            filtered = estimate_prewhitened_intercepts(
+                normalized_y, normalized_x, hac_lags=int(lags), confidence_level=confidence_level,
+            )
+        except ValueError as exception:
+            raise ValueError(f'prewhitened inference for family {family_id!r}: '
+                             f'{exception}') from exception
+        standard_errors = filtered.table['standard_error'].to_numpy()
+        probabilities = filtered.table['pvalue_normal'].to_numpy()
+        interval_lower = filtered.table['ci_lower_pointwise'].to_numpy()
+        interval_upper = filtered.table['ci_upper_pointwise'].to_numpy()
+        rho = filtered.table['rho'].to_numpy()
     invalid = ((residual_rms <= DEGENERACY_RTOL) | (standard_errors <= DEGENERACY_RTOL)
                | ~np.isfinite(residual_rms) | ~np.isfinite(standard_errors))
     if invalid.any():
         raise ValueError(f'degenerate residuals or HAC standard errors relative to response scale: '
                          f'{y.columns[invalid].tolist()!r}')
 
-    coefficients = fit.coefficients.loc['Intercept'].to_numpy()
     adjustment = multiple_testing.adjust_pvalues(
-        pd.Series(fit.pvalues.loc['Intercept'].to_numpy(), index=y.columns),
+        pd.Series(probabilities, index=y.columns),
         family_id=family_id, method=method, significance_level=significance_level,
     )
     with np.errstate(over='ignore', under='ignore', invalid='ignore'):
         displayed = np.column_stack((
             coefficients, standard_errors,
-            fit.confidence_lower.loc['Intercept'].to_numpy(),
-            fit.confidence_upper.loc['Intercept'].to_numpy(),
+            interval_lower, interval_upper,
         )) * y_scale[:, None] * display_factor
     if not np.isfinite(displayed).all() or np.any(displayed[:, 1] <= 0.0):
         raise ValueError('display units produce non-finite values or zero standard errors')
@@ -196,8 +235,11 @@ def _compute_intercept_significance(
         'ci_lower_pointwise': displayed[:, 2],
         'ci_upper_pointwise': displayed[:, 3],
     }, index=y.columns.copy())
+    if rho is not None:
+        table['rho'] = rho
     table.attrs = dict(adjustment.attrs, confidence_level=confidence_level,
-                       confidence_interval='unadjusted/pointwise', output_units=units)
+                       confidence_interval='unadjusted/pointwise', output_units=units,
+                       intercept_inference=inference.value)
     metadata = dict(
         table.attrs, test='mean' if x is None else 'alpha', null_value=0.0,
         alternative='two-sided', reference_distribution='normal', nobs=fit.nobs,
@@ -205,6 +247,7 @@ def _compute_intercept_significance(
         expected_index=None if expected_index is None else expected_index.copy(),
         n_parameters=n_parameters, factor_columns=() if x is None else tuple(x.columns),
         hac_lags=fit.hac_lags, hac_lags_requested=hac_lags, span=None, weighting='equal',
+        filter_nobs=fit.nobs - 1 if prewhitened else None,
         return_convention='simple', return_basis=return_basis, cost_basis=cost_basis,
         af=None if af is None else display_factor, annualised=annualised,
         degeneracy_rtol=DEGENERACY_RTOL,
@@ -224,6 +267,7 @@ def compute_mean_significance(
         method: MultipleTestingMethod = MultipleTestingMethod.HOLM,
         significance_level: float = 0.05,
         af: Optional[float] = None,
+        inference: InterceptInference = InterceptInference.BARTLETT_HAC,
 ) -> SignificanceResult:
     """Test each supplied return mean against zero using one common equal-weight sample.
 
@@ -243,6 +287,8 @@ def compute_mean_significance(
         af: Optional positive periods per year, explicitly chosen for the sampling grid.
             None displays per-period values; a supplied factor multiplies estimates,
             SEs and interval bounds linearly, without changing statistics or p-values.
+        inference: BARTLETT_HAC (default) or PREWHITENED_AR1 standard errors for the
+            means. Prewhitening requires hac_lags <= T-2 and adds a rho column.
 
     Returns:
         A SignificanceResult with mean inference, adjusted decisions and explicit metadata.
@@ -258,7 +304,7 @@ def compute_mean_significance(
     """
     return _compute_intercept_significance(
         returns, None, family_id, return_basis, cost_basis, sampling_frequency,
-        expected_index, hac_lags, confidence_level, method, significance_level, af,
+        expected_index, hac_lags, confidence_level, method, significance_level, af, inference,
     )
 
 
@@ -275,6 +321,7 @@ def compute_alpha_significance(
         method: MultipleTestingMethod = MultipleTestingMethod.HOLM,
         significance_level: float = 0.05,
         af: Optional[float] = None,
+        inference: InterceptInference = InterceptInference.BARTLETT_HAC,
 ) -> SignificanceResult:
     """Test intercepts in supplied multi-factor regressions with common-sample HAC.
 
@@ -299,6 +346,9 @@ def compute_alpha_significance(
         significance_level: Family-wise error/FDR target strictly between zero and one.
         af: Optional explicit periods per year for linear annual display of alpha, SE
             and confidence bounds. None retains per-period units; p-values do not change.
+        inference: BARTLETT_HAC (default) or PREWHITENED_AR1 standard errors for the
+            alphas. Prewhitening filters each alpha's scalar influence series, not the
+            joint score; it requires hac_lags <= T-2 and adds a rho column.
 
     Returns:
         A SignificanceResult containing intercept inference and family/sample metadata.
@@ -316,7 +366,7 @@ def compute_alpha_significance(
         raise ValueError('factors must be a nonempty DataFrame; use the mean test without factors')
     return _compute_intercept_significance(
         returns, factors, family_id, return_basis, cost_basis, sampling_frequency,
-        expected_index, hac_lags, confidence_level, method, significance_level, af,
+        expected_index, hac_lags, confidence_level, method, significance_level, af, inference,
     )
 
 

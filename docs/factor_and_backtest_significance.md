@@ -19,10 +19,9 @@ sample, model and assumptions. A family correction addresses testing several sup
 it does not reconstruct an unrecorded search for successful strategies.
 
 > **Pitfall.** The family interfaces in this chapter are **source-only development interfaces**,
-> not top-level exports in `qis.__all__` or a verified released API. The finite-sample qualification
-> stage remains incomplete. Correctness/reference checks do not establish nominal size or
-> coverage. A separate prewhitened V3-A prototype remains private and experimental and is not
-> selected by the functions demonstrated here. No legacy default or validation gate is changed.
+> not top-level exports in `qis.__all__` or a verified released API. Correctness and reference
+> checks do not establish nominal size or coverage, and the maintainer's finite-sample
+> validation study did not meet all of its predeclared gates for either intercept estimator.
 
 ## Overview
 
@@ -30,8 +29,8 @@ Three questions have different estimands:
 
 | Question | Null hypothesis | Calculation |
 |---|---|---|
-| Does each supplied return series have a nonzero mean? | Mean equals zero | Equal-weight mean with Bartlett HAC inference |
-| Does each supplied strategy have alpha against supplied factors? | Regression intercept equals zero | Common-sample OLS with an intercept and Bartlett HAC inference |
+| Does each supplied return series have a nonzero mean? | Mean equals zero | Equal-weight mean with Bartlett HAC inference, optionally AR(1)-prewhitened |
+| Does each supplied strategy have alpha against supplied factors? | Regression intercept equals zero | Common-sample OLS with an intercept and Bartlett HAC inference, optionally AR(1)-prewhitened |
 | Does each candidate differ from one fixed benchmark? | Arithmetic Sharpe difference equals zero | Existing paired Sharpe-difference test, followed by family correction |
 
 Heteroskedasticity- and autocorrelation-consistent (HAC) standard errors address dependence
@@ -55,7 +54,7 @@ cross-sectional prices of factor risk.
 | Mean adjustment | Equal-weight estimation with an intercept; mean bootstrap subtracts sample means, alpha bootstrap subtracts fitted intercepts only |
 | Timing | Full-sample descriptive inference on supplied realised returns; decision timing and model selection must already be free of look-ahead |
 | Output units | Fractional return per period for mean/alpha, dimensionless Sharpe-difference units for the paired test; p-values and statistics are dimensionless |
-| qis default | Family method `HOLM`, significance level .05, pointwise confidence level .95, HAC lags 3, no annual display; generated bootstrap B=9,999, expected block length 6, seed 20261101 |
+| qis default | Family method `HOLM`, significance level .05, pointwise confidence level .95, HAC lags 3, `InterceptInference.BARTLETT_HAC`, no annual display; generated bootstrap B=9,999, expected block length 6, seed 20261101 |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -125,6 +124,50 @@ $$
 This is not an exact finite-sample Student distribution. `hac_lags=None` selects the existing
 `newey_west_lag_rule(T)` once; an explicit lag must satisfy $0\leq L<T$ and is not silently capped.
 
+### AR(1) prewhitening of the intercept score
+
+With a fixed lag count $L$ the Bartlett estimator of a persistent score's long-run variance is
+biased towards zero, and the bias does not shrink as $T$ grows. `InterceptInference.PREWHITENED_AR1`
+applies the prewhitening of [Andrews–Monahan (1992)](https://doi.org/10.2307/2951574) to the
+scalar influence of each intercept. For the intercept row $a$ of $(X^\top X)^{-1}X^\top$ and
+residuals $\hat\varepsilon_{j,t}$, the influence is
+
+$$
+\psi_{j,t}=T\,a_t\hat\varepsilon_{j,t},
+\qquad
+\hat\theta_j-\theta_j=\frac1T\sum_{t=1}^{T}\psi_{j,t},
+\qquad
+\sum_{t=1}^{T}\psi_{j,t}=0 .
+$$
+
+A zero-intercept AR(1) fitted to $\psi_j$ gives
+$\hat\rho_j=\sum_{t\geq2}\psi_{j,t}\psi_{j,t-1}\big/\sum_{t\geq2}\psi_{j,t-1}^2$ and the $T-1$
+innovations $v_{j,t}=\psi_{j,t}-\hat\rho_j\psi_{j,t-1}$. The Bartlett sum of the innovations is
+recoloured at frequency zero:
+
+$$
+S^{v}_j=\sum_{t=2}^{T}v_{j,t}^2
++2\sum_{\ell=1}^{L}\left(1-\frac{\ell}{L+1}\right)\sum_{t=\ell+2}^{T}v_{j,t}v_{j,t-\ell},
+\qquad
+\widehat{\operatorname{Var}}(\hat\theta_j)=\frac{T}{T-k}\,\frac{S^{v}_j}{(1-\hat\rho_j)^2\,T^2}.
+$$
+
+The normaliser keeps the original $T$, as in Andrews–Monahan, so with $\hat\rho_j=0$ the estimate
+equals the plain sandwich without the first observation's contribution. Statistics, p-values and
+pointwise intervals are formed as above, and the table adds the column `rho`. A fit with
+$|\hat\rho_j|\geq1$ or a lag count above $T-2$ raises instead of truncating $\hat\rho_j$ or
+falling back to the plain kernel. The filter acts on the intercept's scalar influence, not on the
+joint parameter score, so no joint covariance is produced.
+
+Prewhitening is consistent at fixed $L$ for persistent scores, where the plain Bartlett estimator
+is not. It is not a validated default either: in the maintainer's replication study on
+independent rows with cross-correlated responses ($T=720$, $L=0$) its marginal size and pointwise
+non-coverage were 8.0–8.6% against a 7.9% acceptance bound. The other standard treatment of a
+persistent score, fixed-$b$ asymptotics with a nonstandard reference distribution
+([Kiefer–Vogelsang (2005)](https://doi.org/10.1017/S0266466605050565);
+[Sun (2014)](https://doi.org/10.1016/j.jeconom.2013.10.001)), is not implemented; qis keeps the
+normal reference for both estimators.
+
 ### Paired Sharpe differences
 
 For each candidate, `compute_sharpe_significance` delegates to the existing
@@ -167,8 +210,10 @@ Results return to the supplied label order, and `reject` means adjusted p-value 
 `MultipleTestingMethod.HOLM` implements [Holm (1979)](https://www.jstor.org/stable/4615733);
 `MultipleTestingMethod.BHY` implements the harmonic dependence correction of
 [Benjamini–Yekutieli (2001)](https://doi.org/10.1214/aos/1013699998), not ordinary
-Benjamini–Hochberg. Neither procedure repairs invalid marginal p-values or adjusts the displayed
-pointwise intervals. Under an all-null family, FDR and FWER coincide; under a mixture they differ.
+Benjamini–Hochberg; applying them to strategy t-statistics follows the practice of
+[Harvey, Liu and Zhu (2016)](https://doi.org/10.1093/rfs/hhv059). Neither procedure repairs
+invalid marginal p-values or adjusts the displayed pointwise intervals. Under an all-null family,
+FDR and FWER coincide; under a mixture they differ.
 
 ### Null-centred joint stationary bootstrap
 
@@ -186,7 +231,13 @@ K_j=\sum_{b=1}^{B}\mathbf{1}\{|z^*_{j,b}|\geq|z_j|\},
 $$
 
 The finite-resample adjustment prevents a zero p-value. Holm/BHY correct these approximate
-bootstrap p-values. The retained effect intervals remain **normal HAC pointwise intervals**;
+bootstrap p-values. This is the studentized block bootstrap with HAC standard errors refitted
+in every draw of [Romano–Wolf (2006)](https://doi.org/10.1080/10485250600687812) and
+[Ledoit–Wolf (2008)](https://doi.org/10.1016/j.jempfin.2008.03.002), with a Bartlett rather
+than a quadratic-spectral kernel; the family structure follows
+[White (2000)](https://doi.org/10.1111/1468-0262.00152) and
+[Romano–Wolf (2005)](https://doi.org/10.1111/j.1468-0262.2005.00615.x) without their stepdown
+maximum-statistic test. The retained effect intervals remain **normal HAC pointwise intervals**;
 no bootstrap effect CI is constructed. The separate 95% Clopper–Pearson bounds describe the
 conditional tail probability underlying $K_j/B$, before the add-one adjustment, assuming
 independent draws. They are not confidence intervals for a mean or alpha.
@@ -211,6 +262,26 @@ statistic, p-values and family decisions unchanged.
 For mean/alpha use $\mathrm{af}$, and for arithmetic Sharpe differences use
 $\sqrt{\mathrm{af}}$. This is a display convention, not a new temporal aggregation or
 independence assumption. $\square$
+
+### What is standard and what is specific to qis
+
+None of the estimators or corrections in this chapter is new. The table separates the published
+method from the choices made in qis, so that a reader can cite the former and audit the latter.
+
+| Element | Published method | qis choice |
+|---|---|---|
+| Bartlett HAC with the $T/(T-k)$ correction | Newey–West (1987); Andrews (1991) | One fixed lag count $L$ shared by every estimator; `newey_west_lag_rule` only on request |
+| Prewhitening with recolouring at frequency zero | Andrews–Monahan (1992) | Applied to the scalar intercept influence, which is their estimator for the linear combination $a^\top g_t$ of the score, instead of a VAR(1) of the full score; fixed Bartlett lag on the innovations instead of their automatic quadratic-spectral bandwidth; abort at $\lvert\hat\rho_j\rvert\geq1$ instead of truncating $\hat\rho_j$ at .97 |
+| Fixed-$b$ asymptotics for persistent scores | Kiefer–Vogelsang (2005); Sun (2014) | Not implemented; the normal reference is retained |
+| Holm and Benjamini–Yekutieli corrections | Holm (1979); Benjamini–Yekutieli (2001); Harvey, Liu and Zhu (2016) | Applied to marginal p-values of a predeclared family; no stepdown or maximum-statistic test |
+| Bootstrap tests over a family of strategies | White (2000); Romano–Wolf (2005) | Same null-centred joint resampling; corrections stay marginal rather than stepwise |
+| Studentized block bootstrap with HAC standard errors refitted in every draw | Romano–Wolf (2006); Ledoit–Wolf (2008) | Stationary bootstrap of Politis–Romano (1994) with one index matrix shared by every response and factor; Bartlett rather than quadratic-spectral kernel; inclusive $(1+K_j)/(B+1)$ p-values; an invalid draw aborts the family |
+| Paired Sharpe-difference test | Ledoit–Wolf (2008) delta method; Opdyke (2007) | The existing `sharpe_difference_test` with unprewhitened Bartlett HAC; see the Sharpe chapter |
+
+Specific to qis, and not claimed as methodology: the declared-family and provenance conventions
+(`family_id`, `return_basis`, `cost_basis`, declared calendar, index hash, scale-relative
+degeneracy rule), the abort-rather-than-replace policy for invalid draws, and the finite-sample
+validation record quoted above.
 
 ## Worked example
 
@@ -293,6 +364,32 @@ assert means.table.attrs["confidence_interval"] == "unadjusted/pointwise"
 Inspect each result's `table` together with `metadata`, not just `reject`. These are synthetic
 teaching calculations, not evidence about real factors, investability or finite-sample calibration.
 
+### The same means with prewhitened standard errors
+
+The estimates do not change; the standard errors, intervals and p-values do, and the table gains
+the fitted `rho`. The dense reference below filters the first demeaned series directly.
+
+```python
+from qis.perfstats.significance import InterceptInference
+
+prewhitened = compute_mean_significance(
+    responses, family_id="synthetic_means", inference=InterceptInference.PREWHITENED_AR1,
+    **settings
+)
+np.testing.assert_allclose(prewhitened.table["estimate"], means.table["estimate"])
+assert prewhitened.metadata["intercept_inference"] == "prewhitened_ar1"
+assert "rho" in prewhitened.table and "rho" not in means.table
+
+# Independent reference for the first mean: AR(1) filter, Bartlett sum, recolouring.
+rho = (e[1:] @ e[:-1]) / (e[:-1] @ e[:-1])
+v = e[1:] - rho * e[:-1]
+distance_v = np.abs(np.subtract.outer(np.arange(len(v)), np.arange(len(v))))
+kernel_v = np.maximum(1 - distance_v / 4, 0)
+reference_se = np.sqrt((v @ kernel_v @ v) / (1 - rho) ** 2 / (len(y) * (len(y) - 1)))
+np.testing.assert_allclose(prewhitened.table["rho"].iloc[0], rho, rtol=1e-10)
+np.testing.assert_allclose(prewhitened.table["hac_se"].iloc[0], 12 * reference_se, rtol=1e-10)
+```
+
 ### A small bootstrap interface demonstration
 
 The following uses only 39 draws to exercise the interfaces, **not** to support an empirical
@@ -342,23 +439,26 @@ their GitHub source links do not establish that an installed release already inc
 | Submodule | Entry points | Contract |
 |---|---|---|
 | [`qis.perfstats.multiple_testing`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/multiple_testing.py) | `MultipleTestingMethod`, `adjust_pvalues` | One complete labelled p-value Series; no return estimation |
-| [`qis.perfstats.significance`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/significance.py) | `SignificanceResult`, `compute_mean_significance`, `compute_alpha_significance`, `compute_sharpe_significance` | One complete common sample and an explicit family |
+| [`qis.perfstats.significance`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/significance.py) | `SignificanceResult`, `InterceptInference`, `compute_mean_significance`, `compute_alpha_significance`, `compute_sharpe_significance` | One complete common sample and an explicit family |
 | [`qis.perfstats.bootstrap_significance`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/bootstrap_significance.py) | `compute_bootstrap_mean_significance`, `compute_bootstrap_alpha_significance` | Null-centred joint resampling; no bootstrap Sharpe or effect CI |
+| [`qis.utils.hac_intercept_prewhitening`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/hac_intercept_prewhitening.py) | `PrewhitenedInterceptResult`, `estimate_prewhitened_intercepts` | Per-response AR(1)-prewhitened intercept standard errors; no joint covariance |
 
 `SignificanceResult.table` has `estimate`, `hac_se`, `statistic`, `pvalue_raw`,
 `pvalue_adjusted`, `reject`, `ci_lower_pointwise` and `ci_upper_pointwise`. Sharpe families add
-`sharpe_candidate` and `sharpe_benchmark`. Bootstrap tables add `pvalue_hac`,
-`bootstrap_exceedances` and `bootstrap_tail_mc_lower`/`bootstrap_tail_mc_upper`.
+`sharpe_candidate` and `sharpe_benchmark`; prewhitened mean/alpha families add `rho`. Bootstrap
+tables add `pvalue_hac`, `bootstrap_exceedances` and `bootstrap_tail_mc_lower`/`bootstrap_tail_mc_upper`.
 
 Metadata records the family ID/members/method, null/alternative, sample boundaries/count,
-declared calendar, factor columns or fixed benchmark, lag choice, funding/cost descriptions and
-display units. Bootstrap metadata also records effective $B$, the index source/hash, generated
-block/seed settings where applicable, minimum p-value and first-rank reachability. With
-`include_diagnostics=True` it retains copied `(T, B)` indices and `(B, M)` statistics, not $B$
-full market panels. Without it the draw statistics are streamed into counts.
+declared calendar, factor columns or fixed benchmark, lag choice, `intercept_inference`,
+funding/cost descriptions and display units. Bootstrap metadata also records effective $B$, the
+index source/hash, generated block/seed settings where applicable, minimum p-value and first-rank
+reachability. With `include_diagnostics=True` it retains copied `(T, B)` indices and `(B, M)`
+statistics, plus the `(B, M)` fitted `rho` for prewhitened inference, not $B$ full market panels.
+Without it the draw statistics are streamed into counts.
 
 The canonical numerical owners are the shared
 [`regression.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/regression.py),
+[`hac_intercept_prewhitening.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/hac_intercept_prewhitening.py),
 [`sharpe_inference.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/sharpe_inference.py)
 and existing sampler. The examples above are executed offline by
 [`documentation_examples_test.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/tests/documentation_examples_test.py):
@@ -367,8 +467,13 @@ and existing sampler. The examples above are executed offline by
 python -m pytest src/qis/tests/documentation_examples_test.py -k factor_and_backtest_significance
 ```
 
-The frozen market generator and its seed are unchanged. No market-data download, Fama–French
-study, calibration runner or private V3-A adapter is invoked by these examples.
+The frozen market generator and its seed are unchanged. No market-data download or Fama–French
+study is involved. The repository example
+[`examples/perfstats/factor_and_backtest_significance.py`](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/factor_and_backtest_significance.py)
+runs every analytic of this chapter on the nine full-history instruments of the panel: both
+intercept inferences side by side with the fitted $\hat\rho_j$, Holm and BHY through the family
+functions and directly through `adjust_pvalues`, the four bootstrap families on one shared index
+matrix, and a two-panel figure of p-values and standard-error ratios.
 
 ## Interpretation and limitations
 
@@ -377,11 +482,9 @@ study, calibration runner or private V3-A adapter is invoked by these examples.
   exogenous full-rank factor design. Paired Sharpe inference needs sufficient fourth moments.
 - The 24-observation check is an input-validity threshold, not a claim that 24 observations give
   reliable asymptotic inference. An automatic lag rule is not a finite-sample guarantee.
-- The finite-sample validation programme did not meet all its predeclared marginal-size and
-  pointwise-coverage gates. The implementation/reference checks and passing family-error checks
-  do not override those failures. Qualification remains incomplete for the new family workflow.
-- A private prewhitened prototype was investigated but not promoted. It remains experimental;
-  the examples use the unchanged legacy Bartlett calculations. No calibration is resumed here.
+- The maintainer's finite-sample validation study did not meet all its predeclared marginal-size
+  and pointwise-coverage gates, for the Bartlett default or for AR(1) prewhitening. The
+  implementation/reference checks and passing family-error checks do not override those results.
 - Corrected p-values are not posterior probabilities, and nonrejection is not proof of zero
   return or zero alpha. Statistical evidence does not establish economic materiality or net
   investability. State funding, fees, leverage and the tested effect units.
@@ -408,8 +511,17 @@ study, calibration runner or private V3-A adapter is invoked by these examples.
 ## References
 
 1. Newey, W. K., and West, K. D. (1987). A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix. *Econometrica*, 55(3), 703–708. [Working paper and published-version record](https://www.nber.org/papers/t0055).
-2. Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. *Scandinavian Journal of Statistics*, 6(2), 65–70. [Publisher archive](https://www.jstor.org/stable/4615733).
-3. Benjamini, Y., and Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. *The Annals of Statistics*, 29(4), 1165–1188. [DOI: 10.1214/aos/1013699998](https://doi.org/10.1214/aos/1013699998).
-4. Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870).
-5. Opdyke, J. D. (2007). Comparing Sharpe Ratios: So Where Are the p-Values? *Journal of Asset Management*, 8(5), 308–336. [DOI: 10.1057/palgrave.jam.2250084](https://doi.org/10.1057/palgrave.jam.2250084).
-6. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+2. Andrews, D. W. K. (1991). Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimation. *Econometrica*, 59(3), 817–858. [DOI: 10.2307/2938229](https://doi.org/10.2307/2938229). [pending publisher check]
+3. Andrews, D. W. K., and Monahan, J. C. (1992). An Improved Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimator. *Econometrica*, 60(4), 953–966. [DOI: 10.2307/2951574](https://doi.org/10.2307/2951574). [pending publisher check]
+4. Kiefer, N. M., and Vogelsang, T. J. (2005). A New Asymptotic Theory for Heteroskedasticity-Autocorrelation Robust Tests. *Econometric Theory*, 21(6), 1130–1164. [DOI: 10.1017/S0266466605050565](https://doi.org/10.1017/S0266466605050565). [pending publisher check]
+5. Sun, Y. (2014). Let's fix it: Fixed-b asymptotics versus small-b asymptotics in heteroskedasticity and autocorrelation robust inference. *Journal of Econometrics*, 178(3), 659–677. [DOI: 10.1016/j.jeconom.2013.10.001](https://doi.org/10.1016/j.jeconom.2013.10.001). [pending publisher check]
+6. Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. *Scandinavian Journal of Statistics*, 6(2), 65–70. [Publisher archive](https://www.jstor.org/stable/4615733).
+7. Benjamini, Y., and Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. *The Annals of Statistics*, 29(4), 1165–1188. [DOI: 10.1214/aos/1013699998](https://doi.org/10.1214/aos/1013699998).
+8. Harvey, C. R., Liu, Y., and Zhu, H. (2016). … and the Cross-Section of Expected Returns. *The Review of Financial Studies*, 29(1), 5–68. [DOI: 10.1093/rfs/hhv059](https://doi.org/10.1093/rfs/hhv059). [pending publisher check]
+9. White, H. (2000). A Reality Check for Data Snooping. *Econometrica*, 68(5), 1097–1126. [DOI: 10.1111/1468-0262.00152](https://doi.org/10.1111/1468-0262.00152). [pending publisher check]
+10. Romano, J. P., and Wolf, M. (2005). Stepwise Multiple Testing as Formalized Data Snooping. *Econometrica*, 73(4), 1237–1282. [DOI: 10.1111/j.1468-0262.2005.00615.x](https://doi.org/10.1111/j.1468-0262.2005.00615.x). [pending publisher check]
+11. Romano, J. P., and Wolf, M. (2006). Improved nonparametric confidence intervals in time series regressions. *Journal of Nonparametric Statistics*, 18(2), 199–214. [DOI: 10.1080/10485250600687812](https://doi.org/10.1080/10485250600687812). [pending publisher check]
+12. Ledoit, O., and Wolf, M. (2008). Robust performance hypothesis testing with the Sharpe ratio. *Journal of Empirical Finance*, 15(5), 850–859. [DOI: 10.1016/j.jempfin.2008.03.002](https://doi.org/10.1016/j.jempfin.2008.03.002).
+13. Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870).
+14. Opdyke, J. D. (2007). Comparing Sharpe Ratios: So Where Are the p-Values? *Journal of Asset Management*, 8(5), 308–336. [DOI: 10.1057/palgrave.jam.2250084](https://doi.org/10.1057/palgrave.jam.2250084).
+15. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

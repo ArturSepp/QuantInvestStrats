@@ -10,10 +10,11 @@ from scipy.stats import norm
 # qis
 from qis.datasets.synthetic import generate_synthetic_prices
 from qis.perfstats import multiple_testing, sharpe_inference
+from qis.perfstats import significance
 from qis.perfstats.multiple_testing import MultipleTestingMethod
 from qis.perfstats.returns import to_returns
-from qis.perfstats.significance import (compute_alpha_significance, compute_mean_significance,
-                                       compute_sharpe_significance)
+from qis.perfstats.significance import (InterceptInference, compute_alpha_significance,
+                                       compute_mean_significance, compute_sharpe_significance)
 from qis.perfstats.tests.sharpe_test import _moment_reference
 from qis.utils import regression
 
@@ -671,6 +672,132 @@ def test_sharpe_degenerate_member_rejects_whole_family(scale: float) -> None:
         with pytest.raises(ValueError, match='benchmark.*degenerate'):
             compute_sharpe_significance(y * scale, benchmark * 0.0 + constant * scale,
                                          **CONVENTIONS)
+
+
+def _prewhitened_panel(nobs=72):
+    """Analytic arrays only: no RNG."""
+    t = np.arange(nobs, dtype=float)
+    index = pd.date_range('2000-01-31', periods=nobs, freq='ME', name='date')
+    factors = np.column_stack([.02*np.sin((j+1)*.173*t)+.008*np.cos((j+2)*.411*t)
+                               + .004*(j+1) for j in range(6)])
+    noise = np.column_stack([.005*np.cos((.43+.5*j)*t)+.004*np.sin((1.57+.3*j)*t)
+                             + .003*np.cos(.13*t*t+.1*j) for j in range(3)])
+    values = noise+factors @ (.2+.01*np.arange(18).reshape(6, 3))+[.001, -.002, .0004]
+    return (pd.DataFrame(values, index=index, columns=['A', 'B', 'C']),
+            pd.DataFrame(factors, index=index, columns=[f'F{j}' for j in range(6)]))
+
+
+def _prewhitened_reference(values, factors, lags, confidence=.95):
+    """Independent full-design SVD and dense filter/kernel intercept reference."""
+    nobs = len(values)
+    design = (np.ones((nobs, 1)) if factors is None else
+              np.column_stack((np.ones(nobs), factors)))
+    left, singular, right = np.linalg.svd(design, full_matrices=False)
+    mapping = (right.T/singular) @ left.T
+    coefficients = mapping @ values
+    psi = nobs*mapping[0, :, None]*(values-design @ coefficients)
+    distance = np.abs(np.subtract.outer(np.arange(nobs-1), np.arange(nobs-1)))
+    kernel = np.maximum(1-distance/(lags+1.), 0.)
+    se, rhos = [], []
+    for column in psi.T:
+        rho = np.linalg.lstsq(column[:-1, None], column[1:], rcond=None)[0][0]
+        assert abs(rho) < 1, 'deterministic reference fixture must have a stable filter'
+        operator = np.eye(nobs-1, nobs, k=1)-rho*np.eye(nobs-1, nobs)
+        variance = (nobs/(nobs-design.shape[1])/nobs**2/(1-rho)**2
+                    * column @ operator.T @ kernel @ operator @ column)
+        se.append(np.sqrt(variance))
+        rhos.append(rho)
+    se, rhos = np.asarray(se), np.asarray(rhos)
+    statistic = coefficients[0]/se
+    critical = norm.ppf(.5+.5*confidence)
+    return dict(estimate=coefficients[0], hac_se=se, statistic=statistic, rho=rhos,
+                pvalue_normal=2*norm.sf(np.abs(statistic)),
+                ci_lower_pointwise=coefficients[0]-critical*se,
+                ci_upper_pointwise=coefficients[0]+critical*se)
+
+
+@pytest.mark.parametrize('factor_count', [0, 1, 3, 6])
+@pytest.mark.parametrize('lags', [0, 3, 27])
+@pytest.mark.parametrize('method', METHODS)
+def test_prewhitened_inference_matches_independent_reference(factor_count, lags, method):
+    y, all_x = _prewhitened_panel()
+    x = None if factor_count == 0 else all_x.iloc[:, :factor_count]
+    reference = _prewhitened_reference(y.to_numpy(), None if x is None else x.to_numpy(),
+                                      lags, confidence=.9)
+    settings = dict(CONVENTIONS, hac_lags=lags, method=method, confidence_level=.9,
+                    significance_level=.2, inference=InterceptInference.PREWHITENED_AR1)
+    result = (compute_mean_significance(y, **settings) if x is None
+              else compute_alpha_significance(y, x, **settings))
+    for field in ('estimate', 'hac_se', 'statistic', 'rho', 'ci_lower_pointwise',
+                  'ci_upper_pointwise'):
+        np.testing.assert_allclose(result.table[field], reference[field], rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(result.table.pvalue_raw, reference['pvalue_normal'],
+                               rtol=1e-9, atol=1e-12)
+    adjusted = _correction_reference(reference['pvalue_normal'], method)
+    np.testing.assert_allclose(result.table.pvalue_adjusted, adjusted, rtol=1e-9, atol=1e-12)
+    np.testing.assert_array_equal(result.table.reject, adjusted <= .2)
+    meta = result.metadata
+    assert meta['intercept_inference'] == 'prewhitened_ar1'
+    assert result.table.attrs['intercept_inference'] == 'prewhitened_ar1'
+    assert meta['filter_nobs'] == len(y)-1 and meta['hac_lags'] == lags
+    assert meta['n_parameters'] == factor_count+1
+    # Same estimates as the Bartlett default; only the inference columns change.
+    bartlett = (compute_mean_significance(y, **CONVENTIONS, hac_lags=lags) if x is None
+                else compute_alpha_significance(y, x, **CONVENTIONS, hac_lags=lags))
+    np.testing.assert_array_equal(result.table.estimate, bartlett.table.estimate)
+    assert not np.allclose(result.table.hac_se, bartlett.table.hac_se)
+    assert 'rho' not in bartlett.table
+    assert bartlett.metadata['intercept_inference'] == 'bartlett_hac'
+    assert bartlett.metadata['filter_nobs'] is None
+
+
+def test_prewhitened_display_scaling_and_family_size_invariance():
+    y, x = _prewhitened_panel()
+    x = x.iloc[:, :3]
+    settings = dict(CONVENTIONS, inference=InterceptInference.PREWHITENED_AR1)
+    base = compute_alpha_significance(y, x, **settings)
+    annual = compute_alpha_significance(y, x, **settings, af=12)
+    np.testing.assert_allclose(annual.table[DISPLAY_COLUMNS], 12*base.table[DISPLAY_COLUMNS],
+                               rtol=1e-12, atol=1e-12)
+    unchanged = [c for c in base.table if c not in DISPLAY_COLUMNS]
+    np.testing.assert_array_equal(annual.table[unchanged], base.table[unchanged])
+    wide = pd.concat([y.iloc[:, j % 3]*(1+.1*j)+.001*j for j in range(12)], axis=1)
+    wide.columns = [f'H{j:02d}' for j in range(12)]
+    full = compute_alpha_significance(wide, x, **settings)
+    six = compute_alpha_significance(wide.iloc[:, :6], x, **settings)
+    for field in ('estimate', 'hac_se', 'statistic', 'rho', 'pvalue_raw'):
+        np.testing.assert_allclose(six.table[field], full.table[field].iloc[:6],
+                                   rtol=1e-9, atol=1e-12)
+    assert full.metadata['n_hypotheses'] == 12 and six.metadata['n_hypotheses'] == 6
+
+
+def test_default_inference_is_bartlett_and_setting_is_validated(monkeypatch):
+    y, x = _prewhitened_panel()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('the default must not call the prewhitened estimator')
+
+    monkeypatch.setattr(significance, 'estimate_prewhitened_intercepts', forbidden)
+    for result in (compute_mean_significance(y, **CONVENTIONS),
+                   compute_alpha_significance(y, x, **CONVENTIONS)):
+        assert result.metadata['intercept_inference'] == 'bartlett_hac'
+        assert 'rho' not in result.table
+    with pytest.raises(ValueError, match='InterceptInference'):
+        compute_mean_significance(y, **CONVENTIONS, inference='prewhitened_ar1')
+
+
+def test_prewhitened_invalid_filter_or_lag_does_not_fall_back():
+    index = pd.date_range('2000-01-31', periods=50, freq='ME')
+    y = pd.DataFrame({'unstable': np.r_[np.full(48, -3/48), 1., 2.]}, index=index)
+    compute_mean_significance(y, **CONVENTIONS, hac_lags=0)
+    with pytest.raises(ValueError, match='prewhitened inference for family.*unstable'):
+        compute_mean_significance(y, **CONVENTIONS, hac_lags=0,
+                                  inference=InterceptInference.PREWHITENED_AR1)
+    y, _ = _prewhitened_panel()
+    compute_mean_significance(y, **CONVENTIONS, hac_lags=len(y)-1)
+    with pytest.raises(ValueError, match='hac_lags'):
+        compute_mean_significance(y, **CONVENTIONS, hac_lags=len(y)-1,
+                                  inference=InterceptInference.PREWHITENED_AR1)
 
 
 def test_sharpe_frozen_synthetic_panel_end_to_end() -> None:

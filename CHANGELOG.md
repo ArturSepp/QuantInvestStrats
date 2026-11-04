@@ -18,6 +18,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Resolve default QIS configuration from `settings.yaml` beside `qis.local_path`, without
+  selecting configuration through the process environment. Preserve explicit directory and
+  `settings_path=` overrides; remove environment-based setup instructions and test fixtures.
 - Calculate cash accruals in date order for uniquely dated excess-return inputs while
   preserving their supplied row order. `compute_excess_returns` no longer turns a funding
   charge into a credit or uses a future rate when return rows are shuffled or descending.
@@ -108,14 +111,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   regression tests for both choices. Sharpe point estimates and annualisation are unchanged.
 
 - Unify example input/output directories through `qis.local_path` for development 5.43.0.
-  `get_paths(settings_path=None)` supports a private `QIS_SETTINGS_PATH` YAML file;
+  `get_paths(settings_path=None)` supports an explicitly selected private YAML file;
   `get_output_path` and `get_resource_path` accept explicit directory and YAML overrides.
   Directory getters return absolute paths, reject placeholders, create output parents by
   default, and never silently select temporary directories. Input directories must exist
   unless `create=True` is requested for downloads. Relative YAML paths use the YAML folder;
   explicit relative directories use the working directory. Packaged defaults are
   `~/.qis/resources` and `~/.qis/outputs`, so private YAML is optional. Add the packaged
-  `qis/README.md` configuration guide, including persistent Windows setup.
+  `qis/README.md` configuration guide.
 - Remove the duplicate example `get_output_dir`/`parse_output_dir` helpers and directory CLI
   parsers. Examples use `Locals`/`run_local`; pass overrides as Python function arguments.
   Display-only and offline check branches remain write-free; downloads use configured caches.

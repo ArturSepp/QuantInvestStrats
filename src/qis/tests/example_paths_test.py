@@ -27,7 +27,7 @@ def paths(tmp_path, monkeypatch):
     config = tmp_path / 'private.yaml'
     config.write_text(yaml.safe_dump({
         'OUTPUT_PATH': str(output), 'RESOURCE_PATH': str(resources)}), encoding='utf-8')
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
+    monkeypatch.setattr(local_path, '_SETTINGS_PATH', config)
     monkeypatch.syspath_prepend(str(ROOT))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(plt, 'show', lambda: None)
@@ -87,7 +87,6 @@ def test_dendrogram_exports_without_configuration(tmp_path, monkeypatch):
     work.mkdir()
     monkeypatch.setenv('HOME', str(user_home))
     monkeypatch.setenv('USERPROFILE', str(user_home))
-    monkeypatch.delenv('QIS_SETTINGS_PATH', raising=False)
     monkeypatch.syspath_prepend(str(ROOT))
     monkeypatch.chdir(work)
     local_path.get_paths.cache_clear()

@@ -1,8 +1,9 @@
 """Resolve resource/output directories from portable defaults or caller overrides.
 
-Defaults are ``~/.qis/resources`` and ``~/.qis/outputs``; private YAML is optional.
-Set ``QIS_SETTINGS_PATH`` to a YAML file outside the checkout/package to override
-individual defaults. Never put private paths or credentials in the distributed YAML.
+Defaults come from ``settings.yaml`` beside this module: ``~/.qis/resources`` and
+``~/.qis/outputs``. A caller may select another YAML explicitly with ``settings_path``.
+Process environment variables never select the configuration file.
+Never put private paths or credentials in the distributed YAML.
 Relative YAML paths are relative to the YAML file, while explicit
 directory arguments are relative to the working directory. Both expand ``~`` and
 environment variables. See ``qis/README.md`` for configuration and runner examples.
@@ -20,13 +21,12 @@ PathLike = Union[str, Path]
 
 
 def _settings_path(settings_path: Optional[PathLike]) -> Path:
-    """Select an explicit configuration, the environment override, or the template."""
-    value = settings_path if settings_path is not None else os.environ.get('QIS_SETTINGS_PATH')
-    if value is None:
+    """Select an explicit configuration or the YAML beside this module."""
+    if settings_path is None:
         return _SETTINGS_PATH
-    if not str(value).strip():
-        raise ValueError('QIS_SETTINGS_PATH must name a YAML file, not an empty string')
-    return Path(os.path.expandvars(str(value))).expanduser().resolve()
+    if not str(settings_path).strip():
+        raise ValueError('settings_path must name a YAML file, not an empty string')
+    return Path(os.path.expandvars(str(settings_path))).expanduser().resolve()
 
 
 @lru_cache(maxsize=8)
@@ -37,11 +37,11 @@ def _read_settings(path: Path) -> dict:
             values = yaml.safe_load(stream)
     except FileNotFoundError:
         raise FileNotFoundError(
-            'QIS_SETTINGS_PATH/settings_path YAML file does not exist') from None
+            'settings_path YAML file does not exist') from None
     except yaml.YAMLError:
-        raise ValueError('Invalid YAML in QIS_SETTINGS_PATH/settings_path') from None
+        raise ValueError('Invalid YAML in settings_path') from None
     if not isinstance(values, dict) or any(not isinstance(key, str) for key in values):
-        raise ValueError('QIS_SETTINGS_PATH/settings_path YAML must contain a mapping of keys')
+        raise ValueError('settings_path YAML must contain a mapping of keys')
     resolved = dict(values)
     for key, value in values.items():
         if key.endswith('_PATH') and isinstance(value, str) and value.strip():
@@ -56,8 +56,8 @@ def get_paths(settings_path: Optional[PathLike] = None) -> Dict[str, str]:
     """Read YAML configuration, with private entries overriding packaged defaults.
 
     Args:
-        settings_path: Explicit YAML file; otherwise use ``QIS_SETTINGS_PATH`` or the
-            distributed template. Cached by file; call ``get_paths.cache_clear()``
+        settings_path: Explicit YAML file; otherwise use ``settings.yaml`` beside this
+            module. Cached by file; call ``get_paths.cache_clear()``
             after editing a file. Changing the selected file takes effect immediately.
 
     Returns:
@@ -75,7 +75,7 @@ def get_paths(settings_path: Optional[PathLike] = None) -> Dict[str, str]:
     return values
 
 
-# Preserve the established cache-clear hook without caching the environment selection.
+# Preserve the established cache-clear hook without caching configuration selection.
 get_paths.cache_clear = _read_settings.cache_clear
 
 
@@ -86,8 +86,8 @@ def _directory(key: str, local_path: Optional[PathLike], settings_path: Optional
     if (not isinstance(value, (str, Path)) or not str(value).strip()
             or '...' in str(value).replace('\\', '/').split('/')):
         raise ValueError(
-            f'{key} is missing, empty or a placeholder; configure QIS_SETTINGS_PATH '
-            'with private YAML or pass an explicit local_path directory')
+            f'{key} is missing, empty or a placeholder; configure settings.yaml '
+            'or pass an explicit local_path directory or settings_path YAML file')
     folder = Path(os.path.expandvars(str(value))).expanduser().resolve()
     if folder.exists() and not folder.is_dir():
         raise NotADirectoryError(f'{key} must refer to a directory')
@@ -104,7 +104,7 @@ def get_resource_path(local_path: Optional[PathLike] = None, *,
 
     Args:
         local_path: Explicit directory override; bypasses YAML resolution.
-        settings_path: Explicit private YAML file; otherwise use ``QIS_SETTINGS_PATH``.
+        settings_path: Explicit YAML file; otherwise use the YAML beside this module.
         create: Create missing parents for a deliberate data-download/cache destination.
 
     Returns:
@@ -124,7 +124,7 @@ def get_output_path(local_path: Optional[PathLike] = None, *,
 
     Args:
         local_path: Explicit directory override; bypasses YAML resolution.
-        settings_path: Explicit private YAML file; otherwise use ``QIS_SETTINGS_PATH``.
+        settings_path: Explicit YAML file; otherwise use the YAML beside this module.
         create: Create the directory. Set False for a report writer requiring a fresh path.
 
     Returns:

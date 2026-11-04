@@ -17,6 +17,7 @@ import yaml
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 
+from qis import local_path
 from qis.datasets.synthetic import generate_synthetic_prices
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -67,7 +68,7 @@ def test_yahoo_workflow(module, yahoo_panel, monkeypatch, tmp_path):
     output = tmp_path / 'new' / 'reports'
     config = tmp_path / 'private.yaml'
     config.write_text(yaml.safe_dump({'OUTPUT_PATH': str(output)}), encoding='utf-8')
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
+    monkeypatch.setattr(local_path, '_SETTINGS_PATH', config)
     monkeypatch.setattr(sys, 'argv', [module])
     if module == 'portfolios.leveraged_etf_strategies':
         namespace = runpy.run_module(f'examples.{module}')
@@ -213,7 +214,7 @@ def test_factsheet_output_directory(module, explicit, yahoo_panel, monkeypatch, 
     configured = tmp_path / 'configured' if explicit else output
     config = tmp_path / 'private.yaml'
     config.write_text(yaml.safe_dump({'OUTPUT_PATH': str(configured)}), encoding='utf-8')
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
+    monkeypatch.setattr(local_path, '_SETTINGS_PATH', config)
     monkeypatch.setattr(sys, 'argv', [module])
     if explicit:
         namespace = runpy.run_module(f'examples.factsheets.{module}')

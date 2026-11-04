@@ -15,6 +15,10 @@ from qis.perfstats import bootstrap_significance as bootstrap
 from qis.perfstats import multiple_testing, significance
 from qis.perfstats.multiple_testing import MultipleTestingMethod
 from qis.perfstats.returns import to_returns
+from qis.perfstats.significance import InterceptInference
+from qis.perfstats.tests.significance_test import (
+    _correction_reference, _prewhitened_panel, _prewhitened_reference,
+)
 from qis.utils import regression
 
 
@@ -452,6 +456,187 @@ def test_generated_shape_and_backend_sample_are_checked(monkeypatch) -> None:
     monkeypatch.setattr(regression, 'estimate_hac_regression', missing_row)
     with pytest.raises(ValueError, match='replicate 0.*sample'):
         _call(y, None, bootstrapped_indices=_indices(len(y), 2))
+
+
+def _prewhitened_bootstrap_reference(y, x, indices, lags):
+    values = y.to_numpy()
+    factors = None if x is None else x.to_numpy()
+    observed = _prewhitened_reference(values, factors, lags)
+    center = values.mean(axis=0) if x is None else observed['estimate']
+    draws = [_prewhitened_reference((values-center)[indices[:, b]],
+                                    None if x is None else factors[indices[:, b]], lags)
+             for b in range(indices.shape[1])]
+    statistics = np.vstack([row['statistic'] for row in draws])
+    rhos = np.vstack([row['rho'] for row in draws])
+    counts = (np.abs(statistics) >= np.abs(observed['statistic'])).sum(axis=0)
+    return dict(observed=observed, statistics=statistics, rhos=rhos, counts=counts,
+                pvalues=(1+counts)/(indices.shape[1]+1))
+
+
+@pytest.mark.parametrize('factor_count', [0, 1, 3, 6])
+@pytest.mark.parametrize('lags', [0, 3])
+@pytest.mark.parametrize('method', METHODS)
+def test_prewhitened_bootstrap_matches_supplied_index_reference(factor_count, lags, method):
+    y, all_x = _prewhitened_panel()
+    x = None if factor_count == 0 else all_x.iloc[:, :factor_count]
+    indices = _indices(len(y), 11)
+    y0, x0, indices0 = y.copy(deep=True), None if x is None else x.copy(deep=True), indices.copy()
+    reference = _prewhitened_bootstrap_reference(y, x, indices, lags)
+    result = _call(y, x, bootstrapped_indices=indices, hac_lags=lags, method=method,
+                   significance_level=.35, include_diagnostics=True,
+                   inference=InterceptInference.PREWHITENED_AR1)
+    for field in ('estimate', 'hac_se', 'statistic', 'rho', 'ci_lower_pointwise',
+                  'ci_upper_pointwise'):
+        np.testing.assert_allclose(result.table[field], reference['observed'][field],
+                                   rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(result.metadata['bootstrap_statistics'], reference['statistics'],
+                               rtol=1e-9, atol=1e-12)
+    np.testing.assert_allclose(result.metadata['bootstrap_prewhitening_rho'], reference['rhos'],
+                               rtol=1e-9, atol=1e-12)
+    np.testing.assert_array_equal(result.table.bootstrap_exceedances, reference['counts'])
+    np.testing.assert_array_equal(result.table.pvalue_raw, reference['pvalues'])
+    adjusted = _correction_reference(reference['pvalues'], method)
+    np.testing.assert_allclose(result.table.pvalue_adjusted, adjusted, rtol=1e-14, atol=1e-15)
+    np.testing.assert_array_equal(result.table.reject, adjusted <= .35)
+    for name, count in zip(y.columns, reference['counts']):
+        expected = binomtest(int(count), indices.shape[1]).proportion_ci(method='exact')
+        np.testing.assert_allclose(result.table.loc[name, ['bootstrap_tail_mc_lower',
+                                                          'bootstrap_tail_mc_upper']].astype(float),
+                                   [expected.low, expected.high], rtol=1e-10, atol=1e-12)
+    meta = result.metadata
+    assert meta['intercept_inference'] == 'prewhitened_ar1'
+    assert meta['interval_method'] == 'normal prewhitened HAC'
+    assert meta['pvalue_source'] == 'bootstrap' and meta['index_source'] == 'supplied'
+    assert meta['null_center'] == ('sample_mean' if x is None else 'fitted_alpha')
+    np.testing.assert_allclose(result.table.pvalue_hac, reference['observed']['pvalue_normal'],
+                               rtol=1e-9, atol=1e-12)
+    rho_frame = meta['bootstrap_prewhitening_rho']
+    assert rho_frame.shape == (11, len(y.columns)) and rho_frame.index.name == 'replicate'
+    assert rho_frame.columns.equals(y.columns)
+    # Every draw refits its own filter; the observed rho is not reused.
+    assert not np.allclose(reference['rhos'], reference['observed']['rho'])
+    pd.testing.assert_frame_equal(y, y0)
+    if x is not None:
+        pd.testing.assert_frame_equal(x, x0)
+    np.testing.assert_array_equal(indices, indices0)
+
+
+@pytest.mark.parametrize('alpha', [False, True])
+def test_prewhitened_every_draw_refits_paired_null_rows(alpha, monkeypatch):
+    y, x = _prewhitened_panel()
+    x = x.iloc[:, :3] if alpha else None
+    indices = _indices(len(y), 4)
+    calls = []
+    original = bootstrap.estimate_prewhitened_intercepts
+
+    def spy(y, x=None, **kwargs):
+        result = original(y, x, **kwargs)
+        calls.append((y.copy(deep=True), None if x is None else x.copy(deep=True), kwargs,
+                      result.table['rho'].to_numpy().copy()))
+        return result
+
+    monkeypatch.setattr(bootstrap, 'estimate_prewhitened_intercepts', spy)
+    result = _call(y, x, bootstrapped_indices=indices, include_diagnostics=True,
+                   inference=InterceptInference.PREWHITENED_AR1)
+    assert len(calls) == indices.shape[1]
+    values = y.to_numpy()/np.max(np.abs(y.to_numpy()), axis=0)
+    center = values.mean(axis=0) if x is None else (
+        result.table.estimate.to_numpy()/np.max(np.abs(y.to_numpy()), axis=0))
+    factor_values = None if x is None else x.to_numpy()/np.max(np.abs(x.to_numpy()), axis=0)
+    for b, (draw_y, draw_x, settings, fitted_rho) in enumerate(calls):
+        np.testing.assert_allclose(draw_y, (values-center)[indices[:, b]],
+                                   rtol=1e-12, atol=1e-12)
+        if x is not None:
+            np.testing.assert_array_equal(draw_x, factor_values[indices[:, b]])
+            assert draw_x.index.equals(y.index)
+        assert draw_y.index.equals(y.index) and settings['hac_lags'] == 3
+        np.testing.assert_array_equal(fitted_rho,
+                                      result.metadata['bootstrap_prewhitening_rho'].iloc[b])
+
+
+def test_prewhitened_streaming_and_display_match_diagnostics():
+    y, x = _prewhitened_panel()
+    x = x.iloc[:, :3]
+    settings = dict(bootstrapped_indices=_indices(len(y), 7),
+                    inference=InterceptInference.PREWHITENED_AR1)
+    full = _call(y, x, **settings, include_diagnostics=True)
+    streaming = _call(y, x, **settings)
+    pd.testing.assert_frame_equal(full.table, streaming.table)
+    for field in ('bootstrap_statistics', 'bootstrap_indices', 'bootstrap_prewhitening_rho'):
+        assert field in full.metadata and field not in streaming.metadata
+    annual = _call(y, x, **settings, af=12)
+    dimensional = ['estimate', 'hac_se', 'ci_lower_pointwise', 'ci_upper_pointwise']
+    np.testing.assert_allclose(annual.table[dimensional], 12*full.table[dimensional],
+                               rtol=1e-12, atol=1e-12)
+    unchanged = [name for name in full.table if name not in dimensional]
+    np.testing.assert_array_equal(annual.table[unchanged], full.table[unchanged])
+
+
+def test_prewhitened_generated_draws_and_bartlett_default(monkeypatch):
+    y, x = _prewhitened_panel()
+    generated = _call(y, x, num_samples=5, inference=InterceptInference.PREWHITENED_AR1)
+    assert generated.metadata['index_source'] == 'generated'
+    assert generated.metadata['bootstrap_type'] is BootstrapType.STATIONARY
+    assert generated.metadata['bootstrap_index_shape'] == (len(y), 5)
+    assert 'rho' in generated.table
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('the default must not call the prewhitened estimator')
+
+    monkeypatch.setattr(bootstrap, 'estimate_prewhitened_intercepts', forbidden)
+    monkeypatch.setattr(significance, 'estimate_prewhitened_intercepts', forbidden)
+    default = _call(y, x, bootstrapped_indices=_indices(len(y), 3))
+    assert default.metadata['intercept_inference'] == 'bartlett_hac'
+    assert default.metadata['interval_method'] == 'normal HAC'
+    assert 'rho' not in default.table and 'bootstrap_prewhitening_rho' not in default.metadata
+    with pytest.raises(ValueError, match='InterceptInference'):
+        _call(y, x, bootstrapped_indices=_indices(len(y), 3), inference='bartlett_hac')
+
+
+@pytest.mark.parametrize('alpha', [False, True])
+def test_prewhitened_invalid_draw_aborts_without_fallback_or_redraw(alpha, monkeypatch):
+    y, x = _prewhitened_panel()
+    x = x.iloc[:, :3] if alpha else None
+    indices = _indices(len(y), 3)
+    indices[:, 1] = 0
+    replicates = []
+    original = bootstrap._draw_statistics
+
+    def spy(draw_y, draw_x, lags, inference, replicate):
+        replicates.append(replicate)
+        return original(draw_y, draw_x, lags, inference, replicate)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('no redraw is allowed')
+
+    monkeypatch.setattr(bootstrap, '_draw_statistics', spy)
+    monkeypatch.setattr(bootstrap_numba, 'generate_bootstrapped_indices', forbidden)
+    with pytest.raises(ValueError, match="bootstrap replicate 1.*'A'"):
+        _call(y, x, bootstrapped_indices=indices, inference=InterceptInference.PREWHITENED_AR1)
+    assert replicates == [0, 1]
+
+
+def test_prewhitened_inclusive_plus_one_and_automatic_lag_selected_once(monkeypatch):
+    y, _ = _prewhitened_panel()
+    indices = np.arange(len(y), dtype=np.int64)[:, None]
+    observed = significance.compute_mean_significance(
+        y, **CONVENTIONS, inference=InterceptInference.PREWHITENED_AR1)
+    calls = []
+
+    def lag_rule(nobs):
+        calls.append(nobs)
+        return 3
+
+    def ties(*args, **kwargs):
+        return observed.table.statistic.to_numpy(), observed.table.rho.to_numpy()
+
+    monkeypatch.setattr(regression, 'newey_west_lag_rule', lag_rule)
+    monkeypatch.setattr(bootstrap, '_draw_statistics', ties)
+    result = _call(y, None, bootstrapped_indices=indices, hac_lags=None,
+                   inference=InterceptInference.PREWHITENED_AR1)
+    np.testing.assert_array_equal(result.table.bootstrap_exceedances, np.ones(y.shape[1]))
+    np.testing.assert_array_equal(result.table.pvalue_raw, np.ones(y.shape[1]))
+    assert calls == [len(y)] and result.metadata['minimum_pvalue'] == .5
 
 
 def test_frozen_synthetic_monthly_integration_and_automatic_lags(monkeypatch) -> None:

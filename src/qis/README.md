@@ -8,12 +8,12 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 [qis](https://github.com/ArturSepp/QuantInvestStrats) uses [local_path.py](local_path.py)
 and [settings.yaml](settings.yaml) for directory configuration. Software citation:
 [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
-This guide describes the development 5.43.0 configuration contract.
+This guide describes the development 5.45.0 configuration contract.
 
 ## Start without configuration
 
-A fresh clone or installation needs no private YAML or environment variable for the
-default directories:
+A fresh clone or installation reads `settings.yaml` beside `local_path.py`. No process
+environment setting selects or overrides that YAML file. Its default directories are:
 
 | YAML key | Default directory | Purpose |
 |---|---|---|
@@ -40,15 +40,14 @@ raises if it is missing. Creating a directory does not download or fabricate its
 `get_output_path(create=False)` resolves a destination without creating it, for report
 writers that require a fresh path. No directories are created merely by importing qis.
 
-## Optional private YAML
+## Explicit YAML overrides
 
-Private configuration is useful for development, research or production; it is not
-development-only. Keep it **outside the checkout and installed package**. Do not edit
-the packaged `settings.yaml`: release checks reject machine-specific changes and extra
-YAML files inside the package.
+The adjacent `settings.yaml` is the configuration source for ordinary QIS calls and
+examples. For a particular call, pass another YAML file with `settings_path=`. Keep
+private files outside the checkout and installed package; release checks reject
+machine-specific distributed defaults and extra YAML files inside the package.
 
-For example, save this as `%LOCALAPPDATA%/qis/settings.yaml` on Windows, creating its
-parent directory if needed. Paths below are illustrative; choose your own locations:
+For example, a caller-owned `C:/Data/qis/private-settings.yaml` could contain:
 
 ```yaml
 RESOURCE_PATH: 'C:/Data/qis/resources'
@@ -63,44 +62,13 @@ overriding `RESOURCE_PATH` does not automatically change `LOCAL_RESOURCE_PATH` o
 distributed value is an inert placeholder, not a configured service. Protect any
 credentials and never commit the private file.
 
-### Windows: use the YAML in future sessions
-
-After saving the file, run in PowerShell:
-
-```powershell
-$qisSettingsFile = Join-Path $env:LOCALAPPDATA 'qis/settings.yaml'
-if (-not (Test-Path -LiteralPath $qisSettingsFile -PathType Leaf)) {
-    throw 'Save the private YAML file first.'
-}
-[Environment]::SetEnvironmentVariable('QIS_SETTINGS_PATH', $qisSettingsFile, 'User')
-$env:QIS_SETTINGS_PATH = $qisSettingsFile
-```
-
-The User setting persists for future processes; the last line sets this PowerShell
-session immediately. Restart your IDE, terminals and Python processes so `run_local`
-examples inherit the setting. Set it **before importing qis**. No administrator access
-is needed for a User-level setting. See Microsoft's
-[persistent environment-variable guidance](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables#creating-persistent-environment-variables-on-windows).
-
-To return to packaged defaults, remove the User override and the current shell override,
-then restart already-running applications:
-
-```powershell
-[Environment]::SetEnvironmentVariable('QIS_SETTINGS_PATH', $null, 'User')
-Remove-Item Env:QIS_SETTINGS_PATH -ErrorAction SilentlyContinue
-```
-
-On Linux/macOS, set `export QIS_SETTINGS_PATH=/absolute/path/settings.yaml` before
-starting Python; put it in your shell startup configuration if persistence is wanted.
-
 ## Explicit overrides and resolution rules
 
 Directory resolution uses this priority:
 
 1. Explicit directory passed to a getter or example runner.
 2. Explicit `settings_path` YAML passed to a getter.
-3. YAML selected by `QIS_SETTINGS_PATH`.
-4. Packaged defaults.
+3. `settings.yaml` beside `qis.local_path`.
 
 ```python
 from qis import local_path

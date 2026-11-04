@@ -1,6 +1,6 @@
 # Portable defaults; no private configuration is needed for public examples.
-# Keep this release-checked file unchanged. Override keys in an external YAML
-# selected by QIS_SETTINGS_PATH; see README.md beside this file.
+# This release-checked file beside local_path.py is the default configuration.
+# Select another YAML explicitly with settings_path; see README.md beside this file.
 
 RESOURCE_PATH: '~/.qis/resources'
 

@@ -64,14 +64,17 @@ page. Remove the mark once it has.
 ## Estimation and resampling
 
 - Andrews, D. W. K. (1991). Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimation. *Econometrica*, 59(3), 817–858. [DOI: 10.2307/2938229](https://doi.org/10.2307/2938229). [pending publisher check]
+- Andrews, D. W. K., and Monahan, J. C. (1992). An Improved Heteroskedasticity and Autocorrelation Consistent Covariance Matrix Estimator. *Econometrica*, 60(4), 953–966. [DOI: 10.2307/2951574](https://doi.org/10.2307/2951574). [pending publisher check]
 - Benjamini, Y., and Yekutieli, D. (2001). The control of the false discovery rate in multiple testing under dependency. *The Annals of Statistics*, 29(4), 1165–1188. [DOI: 10.1214/aos/1013699998](https://doi.org/10.1214/aos/1013699998).
 - D'Agostino, R., and Pearson, E. S. (1973). Tests for Departure from Normality. Empirical Results for the Distributions of b2 and √b1. *Biometrika*, 60(3), 613–622. [DOI: 10.1093/biomet/60.3.613](https://doi.org/10.1093/biomet/60.3.613). [pending publisher check]
 - Efron, B. (1979). Bootstrap Methods: Another Look at the Jackknife. *The Annals of Statistics*, 7(1), 1–26. [DOI: 10.1214/aos/1176344552](https://doi.org/10.1214/aos/1176344552). [pending publisher check]
 - Fama, E. F., and MacBeth, J. D. (1973). Risk, Return, and Equilibrium: Empirical Tests. *Journal of Political Economy*, 81(3), 607–636. [DOI: 10.1086/260061](https://doi.org/10.1086/260061). [pending publisher check]
+- Harvey, C. R., Liu, Y., and Zhu, H. (2016). … and the Cross-Section of Expected Returns. *The Review of Financial Studies*, 29(1), 5–68. [DOI: 10.1093/rfs/hhv059](https://doi.org/10.1093/rfs/hhv059). [pending publisher check]
 - Holm, S. (1979). A Simple Sequentially Rejective Multiple Test Procedure. *Scandinavian Journal of Statistics*, 6(2), 65–70. [Publisher archive](https://www.jstor.org/stable/4615733).
 - J.P. Morgan and Reuters (1996). *RiskMetrics — Technical Document*, 4th edition. J.P. Morgan. [pending publisher check]
 - Joanes, D. N., and Gill, C. A. (1998). Comparing Measures of Sample Skewness and Kurtosis. *Journal of the Royal Statistical Society: Series D (The Statistician)*, 47(1), 183–189. [DOI: 10.1111/1467-9884.00122](https://doi.org/10.1111/1467-9884.00122). [pending publisher check]
 - Jolliffe, I. T. (2002). *Principal Component Analysis*, 2nd edition. Springer. [pending publisher check]
+- Kiefer, N. M., and Vogelsang, T. J. (2005). A New Asymptotic Theory for Heteroskedasticity-Autocorrelation Robust Tests. *Econometric Theory*, 21(6), 1130–1164. [DOI: 10.1017/S0266466605050565](https://doi.org/10.1017/S0266466605050565). [pending publisher check]
 - Kish, L. (1965). *Survey Sampling*. Wiley. [pending publisher check]
 - Künsch, H. R. (1989). The Jackknife and the Bootstrap for General Stationary Observations. *The Annals of Statistics*, 17(3), 1217–1241. [DOI: 10.1214/aos/1176347265](https://doi.org/10.1214/aos/1176347265). [pending publisher check]
 - Laloux, L., Cizeau, P., Bouchaud, J.-P., and Potters, M. (1999). Noise Dressing of Financial Correlation Matrices. *Physical Review Letters*, 83(7), 1467–1470. [DOI: 10.1103/PhysRevLett.83.1467](https://doi.org/10.1103/PhysRevLett.83.1467). [pending publisher check]
@@ -81,8 +84,12 @@ page. Remove the mark once it has.
 - Newey, W. K., and West, K. D. (1994). Automatic Lag Selection in Covariance Matrix Estimation. *The Review of Economic Studies*, 61(4), 631–653. [DOI: 10.2307/2297912](https://doi.org/10.2307/2297912). [pending publisher check]
 - Politis, D. N., and Romano, J. P. (1994). The Stationary Bootstrap. *Journal of the American Statistical Association*, 89(428), 1303–1313. [DOI: 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870).
 - Politis, D. N., and White, H. (2004). Automatic Block-Length Selection for the Dependent Bootstrap. *Econometric Reviews*, 23(1), 53–70. [DOI: 10.1081/ETC-120028836](https://doi.org/10.1081/ETC-120028836). [pending publisher check]
+- Romano, J. P., and Wolf, M. (2005). Stepwise Multiple Testing as Formalized Data Snooping. *Econometrica*, 73(4), 1237–1282. [DOI: 10.1111/j.1468-0262.2005.00615.x](https://doi.org/10.1111/j.1468-0262.2005.00615.x). [pending publisher check]
+- Romano, J. P., and Wolf, M. (2006). Improved nonparametric confidence intervals in time series regressions. *Journal of Nonparametric Statistics*, 18(2), 199–214. [DOI: 10.1080/10485250600687812](https://doi.org/10.1080/10485250600687812). [pending publisher check]
 - Spearman, C. (1904). The Proof and Measurement of Association between Two Things. *The American Journal of Psychology*, 15(1), 72–101. [DOI: 10.2307/1412159](https://doi.org/10.2307/1412159). [pending publisher check]
+- Sun, Y. (2014). Let's fix it: Fixed-b asymptotics versus small-b asymptotics in heteroskedasticity and autocorrelation robust inference. *Journal of Econometrics*, 178(3), 659–677. [DOI: 10.1016/j.jeconom.2013.10.001](https://doi.org/10.1016/j.jeconom.2013.10.001). [pending publisher check]
 - White, H. (1980). A Heteroskedasticity-Consistent Covariance Matrix Estimator and a Direct Test for Heteroskedasticity. *Econometrica*, 48(4), 817–838. [DOI: 10.2307/1912934](https://doi.org/10.2307/1912934). [pending publisher check]
+- White, H. (2000). A Reality Check for Data Snooping. *Econometrica*, 68(5), 1097–1126. [DOI: 10.1111/1468-0262.00152](https://doi.org/10.1111/1468-0262.00152). [pending publisher check]
 
 ## Portfolios, risk and breadth
 

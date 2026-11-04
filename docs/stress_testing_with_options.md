@@ -325,8 +325,9 @@ On the maintainer's Windows host, use the existing external environment and C-lo
 ~~~
 
 The [directory defaults](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/README.md)
-are `~/.qis/resources` and `~/.qis/outputs`. Optionally set `QIS_SETTINGS_PATH` to private
-YAML with C-local `RESOURCE_PATH` and `OUTPUT_PATH` before running the Windows command.
+come from `settings.yaml` beside `qis.local_path`: `~/.qis/resources` and `~/.qis/outputs`.
+For a one-run destination, pass C-local `input_path` and `output_path` arguments to
+`run_local`; no process environment setting selects the configuration file.
 The default cache is `RESOURCE_PATH/options_stress`; the default report destination is
 `OUTPUT_PATH/options_stress`. Supply a **fresh `output_path`** to replay the cached input
 on subsequent runs. Select `Locals.CHECK` without an output override to calculate and print

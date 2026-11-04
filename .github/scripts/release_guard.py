@@ -27,7 +27,7 @@ from pathlib import Path, PurePosixPath
 TAG_RE = re.compile(r"v(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?)")
 # Hash of the reviewed portable defaults, with LF line endings. Changing the
 # distributed configuration requires an explicit review and a new digest here.
-SETTINGS_SHA256 = "4e618880cbed19ad2f59d6d5a77680db4dccfdcf8a9fc3433074ac48ac054a27"
+SETTINGS_SHA256 = "43e0474cc21b0824ab3a96ce52da01816a6d24d2d465419befdfd83016420cd5"
 
 
 def validate_package_configuration(files: list[tuple[str, bytes]]) -> None:

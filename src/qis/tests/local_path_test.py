@@ -15,7 +15,6 @@ def isolated_settings(monkeypatch, tmp_path):
     user_home.mkdir()
     monkeypatch.setenv('HOME', str(user_home))
     monkeypatch.setenv('USERPROFILE', str(user_home))
-    monkeypatch.delenv('QIS_SETTINGS_PATH', raising=False)
     local_path.get_paths.cache_clear()
     yield
     local_path.get_paths.cache_clear()
@@ -29,41 +28,50 @@ def write_settings(folder, **values):
     return path
 
 
+def test_default_settings_do_not_read_configuration_from_environment(monkeypatch):
+    """Process configuration cannot redirect the YAML beside the installed resolver."""
+    environment_get = local_path.os.environ.get
+
+    def home_only(key, *args):
+        if key not in {'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH'}:
+            raise AssertionError('Settings selection must not read process configuration')
+        return environment_get(key, *args)
+
+    monkeypatch.setattr(local_path.os.environ, 'get', home_only)
+    assert local_path.get_paths()['OUTPUT_PATH'] == str(Path.home() / '.qis/outputs')
+
+
 def test_external_yaml_relative_paths_and_creation(tmp_path, monkeypatch):
     config = write_settings(tmp_path / 'config', OUTPUT_PATH='../reports', RESOURCE_PATH='data')
     (config.parent / 'data').mkdir()
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(config))
     monkeypatch.chdir(tmp_path)
-    assert local_path.get_output_path() == str(tmp_path / 'reports')
+    assert local_path.get_output_path(settings_path=config) == str(tmp_path / 'reports')
     assert (tmp_path / 'reports').is_dir()
-    assert local_path.get_resource_path() == str(config.parent / 'data')
+    assert local_path.get_resource_path(settings_path=config) == str(config.parent / 'data')
     # Partial private YAML retains unrelated packaged keys for legacy get_paths callers.
-    assert 'UNIVERSE_PATH' in local_path.get_paths()
+    assert 'UNIVERSE_PATH' in local_path.get_paths(settings_path=config)
 
 
 def test_explicit_directory_bypasses_yaml(tmp_path, monkeypatch):
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(tmp_path / 'missing.yaml'))
+    monkeypatch.setattr(local_path, '_SETTINGS_PATH', tmp_path / 'missing.yaml')
     monkeypatch.chdir(tmp_path)
     assert local_path.get_output_path('explicit/output') == str(tmp_path / 'explicit/output')
     assert local_path.get_resource_path(tmp_path) == str(tmp_path)
 
 
-def test_explicit_config_beats_environment(tmp_path, monkeypatch):
+def test_explicit_config_overrides_packaged_values(tmp_path):
     config = write_settings(tmp_path / 'config', OUTPUT_PATH='reports')
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(tmp_path / 'missing.yaml'))
     assert local_path.get_output_path(settings_path=config) == str(config.parent / 'reports')
 
 
-def test_environment_switch_and_explicit_cache_clear(tmp_path, monkeypatch):
+def test_explicit_configuration_switch_and_cache_clear(tmp_path):
     first = write_settings(tmp_path / 'first', OUTPUT_PATH='one')
     second = write_settings(tmp_path / 'second', OUTPUT_PATH='two')
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(first))
-    assert Path(local_path.get_output_path()).name == 'one'
-    monkeypatch.setenv('QIS_SETTINGS_PATH', str(second))
-    assert Path(local_path.get_output_path()).name == 'two'
+    assert Path(local_path.get_output_path(settings_path=first)).name == 'one'
+    assert Path(local_path.get_output_path(settings_path=second)).name == 'two'
     second.write_text('OUTPUT_PATH: three\n', encoding='utf-8')
     local_path.get_paths.cache_clear()
-    assert Path(local_path.get_output_path()).name == 'three'
+    assert Path(local_path.get_output_path(settings_path=second)).name == 'three'
 
 
 def test_get_paths_returns_independent_mapping(tmp_path):
@@ -83,7 +91,7 @@ def test_expands_environment_and_home(tmp_path, monkeypatch):
 @pytest.mark.parametrize('value', ['', '  ', 'C:\\Users\\...\\', None, 42, ['folder']])
 def test_invalid_path_is_actionable_without_making_directory(tmp_path, value):
     config = write_settings(tmp_path, OUTPUT_PATH=value)
-    with pytest.raises(ValueError, match='OUTPUT_PATH.*QIS_SETTINGS_PATH'):
+    with pytest.raises(ValueError, match='OUTPUT_PATH.*settings.yaml'):
         local_path.get_output_path(settings_path=config)
 
 
@@ -154,5 +162,5 @@ def test_invalid_yaml_does_not_echo_private_values(tmp_path, content):
 
 
 def test_missing_explicit_config_does_not_fall_back(tmp_path):
-    with pytest.raises(FileNotFoundError, match='QIS_SETTINGS_PATH'):
+    with pytest.raises(FileNotFoundError, match='settings_path'):
         local_path.get_output_path(settings_path=tmp_path / 'missing.yaml')

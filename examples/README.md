@@ -49,6 +49,7 @@ examples/
 | `quickstart.py` | Yahoo-data plotting walkthrough: prices, drawdowns and risk-adjusted tables. Uses YAML `OUTPUT_PATH`; the package README starts with offline data. |
 | `full_performance_report.py` | Five-figure summary on a yfinance universe (ETFs, crypto, vol ETFs…). Uses `_helpers.reporting_helpers`. |
 | `sharpe_vs_sortino.py` | Sharpe vs Sortino across return frequencies. |
+| `factor_and_backtest_significance.py` | Offline mean, alpha and paired-Sharpe families on the nine full-history instruments of the frozen synthetic panel: Bartlett and AR(1)-prewhitened intercept inference side by side, Holm/BHY through the family functions and directly through `adjust_pvalues`, four stationary-bootstrap families on one shared index matrix, and a two-panel figure. Source-only interfaces, not in `qis.__all__`; finite-sample size and coverage are not established. |
 | `risk_return_frontier.py` | Bond-ETF risk/return scatter using `compute_ra_perf_table`. |
 | `rolling_performance.py` | Rolling per-annum returns via `compute_rolling_perf_stat`. **Bloomberg.** |
 | `cboe_vol_strats_perf.py` | [Cboe SVRPO](https://www.cboe.com/us/indices/dashboard/svrpo/) market-neutral volatility risk-premia index vs SPY — downloads Cboe's public CSV and Yahoo benchmark/rate data. No local resource file required. |
@@ -57,6 +58,15 @@ examples/
 | `timeseries_backfill.py` | Extend a newer provider history backwards with `bfill_timeseries`, preserving its recent price path. |
 | `turnover_conventions.py` | Yahoo SPY/TLT comparison of all four turnover conventions for a 100% funded tactical portfolio and the same portfolio at 2x leverage. |
 | `unsmoothing_and_delevering.py` | End-to-end walkthrough of `delever_returns`, `implied_leverage`, `unsmooth_returns_ar1_ewma` and `unsmooth_returns_glm` on a bundled OCSL/GCF dataset. |
+
+Run the significance walkthrough with
+`python -m examples.perfstats.factor_and_backtest_significance`. Its default `Locals.ANALYTIC`
+prints the three families, the Bartlett-versus-prewhitened comparison tables and the direct
+`adjust_pvalues` / `estimate_prewhitened_intercepts` calls, and shows the figure without writing
+files. `Locals.BOOTSTRAP` adds the four bootstrap families (B=199, one index matrix);
+`Locals.EXPORT` also writes every table as CSV and the figure as PNG using YAML `OUTPUT_PATH`.
+An explicit `run_local(..., output_path=...)` overrides that configuration. See the
+[significance guide](../docs/factor_and_backtest_significance.md) for assumptions and limitations.
 
 ## models — EWM, regression, vol estimation
 
@@ -192,7 +202,7 @@ Examples use [`qis.local_path`](../src/qis/local_path.py) as the single director
 No configuration is required: packaged defaults are `~/.qis/resources` for resource files
 and caches, and `~/.qis/outputs` for reports. Keep `src/qis/settings.yaml` unchanged: it
 contains release-checked portable defaults, not private paths or credentials. See the
-[configuration guide](../src/qis/README.md) for permanent Windows setup and all settings.
+[configuration guide](../src/qis/README.md) for the YAML source and explicit overrides.
 
 Optionally create private YAML outside the checkout/package, for example
 `C:/Data/qis/private-settings.yaml`:
@@ -202,19 +212,12 @@ RESOURCE_PATH: 'C:/Data/qis/resources'
 OUTPUT_PATH: 'C:/Data/qis/outputs'
 ```
 
-Set its location before importing qis or starting an example:
+Select private YAML explicitly with `settings_path=` on a directory getter, as below.
+Ordinary example calls use `settings.yaml` beside `qis.local_path`; no process environment
+setting selects another configuration. Examples never generate or modify private YAML.
 
-```powershell
-$env:QIS_SETTINGS_PATH = 'C:/Data/qis/private-settings.yaml'
-& 'C:/Python/QuantInvestStrats312/Scripts/python.exe' -m examples.factsheets.multi_assets
-```
-
-On Linux/macOS, use `export QIS_SETTINGS_PATH=/absolute/path/private-settings.yaml`,
-with paths appropriate to that machine. No private configuration file is generated or
-modified by an example.
-
-The precedence is **explicit directory argument > explicit YAML file >
-`QIS_SETTINGS_PATH` YAML > packaged defaults**. Private YAML can contain just the keys
+The precedence is **explicit directory argument > explicit YAML argument >
+adjacent settings.yaml**. Private YAML can contain just the keys
 needed by a workflow; other keys retain the packaged defaults. A missing selected YAML,
 malformed YAML, or invalid directory value produces an actionable error, not a
 silent temporary-directory fallback.
@@ -222,7 +225,7 @@ silent temporary-directory fallback.
 ```python
 from qis import local_path
 
-# Read defaults or the private configuration selected by QIS_SETTINGS_PATH.
+# Read settings.yaml beside qis.local_path.
 resources = local_path.get_resource_path(create=True)  # Deliberate download/cache directory.
 outputs = local_path.get_output_path()
 

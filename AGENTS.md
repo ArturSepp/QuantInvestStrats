@@ -1,5 +1,8 @@
 ## Python environment (mandatory)
 
+- QIS directory configuration comes from `src/qis/local_path.py` and its adjacent
+  `settings.yaml`. Do not introduce environment-variable selection of the YAML file.
+  One-run overrides use explicit Python arguments; keep distributed YAML portable.
 - Never create, use, or install packages into a Python virtual environment anywhere under `C:\Users\artur\OneDrive`.
 - Keep this repository's environment outside OneDrive at `C:\Python\QuantInvestStrats312`.
 - Use `C:\Python\QuantInvestStrats312\Scripts\python.exe` for Python, tests, linters, and package installation.

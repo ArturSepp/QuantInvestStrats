@@ -12,6 +12,15 @@ unadjusted pointwise HAC intervals remain diagnostics; no bootstrap confidence i
 constructed. Binomial tail-probability intervals describe Monte Carlo uncertainty conditional
 on the data and independent draws, not uncertainty about the population effect or exact size.
 No sampler, Sharpe test, max-t adjustment, strategy search or invalid-draw replacement is added.
+With ``InterceptInference.PREWHITENED_AR1`` the observed sample and every draw use the
+AR(1)-prewhitened intercept standard error, refitting rho in each draw.
+
+The procedure is the studentized block bootstrap with HAC standard errors refitted in every
+draw of Romano and Wolf (2006, J. Nonparametric Statistics 18(2)) and Ledoit and Wolf (2008,
+J. Empirical Finance 15(5)), with a Bartlett rather than a quadratic-spectral kernel. The
+family structure follows White (2000) and Romano and Wolf (2005, Econometrica 73(4)); qis
+corrects the marginal p-values with Holm/BHY instead of their stepdown maximum statistic.
+Specific to qis are the declared-family and provenance conventions and the abort policy.
 """
 
 # packages
@@ -20,7 +29,7 @@ import warnings
 import numpy as np
 import pandas as pd
 from numbers import Integral
-from typing import Optional
+from typing import Optional, Tuple
 from statsmodels.stats.proportion import proportion_confint
 
 # qis
@@ -28,8 +37,9 @@ from qis.models.bootstrap import bootstrap_numba
 from qis.models.bootstrap.bootstrap_numba import BootstrapType
 from qis.perfstats import multiple_testing, significance
 from qis.perfstats.multiple_testing import MultipleTestingMethod
-from qis.perfstats.significance import SignificanceResult
+from qis.perfstats.significance import InterceptInference, SignificanceResult
 from qis.utils import regression
+from qis.utils.hac_intercept_prewhitening import estimate_prewhitened_intercepts
 
 
 def _integer_setting(value: int, name: str, minimum: int = 1,
@@ -57,29 +67,47 @@ def _validate_indices(indices: np.ndarray, nobs: int,
 
 
 def _draw_statistics(y: pd.DataFrame, x: Optional[pd.DataFrame], lags: int,
-                     replicate: int) -> np.ndarray:
-    """Refit one complete drawn sequence, aborting rather than replacing invalid draws."""
+                     inference: InterceptInference, replicate: int,
+                     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    """Refit one complete drawn sequence, aborting rather than replacing invalid draws.
+
+    Returns the studentized intercepts and, for prewhitened inference, the AR(1)
+    coefficients fitted to this draw; the observed rho is never reused.
+    """
+    scale = np.max(np.abs(y.to_numpy()), axis=0)
+    tolerance = significance.DEGENERACY_RTOL * scale
+    rho = None
     try:
-        fitted = regression.estimate_hac_regression(y=y, x=x, span=None, hac_lags=lags)
+        if inference is InterceptInference.PREWHITENED_AR1:
+            # Degenerate residuals give zero influence, which the estimator rejects itself.
+            filtered = estimate_prewhitened_intercepts(y, x, hac_lags=lags)
+            se = filtered.table['standard_error'].to_numpy()
+            statistics = filtered.table['statistic'].to_numpy()
+            rho = filtered.table['rho'].to_numpy()
+            degenerate = se <= tolerance
+            nobs_fitted, lags_fitted = filtered.nobs, filtered.hac_lags
+        else:
+            fitted = regression.estimate_hac_regression(y=y, x=x, span=None, hac_lags=lags)
+            design = (np.ones((len(y), 1)) if x is None
+                      else np.column_stack((np.ones(len(y)), x)))
+            residuals = y.to_numpy() - design @ fitted.coefficients.to_numpy()
+            rms = np.sqrt(np.mean(residuals ** 2, axis=0))
+            se = fitted.hac_se.loc['Intercept'].to_numpy()
+            degenerate = (rms <= tolerance) | (se <= tolerance) | ~np.isfinite(rms)
+            nobs_fitted, lags_fitted = fitted.nobs, fitted.hac_lags
     except ValueError as exception:
         raise ValueError(f'bootstrap replicate {replicate}; hypotheses {y.columns.tolist()!r}: '
                          f'{exception}') from exception
-    design = np.ones((len(y), 1)) if x is None else np.column_stack((np.ones(len(y)), x))
-    residuals = y.to_numpy() - design @ fitted.coefficients.to_numpy()
-    scale = np.max(np.abs(y.to_numpy()), axis=0)
-    rms = np.sqrt(np.mean(residuals ** 2, axis=0))
-    se = fitted.hac_se.loc['Intercept'].to_numpy()
-    tolerance = significance.DEGENERACY_RTOL * scale
-    invalid = ((scale == 0.0) | (rms <= tolerance) | (se <= tolerance)
-               | ~np.isfinite(rms) | ~np.isfinite(se))
+    invalid = (scale == 0.0) | degenerate | ~np.isfinite(se)
     if invalid.any():
         raise ValueError(f'bootstrap replicate {replicate}; invalid residuals/SE for hypotheses '
                          f'{y.columns[invalid].tolist()!r}')
-    statistics = fitted.coefficients.loc['Intercept'].to_numpy() / se
-    if not np.isfinite(statistics).all() or fitted.nobs != len(y) or fitted.hac_lags != lags:
+    if inference is not InterceptInference.PREWHITENED_AR1:
+        statistics = fitted.coefficients.loc['Intercept'].to_numpy() / se
+    if not np.isfinite(statistics).all() or nobs_fitted != len(y) or lags_fitted != lags:
         raise ValueError(f'bootstrap replicate {replicate}; invalid statistics/sample for '
                          f'hypotheses {y.columns.tolist()!r}')
-    return statistics
+    return statistics, rho
 
 
 def _bootstrap_significance(
@@ -89,8 +117,12 @@ def _bootstrap_significance(
         confidence_level: float, method: MultipleTestingMethod, significance_level: float,
         af: Optional[float], num_samples: Optional[int], block_size: int, seed: int,
         bootstrapped_indices: Optional[np.ndarray], include_diagnostics: bool,
+        inference: InterceptInference,
 ) -> SignificanceResult:
     """Validate observed inference once, draw jointly and stream studentized tail counts."""
+    if not isinstance(inference, InterceptInference):
+        raise ValueError(f'inference must be an InterceptInference member, got {inference!r}')
+    prewhitened = inference is InterceptInference.PREWHITENED_AR1
     if num_samples is not None:
         num_samples = _integer_setting(num_samples, 'num_samples')
     # Numba's geometric inverse CDF requires 1 - 1/block_size < 1 in float64.
@@ -104,7 +136,7 @@ def _bootstrap_significance(
     settings = dict(family_id=family_id, return_basis=return_basis, cost_basis=cost_basis,
                     sampling_frequency=sampling_frequency, expected_index=expected_index,
                     hac_lags=hac_lags, confidence_level=confidence_level, method=method,
-                    significance_level=significance_level, af=None)
+                    significance_level=significance_level, af=None, inference=inference)
     observed = (significance.compute_mean_significance(returns, **settings) if factors is None
                 else significance.compute_alpha_significance(returns, factors, **settings))
     nobs, members = observed.metadata['nobs'], observed.table.index
@@ -137,16 +169,20 @@ def _bootstrap_significance(
     observed_statistics = np.abs(observed.table['statistic'].to_numpy())
     exceedances = np.zeros(len(members), dtype=np.int64)
     diagnostic_statistics = np.empty((count, len(members))) if include_diagnostics else None
+    diagnostic_rho = (np.empty((count, len(members)))
+                      if prewhitened and include_diagnostics else None)
     for replicate in range(count):
         rows = indices[:, replicate]
         draw_y = pd.DataFrame(null_values[rows], index=returns.index, columns=members)
         draw_x = None if factor_values is None else pd.DataFrame(
             factor_values[rows], index=returns.index, columns=factors.columns,
         )
-        statistics = _draw_statistics(draw_y, draw_x, lags, replicate)
+        statistics, rho = _draw_statistics(draw_y, draw_x, lags, inference, replicate)
         exceedances += np.abs(statistics) >= observed_statistics
         if diagnostic_statistics is not None:
             diagnostic_statistics[replicate] = statistics
+        if diagnostic_rho is not None:
+            diagnostic_rho[replicate] = rho
 
     pvalues = (1.0 + exceedances) / (count + 1.0)
     adjusted = multiple_testing.adjust_pvalues(pd.Series(pvalues, index=members),
@@ -179,9 +215,11 @@ def _bootstrap_significance(
                       RuntimeWarning, stacklevel=3)
     units = ('fractional simple return/period' if af is None
              else 'annualised fractional simple return')
+    interval_method = 'normal prewhitened HAC' if prewhitened else 'normal HAC'
     table.attrs = dict(adjusted.attrs, confidence_level=observed.metadata['confidence_level'],
-                       confidence_interval='unadjusted/pointwise', interval_method='normal HAC',
-                       output_units=units, pvalue_source='bootstrap')
+                       confidence_interval='unadjusted/pointwise', interval_method=interval_method,
+                       output_units=units, pvalue_source='bootstrap',
+                       intercept_inference=inference.value)
     metadata = dict(observed.metadata)
     metadata.update(table.attrs)
     metadata.update(
@@ -208,6 +246,9 @@ def _bootstrap_significance(
         metadata['bootstrap_statistics'] = pd.DataFrame(
             diagnostic_statistics, columns=members, index=pd.RangeIndex(count, name='replicate'),
         )
+    if diagnostic_rho is not None:
+        metadata['bootstrap_prewhitening_rho'] = pd.DataFrame(
+            diagnostic_rho, columns=members, index=pd.RangeIndex(count, name='replicate'))
     return SignificanceResult(table=table, metadata=metadata)
 
 
@@ -220,6 +261,7 @@ def compute_bootstrap_mean_significance(
         significance_level: float = 0.05, af: Optional[float] = None,
         num_samples: Optional[int] = None, block_size: int = 6, seed: int = 20261101,
         bootstrapped_indices: Optional[np.ndarray] = None, include_diagnostics: bool = False,
+        inference: InterceptInference = InterceptInference.BARTLETT_HAC,
 ) -> SignificanceResult:
     """Test zero return means with a null-centered joint stationary bootstrap.
 
@@ -229,7 +271,7 @@ def compute_bootstrap_mean_significance(
 
     Args:
         returns: Complete finite fractional simple-return DataFrame, one hypothesis per
-            column, with ordered unique dates. The Stage 2 mean-test contract applies.
+            column, with ordered unique dates; the compute_mean_significance contract applies.
         family_id: Identifier of the complete predeclared hypothesis family.
         return_basis: Funding/RF treatment already reflected in the supplied inputs.
         cost_basis: Description of gross/net costs already reflected in the inputs.
@@ -250,7 +292,10 @@ def compute_bootstrap_mean_significance(
         bootstrapped_indices: Optional authoritative integer ndarray of shape (T, B), with
             values in [0, T-1]. Its origin/law is caller-owned; no stationary claim is inferred.
         include_diagnostics: Retain a copy of indices and labelled (B, M) studentized statistics
-            in metadata. Default False streams counts; no B complete panels are retained.
+            in metadata, plus the (B, M) fitted rho for prewhitened inference. Default False
+            streams counts; no B complete panels are retained.
+        inference: BARTLETT_HAC (default) or PREWHITENED_AR1 standard errors, used for the
+            observed statistics and refitted in every draw. Prewhitening needs hac_lags <= T-2.
 
     Returns:
         SignificanceResult with corrected bootstrap p-values, pvalue_hac diagnostics,
@@ -267,7 +312,7 @@ def compute_bootstrap_mean_significance(
     return _bootstrap_significance(
         returns, None, family_id, return_basis, cost_basis, sampling_frequency, expected_index,
         hac_lags, confidence_level, method, significance_level, af, num_samples, block_size,
-        seed, bootstrapped_indices, include_diagnostics,
+        seed, bootstrapped_indices, include_diagnostics, inference,
     )
 
 
@@ -280,6 +325,7 @@ def compute_bootstrap_alpha_significance(
         significance_level: float = 0.05, af: Optional[float] = None,
         num_samples: Optional[int] = None, block_size: int = 6, seed: int = 20261101,
         bootstrapped_indices: Optional[np.ndarray] = None, include_diagnostics: bool = False,
+        inference: InterceptInference = InterceptInference.BARTLETT_HAC,
 ) -> SignificanceResult:
     """Test zero multi-factor alphas with paired rows from the recentered regression null.
 
@@ -288,8 +334,8 @@ def compute_bootstrap_alpha_significance(
     shared HAC estimator. Studentized tail counts give (1+exceedances)/(B+1).
 
     Args:
-        returns: Complete finite fractional simple-return responses. The Stage 2 alpha-test
-            contract applies, including T >= 24, T > k and nondegenerate full-rank designs.
+        returns: Complete finite fractional simple-return responses. The
+            compute_alpha_significance contract applies: T >= 24, T > k and a full-rank design.
         factors: Nonempty factor-return DataFrame on exactly the same dates. Self-regressors,
             constants and duplicate/dependent columns are rejected.
         family_id: Identifier of the complete predeclared alpha family.
@@ -309,7 +355,10 @@ def compute_bootstrap_alpha_significance(
         seed: Integer in [0, 2**32-1] for the Numba sampler; generation only.
         bootstrapped_indices: Authoritative integer ndarray (T, B), entries in [0, T-1].
             One matrix is shared by every factor and response; its supplied law is caller-owned.
-        include_diagnostics: Keep copied indices and a labelled (B, M) statistic frame in metadata.
+        include_diagnostics: Keep copied indices and a labelled (B, M) statistic frame in
+            metadata, plus the (B, M) fitted rho for prewhitened inference.
+        inference: BARTLETT_HAC (default) or PREWHITENED_AR1 standard errors, used for the
+            observed statistics and refitted in every draw. Prewhitening needs hac_lags <= T-2.
 
     Returns:
         SignificanceResult with approximate bootstrap p-values/decisions, observed HAC
@@ -329,5 +378,5 @@ def compute_bootstrap_alpha_significance(
     return _bootstrap_significance(
         returns, factors, family_id, return_basis, cost_basis, sampling_frequency, expected_index,
         hac_lags, confidence_level, method, significance_level, af, num_samples, block_size,
-        seed, bootstrapped_indices, include_diagnostics,
+        seed, bootstrapped_indices, include_diagnostics, inference,
     )
