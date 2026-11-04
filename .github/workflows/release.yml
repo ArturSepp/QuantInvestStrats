@@ -36,7 +36,8 @@ env:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The full, unsharded source suite plus docs and packaging exceeds 45 minutes.
+    timeout-minutes: 90
     outputs:
       publish: ${{ steps.artifacts.outputs.publish }}
       sha: ${{ steps.identity.outputs.sha }}
