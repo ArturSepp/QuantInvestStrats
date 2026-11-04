@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject missing nullable marks in `PortfolioAccounting` before reconciliation, matching
+  ordinary NaN handling. Incomplete ledgers can no longer appear reconciled because their
+  unknown balances were skipped. Complete nullable ledgers retain their accounting basis.
+
 ## [5.44.6] - 2026-11-04
 
 ### Added

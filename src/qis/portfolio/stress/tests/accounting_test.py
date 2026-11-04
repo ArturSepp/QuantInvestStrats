@@ -35,6 +35,53 @@ def account_portfolio(market, basis=ReportingBasis.NET_EQUITY, fixed=None):
     return market(holdings, denominator=account.denominator, underlyings=quotes, accounting=account)
 
 
+@pytest.mark.parametrize("dtype,marks", [
+    ("float64", [90., np.nan]),
+    ("Float64", [90., pd.NA]),
+    ("Int64", [90, pd.NA]),
+    ("Float64", [pd.NA, pd.NA]),
+    ("Int64", [pd.NA, pd.NA]),
+])
+def test_portfolio_accounting_rejects_missing_marks_without_changing_input(dtype, marks):
+    # An unknown balance is not zero, even if the known marks already match equity.
+    rows = pd.DataFrame({"mtm": pd.array(marks, dtype=dtype),
+                         "role": [PositionRole.ASSET, PositionRole.OTHER]},
+                        index=pd.Index(["known", "unmodelled"], name="position"))
+    rows.columns.name = "field"
+    rows.attrs = {"source": {"currency": "USD"}}
+    before = rows.copy(deep=True)
+    before.index = rows.index.copy(deep=True)
+    before.columns = rows.columns.copy(deep=True)
+    with pytest.raises(ValueError, match="finite marks"):
+        PortfolioAccounting(rows, 90.)
+    pd.testing.assert_frame_equal(rows, before)
+    assert rows.attrs == {"source": {"currency": "USD"}}
+
+
+@pytest.mark.parametrize("dtype", ["Float64", "Int64"])
+@pytest.mark.parametrize("basis,fixed,denominator", [
+    (ReportingBasis.NET_EQUITY, None, 90.),
+    (ReportingBasis.GROSS_ASSETS, None, 110.),
+    (ReportingBasis.FIXED_NOTIONAL, 200., 200.),
+])
+def test_portfolio_accounting_preserves_complete_nullable_ledgers(
+        market, dtype, basis, fixed, denominator):
+    p = account_portfolio(market, basis, fixed)
+    rows = p.accounting.positions.astype({"mtm": dtype})
+    account = PortfolioAccounting(rows, 90., basis, fixed)
+    pd.testing.assert_frame_equal(account.positions, rows)
+    # These balances follow from 100 + 10 - 20, independently of pandas reductions.
+    expected = pd.Series({"gross_assets": 110., "borrowing": 20., "other_liabilities": 0.,
+                          "net_equity": 90., "assets_to_equity": 110/90,
+                          "debt_to_equity": 20/90, "reporting_denominator": denominator})
+    pd.testing.assert_series_equal(account.summary(), expected)
+    result = run_portfolio_stress_test(replace(p, accounting=account), request())
+    assert result.summaries["requested"].loc[
+        "down", "portfolio_return"] == pytest.approx(-20/denominator)
+    assert result.report_diagnostics["requested equity after stress"].loc[
+        "down", "equity_after_stress"] == pytest.approx(70.)
+
+
 def test_borrowing_reduces_equity_denominator_and_preserves_asset_pnl(market):
     p = account_portfolio(market)
     result = run_portfolio_stress_test(p, request())
