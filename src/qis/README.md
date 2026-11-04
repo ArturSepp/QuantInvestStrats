@@ -8,7 +8,7 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 [qis](https://github.com/ArturSepp/QuantInvestStrats) uses [local_path.py](local_path.py)
 and [settings.yaml](settings.yaml) for directory configuration. Software citation:
 [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
-This guide describes the development 5.45.0 configuration contract.
+This guide describes the 5.44.6 configuration contract.
 
 ## Start without configuration
 

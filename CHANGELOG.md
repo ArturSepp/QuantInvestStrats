@@ -7,14 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.6] - 2026-11-04
+
 ### Added
 
+- Add source-only declared-family mean, alpha and paired-Sharpe significance workflows
+  with Holm/BHY corrections, studentized stationary-bootstrap mean/alpha tests and explicit
+  provenance. Offer AR(1)-prewhitened intercept inference and an offline worked example.
 - `compute_asset_returns_dict` accepts `ffill_nans` and forwards it to `to_returns` for every
   frequency group. The default `True` keeps current results; `False` leaves a missing
   period-end price missing instead of carrying the last price forward as a zero return.
   The option follows `is_log_returns`, preserving existing positional calls. Input already on
   the requested frequency grid retains its missing observations, as in `to_returns`.
-  The development version is 5.45.0 for this additive public signature change.
+  This additive public signature change is included in 5.44.6.
 
 ### Fixed
 
