@@ -1,1 +1,1 @@
-{"notifications": {}, "repository": "ArturSepp/QuantInvestStrats", "schema_version": 1}
+{"notifications": {"4aea0ed5e01ba052a25a2e3da08e5cf7497843ad9cc22eb0755dbfc2628171f8": {"details": ["Only existing action SHA/version pins may change"], "head": "7e48fb81f2da2384ddbe712a270dde1ec990c515", "kind": "blocked", "phase": "posting", "pr": 246}}, "repository": "ArturSepp/QuantInvestStrats", "schema_version": 1}
