@@ -344,7 +344,7 @@ class LinearModel:
                 Each row represents portfolio weights at a specific date.
             factor_var_name: Name for the factor risk column in output. Defaults to 'Systematic'.
             idiosyncratic_var_name: Name for the idiosyncratic risk column in output. Defaults
-                to 'Idiosyncratic'.
+                to 'Idiosyncratic'. Must not match a factor contribution column.
 
         Returns:
             Tuple containing total-risk contribution ratios, factor contributions normalized by
@@ -355,7 +355,8 @@ class LinearModel:
             loads on has exposure zero.
 
         Raises:
-            ValueError: If factor covariance matrices or residual variances are unavailable.
+            ValueError: If factor covariance matrices or residual variances are unavailable,
+                or the idiosyncratic label conflicts with a factor contribution column.
         """
         if self.x_covars is None:
             raise ValueError(f"self.x_covars must be provided")
@@ -414,8 +415,10 @@ class LinearModel:
         idio_vars = pd.Series(idio_vars, name=idiosyncratic_var_name)
         portfolio_var = pd.concat([portfolio_factor_vars, idio_vars], axis=1, sort=True)
         idio_vars_contrib = pd.Series(idio_vars_contrib)
-        # Add idiosyncratic risk contribution as a separate column
-        factor_risk_contrib_idio[idiosyncratic_var_name] = idio_vars_contrib.to_numpy()
+        # Assignment could replace a factor share, and normalization would hide the lost component.
+        factor_risk_contrib_idio.insert(
+            len(factor_risk_contrib_idio.columns), idiosyncratic_var_name,
+            idio_vars_contrib.to_numpy())
         # Normalize all risk contributions to sum to 1.0 across factors for each date;
         # an undefined date stays NaN rather than becoming a zero share
         factor_rcs_ratios = factor_risk_contrib_idio.divide(

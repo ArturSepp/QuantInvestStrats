@@ -148,6 +148,82 @@ def _risk_contribution_model(residual_dates: pd.DatetimeIndex) -> LinearModel:
                        residual_vars=residual_vars)
 
 
+def _risk_label_model(model_type: type[LinearModel], factor_name: str | int | tuple
+                      ) -> tuple[LinearModel, pd.DataFrame]:
+    """Build a two-factor book with independently calculable variance shares."""
+    dates = pd.DatetimeIndex(['2024-03-31', '2024-06-30'])
+    factors = [factor_name, 'Rates']
+    covariance = pd.DataFrame(np.diag([0.04, 0.09]), index=factors, columns=factors)
+    model = model_type(
+        x=pd.DataFrame(0.0, index=dates, columns=factors),
+        y=pd.DataFrame(0.0, index=dates, columns=['Asset']),
+        loadings={factor: pd.DataFrame(1.0, index=dates, columns=['Asset'])
+                  for factor in factors},
+        x_covars={date: covariance for date in dates},
+        residual_vars=pd.DataFrame(0.01, index=dates, columns=['Asset']),
+    )
+    return model, pd.DataFrame(1.0, index=dates, columns=['Asset'])
+
+
+@pytest.mark.parametrize('model_type', [LinearModel, qis.EwmLinearModel])
+@pytest.mark.parametrize(('factor_name', 'residual_options'), [
+    ('Idiosyncratic', {}), ('Equity', {'idiosyncratic_var_name': 'Equity'}),
+    (2, {'idiosyncratic_var_name': 2.0}),
+    (('Equity', 'x'), {'idiosyncratic_var_name': ('Equity', 'x')}),
+])
+def test_compute_factor_risk_contribution_rejects_residual_factor_collision(
+        model_type: type[LinearModel], factor_name: str | int | tuple, residual_options: dict,
+        ) -> None:
+    """Reject default and custom residual names before they overwrite a real factor share."""
+    model, weights = _risk_label_model(model_type, factor_name)
+    frames = [model.x, model.y, weights, model.residual_vars,
+              *model.loadings.values(), *model.x_covars.values()]
+    originals = [frame.copy(deep=True) for frame in frames]
+
+    with pytest.raises(ValueError, match='already exists'):
+        model.compute_factor_risk_contribution(weights, **residual_options)
+
+    for frame, original in zip(frames, originals):
+        pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize('model_type', [LinearModel, qis.EwmLinearModel])
+@pytest.mark.parametrize(('factor_name', 'residual_name', 'systematic_name'), [
+    ('Equity', 'Idiosyncratic', 'Systematic'),
+    ('Idiosyncratic', 'Residual', 'Systematic'),
+    ('Equity', 'Residual', 'Equity'),
+    ('Equity', 'Residual', 'Residual'),
+    (2, '2', 'Systematic'),
+    (('Equity', 'x'), 'Residual', 'Systematic'),
+])
+def test_compute_factor_risk_contribution_preserves_distinct_factor_and_residual_shares(
+        model_type: type[LinearModel], factor_name: str | int | tuple, residual_name: str,
+        systematic_name: str,
+        ) -> None:
+    """Preserve all four outputs, including names that coincide only in another panel."""
+    model, weights = _risk_label_model(model_type, factor_name)
+
+    actual = model.compute_factor_risk_contribution(
+        weights, factor_var_name=systematic_name, idiosyncratic_var_name=residual_name,
+    )
+
+    # Unit exposures give systematic variance .04 + .09 and residual variance .01.
+    # A row sum of one in the first output alone could hide a replaced factor share.
+    expected_total = pd.DataFrame(
+        [[2 / 7, 9 / 14, 1 / 14]] * 2, index=weights.index,
+        columns=[factor_name, 'Rates', residual_name],
+    )
+    expected_systematic = pd.DataFrame(
+        [[4 / 13, 9 / 13]] * 2, index=weights.index, columns=[factor_name, 'Rates'],
+    )
+    expected_variances = pd.DataFrame(
+        [[0.13, 0.01]] * 2, index=weights.index, columns=[systematic_name, residual_name],
+    )
+    for result, expected in zip(
+            actual, (expected_total, expected_total, expected_systematic, expected_variances)):
+        pd.testing.assert_frame_equal(result, expected, rtol=1.0e-12, atol=1.0e-15)
+
+
 def test_factor_risk_contribution_reads_residual_variances_as_of() -> None:
     """Residual variances follow the same as-of rule as weights and loadings."""
     model = _risk_contribution_model(residual_dates=pd.DatetimeIndex(['2024-01-31']))

@@ -9,6 +9,10 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Reject residual-risk labels that would replace a factor contribution in
+  `LinearModel.compute_factor_risk_contribution`, including its public `EwmLinearModel`
+  interface. Choose a distinct residual label to retain every component; nonconflicting
+  risk shares and variance calculations are unchanged.
 - Reject missing nullable marks in `PortfolioAccounting` before reconciliation, matching
   ordinary NaN handling. Incomplete ledgers can no longer appear reconciled because their
   unknown balances were skipped. Complete nullable ledgers retain their accounting basis.
