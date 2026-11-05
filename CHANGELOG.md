@@ -12,6 +12,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Reject missing nullable marks in `PortfolioAccounting` before reconciliation, matching
   ordinary NaN handling. Incomplete ledgers can no longer appear reconciled because their
   unknown balances were skipped. Complete nullable ledgers retain their accounting basis.
+- Widen narrow integer holdings and targets, and unsigned 64-bit levels within signed 64-bit
+  capacity, before turnover arithmetic in `compute_turnover` and `PortfolioData.get_turnover`.
+  Sales no longer wrap to inflated turnover, and promoted holdings also value gross exposure.
+  Nullable integer target results may widen to `Int64`. Floating inputs and other wide integer
+  arithmetic retain their existing behaviour and overflow limitations.
 
 ## [5.44.6] - 2026-11-04
 

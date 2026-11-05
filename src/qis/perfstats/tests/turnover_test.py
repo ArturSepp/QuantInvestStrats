@@ -381,3 +381,135 @@ def test_compute_turnover_warns_and_returns_nan_for_zero_gross_exposure() -> Non
         )
 
     assert actual.loc[units.index[1]].isna().all()
+
+
+@pytest.mark.filterwarnings('error::RuntimeWarning')
+@pytest.mark.parametrize('computation_type', tuple(TurnoverComputationType))
+@pytest.mark.parametrize(
+    ('dtype', 'holdings'),
+    [('uint8', [10, 5, 8]), ('UInt8', [10, 5, 8]), ('Int8', [10, 5, 8]),
+     ('uint64', [10, 5, 8]), ('UInt64', [10, 5, 8]), ('int8', [10, 5, 8]),
+     ('Int8', [1, -127, 1])],
+)
+def test_compute_turnover_promotes_integer_holdings_and_targets(
+        computation_type: TurnoverComputationType,
+        dtype: str,
+        holdings: list[int],
+        ) -> None:
+    """Value whole-unit trades identically through the engine and PortfolioData."""
+    index = pd.date_range('2025-01-01', periods=3, tz='UTC', name='date')
+    units = pd.DataFrame({'A': holdings}, index=index, dtype=dtype)
+    targets = pd.DataFrame({'A': [1, 0, 1]}, index=index, dtype=dtype)
+    notionals = pd.DataFrame(2.0, index=index, columns=['A'])
+    nav = pd.Series(100.0, index=index, name='Portfolio')
+    vols = pd.DataFrame(0.2, index=index, columns=['A'])
+    originals = [value.copy(deep=True) for value in (units, targets, notionals, vols)]
+    portfolio = PortfolioData(
+        nav=nav, prices=notionals, units=units, input_weights=targets,
+        turnover_unit_notional=notionals,
+    )
+
+    actual = compute_turnover(
+        computation_type, units=units, unit_notional=notionals, nav=nav,
+        input_weights=targets, vols=vols,
+    )
+    delegated = portfolio.get_turnover(
+        turnover_computation_type=computation_type, vols=vols,
+        roll_period=None, add_total=False,
+    )
+
+    # Python integers give mathematical changes, independently of pandas' storage arithmetic.
+    # The signed fixture also hits abs(-128), which cannot remain in an Int8 result.
+    expected_values = [None]
+    for previous, current in zip(holdings, holdings[1:]):
+        if computation_type == TurnoverComputationType.TARGET_WEIGHTS:
+            value = 1
+        elif computation_type == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS:
+            value = 0.2
+        elif computation_type == TurnoverComputationType.EXECUTED_NOTIONAL_NAV:
+            value = abs(current - previous) * 2 / 100
+        else:
+            value = abs(current - previous) / abs(current)
+        expected_values.append(value)
+    nullable = dtype[0].isupper()
+    expected_dtype = (
+        'Int64' if nullable and computation_type == TurnoverComputationType.TARGET_WEIGHTS
+        else 'Float64' if nullable else 'float64'
+    )
+    expected = pd.DataFrame(
+        {'A': expected_values}, index=index.copy(deep=True), dtype=expected_dtype,
+    )
+    pd.testing.assert_frame_equal(actual, expected)
+    pd.testing.assert_frame_equal(delegated, expected)
+    for value, original in zip((units, targets, notionals, vols), originals):
+        pd.testing.assert_frame_equal(value, original)
+
+
+@pytest.mark.parametrize('dtype', ['uint8', 'UInt8', 'Int8'])
+@pytest.mark.parametrize(
+    ('computation_type', 'expected_values'),
+    [(TurnoverComputationType.EXECUTED_NOTIONAL_NAV, [None, 0.5, 0.3]),
+     (TurnoverComputationType.EXECUTED_NOTIONAL_GROSS, [None, 1.0, 0.375])],
+)
+def test_compute_turnover_promotes_integer_notional_products(
+        dtype: str,
+        computation_type: TurnoverComputationType,
+        expected_values: list[float | None],
+        ) -> None:
+    """Use widened holdings for valuation too, not just for their differences."""
+    index = pd.date_range('2025-01-01', periods=3)
+    units = pd.DataFrame({'A': [10, 5, 8]}, index=index, dtype=dtype)
+    notionals = pd.DataFrame(100, index=index, columns=['A'], dtype=dtype)
+    actual = compute_turnover(
+        computation_type, units=units, unit_notional=notionals,
+        nav=pd.Series(1000.0, index=index),
+    )
+    # A five-unit sale trades 500; the remaining book is also 500, not uint8(500)=244.
+    expected = pd.DataFrame(
+        {'A': expected_values}, index=index,
+        dtype='Float64' if dtype[0].isupper() else 'float64',
+    )
+    pd.testing.assert_frame_equal(actual, expected)
+
+
+def test_compute_turnover_preserves_mixed_storage_and_missing_observations() -> None:
+    """Promote columns positionally without casting float neighbors or filling missing trades."""
+    index = pd.date_range('2025-01-01', periods=3, name='date')
+    specifications = [
+        (('asset', 'same'), [10, 5, 8], 'UInt8', [None, 5, 3], 'Int64'),
+        (('asset', 'same'), [0.5, 0.25, 0.75], 'float32', [None, 0.25, 0.5], 'float32'),
+        (('asset', 'nullable'), [0.5, 0.25, 0.75], 'Float32', [None, 0.25, 0.5], 'Float32'),
+        (('mask', 'gap'), [1, None, 0], 'Int8', [None, None, None], 'Int64'),
+        (('mask', 'absent'), [None] * 3, 'UInt8', [None] * 3, 'Int64'),
+        (('storage', 'sparse'), [1, 0, 1], pd.SparseDtype('uint8', 0),
+         [float('nan'), 1.0, 1.0], pd.SparseDtype('float64', 0)),
+    ]
+    data = pd.concat([
+        pd.Series(values, index=index, name=name, dtype=dtype)
+        for name, values, dtype, _, _ in specifications
+    ], axis=1)
+    original = data.copy(deep=True)
+    expected = pd.concat([
+        pd.Series(values, index=index.copy(deep=True), name=name, dtype=dtype)
+        for name, _, _, values, dtype in specifications
+    ], axis=1)
+
+    actual = compute_turnover(TurnoverComputationType.TARGET_WEIGHTS, input_weights=data)
+
+    pd.testing.assert_frame_equal(actual, expected)
+    pd.testing.assert_frame_equal(data, original)
+
+
+@pytest.mark.parametrize('dtype', ['int64', 'Int64', 'uint64', 'UInt64'])
+def test_compute_turnover_preserves_wide_integer_unit_changes(dtype: str) -> None:
+    """Do not erase a one-unit change by converting large integer levels to float first."""
+    index = pd.date_range('2025-01-01', periods=3)
+    targets = pd.DataFrame({'A': [2**53, 2**53 + 1, 2**53 + 2]}, index=index, dtype=dtype)
+    expected = pd.DataFrame(
+        {'A': [None, 1, 1]}, index=index,
+        dtype='Int64' if dtype[0].isupper() else 'float64',
+    )
+
+    actual = compute_turnover(TurnoverComputationType.TARGET_WEIGHTS, input_weights=targets)
+
+    pd.testing.assert_frame_equal(actual, expected)

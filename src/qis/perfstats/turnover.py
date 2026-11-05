@@ -7,6 +7,8 @@ from typing import Optional, TypeVar
 
 import pandas as pd
 
+from qis.perfstats.returns import _return_calculation_prices
+
 
 _PandasObject = TypeVar('_PandasObject', pd.DataFrame, pd.Series)
 
@@ -154,6 +156,8 @@ def compute_turnover(
     weights rather than drifted holdings because it is a theoretical signal-turnover measure.
     Dated inputs are ordered chronologically on local objects before changes or alignment;
     non-dated indexes retain their supplied row order.
+    Narrow integers and unsigned 64-bit levels within signed 64-bit capacity are widened before
+    arithmetic. Other wide integer arithmetic retains its existing overflow limitations.
 
     Args:
         computation_type: Holdings and denominator convention. The default is executed traded
@@ -174,6 +178,7 @@ def compute_turnover(
     Returns:
         Per-instrument two-sided turnover on the input index, ordered chronologically for dated
         inputs. The first row is normally missing because no preceding holding is available.
+        Nullable integer target-weight results may widen to ``Int64``.
 
     Raises:
         TypeError: If a required input is not a pandas object of the expected type.
@@ -186,6 +191,8 @@ def compute_turnover(
     if computation_type == TurnoverComputationType.TARGET_WEIGHTS:
         input_weights = _require_frame(input_weights, 'input_weights')
         input_weights = _chronological_dated_input(input_weights, 'input_weights')
+        # Reuse return-difference promotion without letting its column replacements reach callers.
+        input_weights = _return_calculation_prices(input_weights.copy(deep=False))
         return input_weights.diff(1).abs()
 
     if computation_type == TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS:
@@ -194,6 +201,7 @@ def compute_turnover(
         input_weights = _chronological_dated_input(input_weights, 'input_weights')
         vols = _chronological_dated_input(vols, 'vols')
         _validate_vols_alignment(input_weights=input_weights, vols=vols)
+        input_weights = _return_calculation_prices(input_weights.copy(deep=False))
         return input_weights.diff(1).abs().multiply(vols)
 
     units = _require_frame(units, 'units')
@@ -209,6 +217,8 @@ def compute_turnover(
             )
         nav = _chronological_dated_input(nav, 'nav')
 
+    # Widen the owned frame, not only its differences: gross exposure also multiplies units.
+    units = _return_calculation_prices(units.copy(deep=False))
     traded_notional = units.diff(1).abs().multiply(unit_notional)
 
     if computation_type == TurnoverComputationType.EXECUTED_NOTIONAL_NAV:
