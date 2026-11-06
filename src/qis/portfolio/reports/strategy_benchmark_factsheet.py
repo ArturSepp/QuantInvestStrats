@@ -380,7 +380,7 @@ def generate_strategy_benchmark_factsheet_plt(
         shared = pd.concat([
             multi_portfolio_data.portfolio_datas[strategy_idx].nav,
             multi_portfolio_data.portfolio_datas[benchmark_idx].nav,
-        ], axis=1, join='inner').dropna()
+        ], axis=1, join='inner', sort=True).dropna()
         shared = brinson_period.locate(shared)
         if len(shared) < 2:
             raise ValueError('Brinson requires at least two shared NAV observations')

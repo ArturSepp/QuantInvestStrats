@@ -348,7 +348,7 @@ are the numerical contract; the example is the reader-facing reproduction path.
 
 ## References
 
-1. Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). Determinants of Portfolio Performance. *Financial Analysts Journal*, 42(4), 39â€“44. [DOI: 10.2469/faj.v42.n4.39](https://doi.org/10.2469/faj.v42.n4.39).
-2. Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10â€“22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
+1. Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). Determinants of Portfolio Performance. *Financial Analysts Journal*, 42(4), 39–44. [DOI: 10.2469/faj.v42.n4.39](https://doi.org/10.2469/faj.v42.n4.39).
+2. Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10–22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
 3. R-Finance contributors. PortfolioAttribution. Software. [Frongello linking implementation](https://github.com/R-Finance/PortfolioAttribution/blob/master/R/Frongello.R). Supplemental implementation reference.
 4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

@@ -41,7 +41,7 @@ def _exposure_tables(
     names = [p.ticker or f'Portfolio {i + 1}' for i, p in enumerate(portfolios)]
     if len(set(names)) != len(names):
         raise ValueError('Look-through factsheet requires distinct portfolio names')
-    navs = pd.concat([p.nav for p in portfolios], axis=1, join='inner').dropna()
+    navs = pd.concat([p.nav for p in portfolios], axis=1, join='inner', sort=True).dropna()
     if time_period is not None:
         navs = time_period.locate(navs)
     if len(navs) < 2:
