@@ -7,6 +7,32 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.8] - 2026-11-06
+
+### Added
+
+- Add separate optional `lookthrough_matrix` inputs throughout portfolio grouping,
+  Brinson attribution, grouped risk, exposures, P&L, instrument costs/turnover and
+  the portfolio factsheets. `group_data` remains a Series. A shared resolver applies
+  finite nonnegative row-sum-one overrides and ordinary labels for omitted rows.
+- Support fractional standalone sleeve VaR/TRE from split positions and additive
+  Euler contributions. The general signed/overlapping risk-loadings API is unchanged.
+- Validate shared portfolio classifications and reject unsupported matrix routing.
+- Add `compute_lookthrough_exposures` and `generate_lookthrough_exposures_factsheet`
+  for grouped horizontal comparisons of average and final realised exposures.
+- Add independent `brinson_time_period` and `brinson_group_data` options to the
+  strategy/benchmark factsheet. All attribution panels use that window, with the
+  actual shared NAV baseline/end shown in the heading.
+
+### Changed
+
+- Keep `group_data` and `brinson_group_data` as Series inputs, using the separate
+  `lookthrough_matrix` for fractional partitions. Series callers and calls without
+  a matrix preserve existing results. Keep the Series `asset_class_data` and complete-matrix
+  `group_loadings` keywords as compatibility aliases.
+- Recombine repeated instrument pieces when compacting many look-through sleeves.
+  Document static accounting assumptions and independent TE-report grouping grids.
+
 ## [5.44.7] - 2026-11-06
 
 ### Added
@@ -597,7 +623,7 @@ Its tag is retained for the release audit.
   portfolios; `compute_overlay_blend_frontier` states that its blend is funded with the benchmark
   on its null; `compute_regime_ewm_betas` states which clock its span counts. Remove two
   commented-out code blocks from the report module.
-- Cite Sepp and Dézeraud (2019), with its issue and pages, where the handbook cited Sepp (2019),
+- Cite Sepp and DÃ©zeraud (2019), with its issue and pages, where the handbook cited Sepp (2019),
   and add Sepp (2020) and the long-run companion working paper to the bibliography.
 
 ## [5.33.0] - 2026-09-30
@@ -819,8 +845,8 @@ Each entry below states the size of its effect and, where possible, how to resto
   `freq_drawdown='ME'` the trailing incomplete period was dropped, so a fall in the current month
   was invisible and `CURRENT_DD` referred to the last month-end. On the frozen synthetic universe
   ending 15 December 2025, month-end `CURRENT_DD` moves by up to 2.5 percentage points
-  (`SAL_HF` −22.0% to −19.6%); with the full universe cut at 15 December 2025, `SEQ_US`
-  `CURRENT_DD` is −45.40% instead of −44.89% and its `MAX_DD` deepens from −45.18% to −45.40%.
+  (`SAL_HF` âˆ’22.0% to âˆ’19.6%); with the full universe cut at 15 December 2025, `SEQ_US`
+  `CURRENT_DD` is âˆ’45.40% instead of âˆ’44.89% and its `MAX_DD` deepens from âˆ’45.18% to âˆ’45.40%.
   `WORST` and `BEST` include the partial-period return.
   The default `freq_drawdown='D'` is unaffected; factsheets with monthly or quarterly presets,
   which set `freq_drawdown` to the reporting grid, now show the current drawdown at the last
@@ -865,7 +891,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   `SORTINO_RATIO` and the Calmar numerator no longer depend on whether the rate series starts on
   or before the first price date. On the frozen synthetic universe (2 January 2014 to
   31 December 2025) with 2% cash from the first price date, `SEQ_US` `PA_EXCESS_RETURN` is
-  −0.704% instead of −0.651% and `SCM_GLD` 6.323% instead of 6.265%; with monthly 2% cash from
+  âˆ’0.704% instead of âˆ’0.651% and `SCM_GLD` 6.323% instead of 6.265%; with monthly 2% cash from
   31 January 2014, `SCM_GLD` `SHARPE_EXCESS` is 0.3782 instead of 0.3925.
 - **Behaviour change.** Charge the cash return of the period (t-1, t] at the rate known on the
   return date t-1 in `compute_excess_returns` and every helper built on it. The lag was one
@@ -873,7 +899,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   each month used the second-to-last daily quote of that month. The rate series is now aligned to
   the return grid as of each date and then lagged by one period of that grid. With a realistic
   time-varying daily cash path on the synthetic universe, monthly `SHARPE_EXCESS` of `SEQ_US`
-  moves from −0.0130 to −0.0114 and the annualised regression alpha of `SBD_TSY` from 2.246% to
+  moves from âˆ’0.0130 to âˆ’0.0114 and the annualised regression alpha of `SBD_TSY` from 2.246% to
   2.274%.
 - **Behaviour change.** Accrue backtest cash at the funding rate known at the start of each
   period. `backtest_model_portfolio` credited the cash held over (t-1, t] with the quote dated t,
@@ -929,7 +955,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   report date, and have, per pivot period, the variance of an EWM of the reported returns
   (`span` reports). Previously the standardised pivot return was used as a level deviation with
   full-sample moments: on 20 quarterly reports the daily increments had a volatility of 22.2%
-  against 7.2% implied by the reports and a lag-one autocorrelation of −0.47 (now 11.6% at the
+  against 7.2% implied by the reports and a lag-one autocorrelation of âˆ’0.47 (now 11.6% at the
   default span, 9.0% at `span=1`, and 0.03); `annualization_factor` acted as calendar days (a
   monthly pivot with 12 inflated the bridge 4.7 times; the path no longer depends on it); returns
   summed rather than compounded; an exactly zero report or a first report date off the pivot grid
@@ -949,7 +975,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   correlation. It returned `(n - 1) / (2n)` times that mean, one third of it for three assets.
 - Align the two moments of `LinearModel.get_model_ewm_r2`: both are now geometrically weighted
   sums over the same dates with the same weights. The residual moment used to start from zero
-  after the warm-up while the return moment had run since the first return, so the R² read
+  after the warm-up while the return moment had run since the first return, so the RÂ² read
   0.97 to 0.999 on the first dates after the warm-up instead of the single-observation ratio
   (0.15, 0.00 and 0.79 in the factor-risk-model chapter example); last-date values move by less
   than 0.002 there.
@@ -1004,19 +1030,19 @@ Each entry below states the size of its effect and, where possible, how to resto
   2,508 days (rebalancing and large-move days, at most 8.5%); the undiversified VaR is unchanged
   on these inputs.
 - **Behaviour change.** Make `compute_benchmark_portfolio_risk_contributions` return Euler
-  contributions to tracking error, d_i (Σd)_i / TE, which sum to TE and equal `RiskModel`'s
-  `mcte`. It divided by the benchmark volatility, so its contributions summed to TE²/σ_b (1.69%
+  contributions to tracking error, d_i (Î£d)_i / TE, which sum to TE and equal `RiskModel`'s
+  `mcte`. It divided by the benchmark volatility, so its contributions summed to TEÂ²/Ïƒ_b (1.69%
   instead of 4.94% in the risk-contributions worked example), returned infinities for a zero
   benchmark, and aligned only the portfolio weights to the covariance, so a benchmark Series with
   a missing or extra label raised "matrices are not aligned" and a reordered one came back in
   sorted order. Both weight vectors are now aligned by label and zero tracking error returns
-  zeros. Multiply the result by TE/σ_b to reproduce the former level.
+  zeros. Multiply the result by TE/Ïƒ_b to reproduce the former level.
 - **Behaviour change.** Make `PortfolioData.get_instruments_pnl_risk_attribution`, the
   `AttributionMetric.PNL_RISK` panel of the strategy factsheet ("P&L Risk Attribution,
   sum=100%"), return ex-post Euler shares Cov(x_i, x_p) / Var(x_p) of the portfolio P&L. It
   returned standalone P&L volatility shares (`ddof=0`, zero-P&L days dropped) normalised to 100%,
   which are not a decomposition of portfolio risk and show hedges as positive. In the
-  risk-contributions worked example the Treasury sleeve moves from 13.0% to −1.9%. The new
+  risk-contributions worked example the Treasury sleeve moves from 13.0% to âˆ’1.9%. The new
   optional `is_standalone=True` returns the former shares.
 - Make `PortfolioData.compute_ex_anti_portfolio_vol_implied_by_covar` and
   `compute_risk_contributions_implied_by_covar` with `freq=None` select the input weights as of
@@ -1031,7 +1057,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   default `PerfParams` the benchmark table itself uses instead of raising `AttributeError` on
   `perf_params.freq_vol` when no title is passed.
 - Make the marginal-active-risk development runner (`contributions_run.py`) divide d_i m_i by
-  2 TE: the gradient of active variance sums to 2 TE² against the active weights, so its
+  2 TE: the gradient of active variance sums to 2 TEÂ² against the active weights, so its
   verification printed False and its percentage contributions summed to 200%.
 - Make the EWM seed the state before a column's first finite observation, and let that
   observation update it, whether the column starts on row 0 or later. `ewm_recursion` used to set
@@ -1330,7 +1356,7 @@ Each entry below states the size of its effect and, where possible, how to resto
   passes `alpha_an_factor`.
 - **Behaviour change.** Default `limit_weights_to_max_var_limit(annualization_factor=252.0)`,
   the factor qis applies to business-day returns; it was 260, which understated the one-day VaR
-  by a factor sqrt(252/260) ≈ 0.985 for volatilities annualised with 252, so capped weights are
+  by a factor sqrt(252/260) â‰ˆ 0.985 for volatilities annualised with 252, so capped weights are
   now 1.55% smaller. Pass `annualization_factor=260` for the former caps.
 - **Behaviour change.** Default `PortfolioData.compute_portfolio_benchmark_betas(freq_beta='B',
   factor_beta_span=63)`, the defaults of `compute_portfolio_benchmark_attribution`, so the betas
@@ -2491,7 +2517,7 @@ The values and method name are unchanged.
 selects weights as-of each covariance date. Callers whose weight dates all lie on the
 covariance date grid see identical numbers (characterisation-tested against 5.6.x output).
 Callers with weight dates off that grid previously received zero tracking error on every
-date — the exact-date reindex silently dropped every off-grid weight row — and now receive
+date â€” the exact-date reindex silently dropped every off-grid weight row â€” and now receive
 the tracking error implied by the latest weights known at each covariance date.
 
 ### Added
@@ -2895,19 +2921,19 @@ shipped without the second bounds check below.
   bites.
 
 ### Added
-- `qis/models/bootstrap/tests/test_bootstrap_ar.py` — 14 tests over the AR residual path. Each of
+- `qis/models/bootstrap/tests/test_bootstrap_ar.py` â€” 14 tests over the AR residual path. Each of
   the five defects above has a test that fails on it alone.
-- `qis/examples/models/ar_bootstrap_gaps.py` — measures what a gap costs an AR(1) fit. Over 20
+- `qis/examples/models/ar_bootstrap_gaps.py` â€” measures what a gap costs an AR(1) fit. Over 20
   gap patterns blanking 30% of a 3000-point series at persistence 0.7, dropping the lag pairs
   that straddle a gap deviates from the gap-free estimate by 0.001 to 0.026, while collapsing the
   gaps first deviates by 0.064 to 0.095. The ranges do not overlap. No network, and the test
   suite executes it.
-- `qis/examples/models/bootstrap_convention.py` — measures what the block-resampling convention
+- `qis/examples/models/bootstrap_convention.py` â€” measures what the block-resampling convention
   costs. The superseded truncating sampler draws the first observation of a 250-period sample at
   0.11x its uniform weight and the first decile at 0.53x; applied to a series with rising drift
   it reports a mean return 2.15% per year above the source, against 0.32% for the circular
   sampler now used.
-- `docs/reproducibility.md` — the same measurement as a documentation page, with what follows
+- `docs/reproducibility.md` â€” the same measurement as a documentation page, with what follows
   from it for the return convention, the Sharpe conventions and the reported frequency.
 
 ### Changed
@@ -2928,32 +2954,32 @@ Any result produced with `bootstrap_data`, `bootstrap_price_data`, `bootstrap_ar
 existing number.
 
 ### Added
-- `BootstrapType.FIXED_BLOCK` — circular block resampling with a block of exactly `block_size`,
+- `BootstrapType.FIXED_BLOCK` â€” circular block resampling with a block of exactly `block_size`,
   for a block length chosen to match a known cycle rather than drawn.
 - `min_block_size` on `generate_bootstrapped_indices`, `bootstrap_data`, `bootstrap_ar_process`,
   `bootstrap_price_data` and `bootstrap_price_fundamental_data`. Floors the drawn block length
   under `BootstrapType.STATIONARY`; set it to the number of periods in the slowest-reporting
   series when the panel mixes frequencies. Default `1`, which is the previous behaviour.
-- `theta` on `unsmooth_returns_glm` — supply the Getmansky-Lo-Makarov smoothing weights instead
+- `theta` on `unsmooth_returns_glm` â€” supply the Getmansky-Lo-Makarov smoothing weights instead
   of estimating them, for a coefficient that comes from outside the series (a panel estimate
   pooled across vintages, or a value fixed for a production run). A scalar or an array of
   length q; the sample-length guard does not apply, since nothing is fitted. Default `None`,
   which estimates as before.
 - `qis/models/bootstrap/tests/test_bootstrap_numba.py` and
   `qis/models/unsmoothing/tests/test_ar_lag_glm.py`.
-- `qis/tests/test_examples.py` — every file in `qis/examples/` must parse, every `qis.<name>`
+- `qis/tests/test_examples.py` â€” every file in `qis/examples/` must parse, every `qis.<name>`
   it references must resolve, every qis module it imports from must exist with the symbol it
   names, and every keyword it passes to a qis callable must be in that callable's signature.
   The nine examples that reach no data vendor are executed in a temporary directory. An
   optional dependency is a skip, never a failure.
-- `qis/api.py` — `CORE_API`, the documented core of the public API: 103 symbols grouped by
+- `qis/api.py` â€” `CORE_API`, the documented core of the public API: 103 symbols grouped by
   capability. Nothing is un-exported; the module records which exports the documentation
-  promises to describe. The boundary is measured — a symbol is core when a package that depends
-  on qis, or qis's own examples, README or docs, calls it — plus five bootstrap symbols
+  promises to describe. The boundary is measured â€” a symbol is core when a package that depends
+  on qis, or qis's own examples, README or docs, calls it â€” plus five bootstrap symbols
   promoted by intent. `qis/tests/test_core_api.py` enforces it: a core symbol without an
   `Args:`/`Attributes:` block fails the suite, and the `PENDING_DOCSTRINGS` backlog is a ratchet
   that cannot silently hide finished work.
-- `qis/docs/plotting_kwargs.md` — the keyword arguments every `plot_*` function shares (`ax`,
+- `qis/docs/plotting_kwargs.md` â€” the keyword arguments every `plot_*` function shares (`ax`,
   `title`, `var_format`, `x_date_freq`, `fontsize`, `colors`, `legend_loc`, `y_limits`),
   documented once so individual plot docstrings cover only what is specific to them.
 - Six FX analytics exported from `qis`: `compute_fx_optimal_hedge`, `compute_fx_vol_beta`,
@@ -3016,15 +3042,15 @@ existing number.
 ## [5.0.10] - 2026-07-25
 
 ### Added
-- `qis/tests/synthetic_data.py` — seeded synthetic multi-asset panel for tests, CI and
+- `qis/tests/synthetic_data.py` â€” seeded synthetic multi-asset panel for tests, CI and
   documented examples. `generate_synthetic_prices` and `generate_synthetic_universe` draw a
   10-instrument panel carrying ragged starts, missing observations, stale prices, a delisted
   tail, fat tails, appraisal smoothing and a monthly-reported sleeve, with no network and no
   data file. Internal: not exported from `qis/__init__.py`.
-- `qis/plots/tests/plot_smoke_test.py` — every `plot_*` exported from `qis` runs on that panel
+- `qis/plots/tests/plot_smoke_test.py` â€” every `plot_*` exported from `qis` runs on that panel
   and must draw a figure. The parametrisation is read from `dir(qis)` at collection time, so a
   newly exported `plot_*` without a fixture fails the suite rather than going uncovered.
-- CI runs `pytest` on the 3.10–3.14 matrix against a core install, repeats it with the
+- CI runs `pytest` on the 3.10â€“3.14 matrix against a core install, repeats it with the
   `[data,io]` extras, and lints the lines a push or pull request changes with a pinned `ruff`.
 
 ### Changed
@@ -3110,7 +3136,7 @@ the uploaded sdist or yank it.]
   (`SHARPE_EXCESS`, `SHARPE_LOG_AN`, `SHARPE_LOG_EXCESS`) unchanged. Every
   Sharpe object is now labeled in the output, so the convention is stated rather
   than implied.
-- `qis/docs/sharpe_conventions.md` — decision record deriving the three Sharpe
+- `qis/docs/sharpe_conventions.md` â€” decision record deriving the three Sharpe
   objects (compound, log, arithmetic) and their reconciliation, and
   `qis/perfstats/tests/sharpe_conventions_test.py` pinning the identities.
 
@@ -3185,7 +3211,7 @@ anything a module happened to define became part of the API. Analytics
 (`qis.models`, `qis.portfolio`, `qis.perfstats`) is unchanged apart from four
 enums, because those are the functions a user of the library calls.
 
-`qis.utils` (130 removed) — numpy helpers (`np_nansum`, `np_shift`,
+`qis.utils` (130 removed) â€” numpy helpers (`np_nansum`, `np_shift`,
 `repeat_by_rows`, `running_mean`, `to_finite_np`), DataFrame plumbing
 (`df_zero_like`, `df_ones_like`, `align_df1_to_df2`, `dfs_to_upper_lower_diag`),
 string formatting (`float_to_str`, `str_to_float`, `df_to_numeric`,
@@ -3198,7 +3224,7 @@ proper: `TimePeriod`, `generate_dates_schedule`,
 `ValueType`, `update_kwargs`, `covar_to_corr`, `fit_multivariate_ols` and the
 annualisation factors.
 
-`qis.plots` (58 removed) — matplotlib axis and legend plumbing (`set_spines`,
+`qis.plots` (58 removed) â€” matplotlib axis and legend plumbing (`set_spines`,
 `remove_spines`, `set_ax_tick_params`, `set_legend`, `set_title`,
 `align_y_limits_axs`, `autolabel`, `rand_cmap`, `subplot_border`), the colour
 palette accessors (`get_n_colors`, `get_n_sns_colors`, `get_cmap_colors`), the
@@ -3208,13 +3234,13 @@ All 63 `plot_*` functions remain public, as do `TrendLine`, `LastLabel`,
 `LegendStats` and `PdfType`, which appear in their signatures. `set_suptitle`
 remains public.
 
-`qis.perfstats` (10 removed) — the 14 `*_TABLE_COLUMNS` constants, the
+`qis.perfstats` (10 removed) â€” the 14 `*_TABLE_COLUMNS` constants, the
 `cond_regression` entry points, and the DataFrame operations listed under
 *Moved* below.
 
 ### Added
 
-- `qis.factsheet` — one-call facade over the four factsheet generators
+- `qis.factsheet` â€” one-call facade over the four factsheet generators
   (`qis.portfolio.reports.factsheet_facade`). It picks the report archetype
   from the input type, calibrates windows / regressions / regimes /
   annualisation for the requested reporting frequency via
@@ -3236,7 +3262,7 @@ remains public.
 ### Changed
 
 - Library modules no longer reach through the `qis` namespace. `qis` imported
-  itself — `qis/portfolio/reports/strategy_factsheet.py` called
+  itself â€” `qis/portfolio/reports/strategy_factsheet.py` called
   `qis.set_spines(...)`, `qis/plots/scatter.py` called `qp.get_n_sns_colors(...)`
   through `import qis.plots as qp`, and `qis/portfolio/backtester.py` called
   `qu.repeat_by_rows(...)` through `import qis.utils as qu`. The top-level
@@ -3288,7 +3314,7 @@ importing these by file path must update.
   modules. `compute_desc_table` is defined in both `qis.perfstats.desc_table`
   and `qis.plots.derived.desc_table`, and `DescTableType` in both as well.
   `qis/__init__.py` imported perfstats before plots, so the top-level namespace
-  bound `compute_desc_table` from plots and `DescTableType` from perfstats —
+  bound `compute_desc_table` from plots and `DescTableType` from perfstats â€”
   two different Enum classes, for which `==` returns `False`. The plots export
   is removed and the pair now resolves consistently to `qis.perfstats`.
 - Three names were exported from two modules each and silently shadowed by
@@ -3322,7 +3348,7 @@ For downstream code, the mechanical steps are:
 2. For any `AttributeError: module 'qis' has no attribute X`, import `X` from
    its defining module. `python -c "import qis.plots.utils as m; print(m.X)"`
    locates it; the module list is in `docs/REMOVED_5_0.md`.
-3. Do not import from `qis/examples/` — it is documentation and is
+3. Do not import from `qis/examples/` â€” it is documentation and is
    restructured without notice.
 
 ## [4.3.4] - 2026-07-11
@@ -3330,7 +3356,7 @@ For downstream code, the mechanical steps are:
 Never tagged; ships to users as part of 5.0.3.
 
 ### Added
-- `qis.perfstats.signal_diagnostics` — cross-sectional predictive regression
+- `qis.perfstats.signal_diagnostics` â€” cross-sectional predictive regression
   diagnostics for trading signals with per-asset native-cadence handling. For an
   N-asset panel of signal scores and per-frequency return panels,
   `estimate_signal_diagnostics` quantifies cross-sectional predictive content at
@@ -3339,7 +3365,7 @@ Never tagged; ships to users as part of 5.0.3.
   native periods. `compute_per_asset_betas`, `compute_ic_timeseries` and
   `estimate_ic_ir` expose the per-asset betas, the per-date information
   coefficient series and its IC-IR.
-- `qis.min_obs_for_ar_unsmoothing` — minimum observation count required for an
+- `qis.min_obs_for_ar_unsmoothing` â€” minimum observation count required for an
   AR(q) unsmoothing fit given `ar_order` and `warmup_period`, validating both
   (`ValueError` naming the offending value).
 
@@ -3352,7 +3378,7 @@ Never tagged; ships to users as part of 5.0.3.
 ## [4.3.2] - 2026-06-28
 
 ### Added
-- `qis.estimate_dimson_beta` in `qis.models.unsmoothing.dimson_beta` —
+- `qis.estimate_dimson_beta` in `qis.models.unsmoothing.dimson_beta` â€”
   Dimson (1979) aggregated-coefficient beta to detect return smoothing.
   Regresses each asset on the contemporaneous and lagged market return and
   reports `beta_dimson = sum_k b_k`; the `beta_dimson / b_0` ratio measures
@@ -3360,7 +3386,7 @@ Never tagged; ships to users as part of 5.0.3.
   slopes tests whether the lag effect is real. Pure numpy/pandas, importable
   standalone.
 - `qis.adjust_returns_with_factor_lag` in `qis.models.unsmoothing.factor_lag`
-  — factor-lag (Dimson) unsmoothing for illiquid / appraisal-based series.
+  â€” factor-lag (Dimson) unsmoothing for illiquid / appraisal-based series.
   Companion to the own-lag AR(q) engine; removes smoothing that manifests as
   a lagged response to a liquid factor, which the own-lag AR cannot see (a
   fund-of-funds with near-zero own autocorrelation but a real lagged-equity
@@ -3369,7 +3395,7 @@ Never tagged; ships to users as part of 5.0.3.
   true loading and the existing HCGL / factor-covariance estimator picks it
   up with no change.
 - `qis.adjust_returns_with_joint_unsmoothing` in
-  `qis.models.unsmoothing.joint_lag` — single-regression joint own-lag +
+  `qis.models.unsmoothing.joint_lag` â€” single-regression joint own-lag +
   factor-lag unsmoothing, fitting the own-lag coefficient and the
   lagged-factor beta jointly via the rolling EWMA cross-moment estimator.
   Removes the omitted-variable bias and stage-order dependence of running the
@@ -3426,7 +3452,7 @@ Never tagged; ships to users as part of 5.0.3.
   `models/`, `regimes/`, `portfolios/`, `factsheets/`, `plots/`, `utils/`,
   `case_studies/`, `_helpers/`) with a per-folder `README.md` and a
   module-level docstring on every example file.
-- New example `qis/examples/perfstats/unsmoothing_and_delevering.py` —
+- New example `qis/examples/perfstats/unsmoothing_and_delevering.py` â€”
   end-to-end walkthrough of the leverage / unsmoothing functions on a
   bundled OCSL / Oaktree GCF / SPX / US HY / US Agg weekly NAV dataset.
 - New example `qis/examples/models/multivariate_ols.py` demonstrating
@@ -3437,16 +3463,16 @@ Never tagged; ships to users as part of 5.0.3.
 
 ### Changed
 - Bumped minimum Python from 3.9 to 3.10. (numba 0.61 dropped Python 3.9
-  support, and the bump to numba ≥0.63 for Python 3.14 forces the same
+  support, and the bump to numba â‰¥0.63 for Python 3.14 forces the same
   floor here.)
 - Bumped minimum numba from 0.60.0 to 0.63.0 (required for Python 3.14
   support; see numba 0.63.0 release notes, Dec 2025).
 - Renamed several example files for clarity:
-  - `models/ewm_filters.py` → `models/ewm_kernels.py`
-  - `models/correlation_matrix.py` → `models/ewm_correlation_table.py`
-  - `models/ewma_factor_betas.py` → `models/ewm_linear_model.py`
-  - `portfolios/btc_marginal_contribution.py` → `portfolios/balanced_60_40_with_btc.py`
-  - `perfstats/perf_excluding_best_worst_days.py` → `perfstats/miss_best_worst_days_impact.py`
+  - `models/ewm_filters.py` â†’ `models/ewm_kernels.py`
+  - `models/correlation_matrix.py` â†’ `models/ewm_correlation_table.py`
+  - `models/ewma_factor_betas.py` â†’ `models/ewm_linear_model.py`
+  - `portfolios/btc_marginal_contribution.py` â†’ `portfolios/balanced_60_40_with_btc.py`
+  - `perfstats/perf_excluding_best_worst_days.py` â†’ `perfstats/miss_best_worst_days_impact.py`
 - Moved `infrequent_returns_interpolation.py` from `examples/utils/` to
   `examples/perfstats/` (matches the API location:
   `qis.perfstats.timeseries_bfill`).
@@ -3457,7 +3483,7 @@ Never tagged; ships to users as part of 5.0.3.
   return sources, gross vs net vs costs), not into asset-level NAVs.
   The original names were misleading. The formula is unchanged: the
   function rescales component NAVs by a time-weighted factor so their
-  PA returns sum to the portfolio PA return — useful for stacked-area
+  PA returns sum to the portfolio PA return â€” useful for stacked-area
   visualisation of return decomposition. Docstring rewritten to
   document the actual invariant.
 - `qis.to_portfolio_returns` and `qis.portfolio_returns_to_nav` docstrings
@@ -3476,7 +3502,7 @@ Never tagged; ships to users as part of 5.0.3.
   resample target timestamp (e.g. yfinance returning NaN on the US
   Independence Day Friday that was also the `W-FRI` bucket end),
   `df.reindex(index=freq_index, method='ffill')` returned NaN for that
-  bucket — pandas' `reindex(method='ffill')` looks back through input
+  bucket â€” pandas' `reindex(method='ffill')` looks back through input
   *index labels*, not values, so it found the holiday Friday label
   directly and copied its NaN value. The post-reindex ffill could not
   recover the value because nothing earlier in the resampled output
@@ -3503,13 +3529,13 @@ Never tagged; ships to users as part of 5.0.3.
   alpha computations downstream.
 - `qis.compute_excess_returns` look-ahead bias. The function used
   `lag=None` for `multiply_df_by_dt`, applying today's risk-free rate to
-  today's funding cost — a small contemporaneous-rate look-ahead.
+  today's funding cost â€” a small contemporaneous-rate look-ahead.
   `get_excess_returns_nav` already used `lag=1`. Now both functions agree
   on lag=1 (funding cost at t uses the rate set at t-1).
 - `qis.prices_at_freq` `ffill_nans=False` ignored when `freq is None`.
   Previously the no-freq branch gated only on `fill_na_method` (default
   `'ffill'`), so callers passing `ffill_nans=False` without also
-  overriding `fill_na_method` got ffilled prices anyway — opposite of
+  overriding `fill_na_method` got ffilled prices anyway â€” opposite of
   what the parameter name promised. Now `ffill_nans=False` disables fill
   in both branches consistently.
 - `qis.df_price_ffill_between_nans` ignored its `method` parameter. The
@@ -3536,10 +3562,10 @@ Never tagged; ships to users as part of 5.0.3.
 ### Added
 - Factsheet reporting via [pybloqs](https://github.com/man-group/PyBloqs).
 - Four factsheet types with examples in `qis.examples.factsheets`:
-  - `multi_asset` — cross-sectional comparison
-  - `strategy` — performance / risk / trading stats from `PortfolioData`
-  - `strategy_benchmark` — strategy vs benchmark
-  - `multi_strategy` — parameter sensitivity sweeps
+  - `multi_asset` â€” cross-sectional comparison
+  - `strategy` â€” performance / risk / trading stats from `PortfolioData`
+  - `strategy_benchmark` â€” strategy vs benchmark
+  - `multi_strategy` â€” parameter sensitivity sweeps
 
 ## [1.0.1] - 2022-12-30
 
@@ -3547,6 +3573,6 @@ Initial public release.
 
 ---
 
-Versions between 1.0.1 ↔ 2.0.0 and 2.0.2 onwards (prior to the next
+Versions between 1.0.1 â†” 2.0.0 and 2.0.2 onwards (prior to the next
 release) have not been backfilled. Run `git log --tags --oneline` for
 release-by-release commit history.

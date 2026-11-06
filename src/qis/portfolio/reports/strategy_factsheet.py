@@ -31,6 +31,10 @@ that picks between them by input shape is ``factsheet_facade.py``.
 # packages
 import warnings
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import (
+    resolve_group_partition, resolve_reporting_inputs,
+)
 from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -81,15 +85,30 @@ def _get_monthly_returns_appendix_bounds(num_years: int,
 
 
 def _use_grouped_summary_tables(
-        portfolio_data: PortfolioData,
-        is_grouped: bool,
-        panel_names: str = 'RA performance, YE-returns, and Sharpe-ratio panels',
+    portfolio_data: PortfolioData,
+    is_grouped: bool,
+    panel_names: str = "RA performance, YE-returns, and Sharpe-ratio panels",
+    *,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
 ) -> bool:
-    """Limit dense summary tables while leaving other grouped report panels unchanged."""
-    if not is_grouped or portfolio_data.group_data is None:
+    """Limit dense summary tables while leaving other grouped report panels unchanged.
+
+    Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+            where available. Fractional memberships belong in lookthrough_matrix.
+    """
+    if group_data is None:
+        group_data = portfolio_data.group_data
+    if not is_grouped or (group_data is None and lookthrough_matrix is None):
         return is_grouped
 
-    num_groups = int(portfolio_data.group_data.nunique(dropna=True))
+    num_groups = (int(group_data.nunique(dropna=True)) if lookthrough_matrix is None
+                  else len(resolve_group_partition(
+                      group_data, portfolio_data.weights.columns, lookthrough_matrix).columns))
     if num_groups <= MAX_GROUPS_FOR_SUMMARY_TABLES:
         return True
 
@@ -102,55 +121,57 @@ def _use_grouped_summary_tables(
     return False
 
 
-def generate_strategy_factsheet(portfolio_data: PortfolioData,
-                                benchmark_prices: Union[pd.DataFrame, pd.Series],
-                                time_period: TimePeriod = None,
-                                ytd_attribution_time_period: TimePeriod = qis.get_ytd_time_period(),
-                                weight_report_time_period: TimePeriod = None,
-                                perf_params: PerfParams = PERF_PARAMS,
-                                regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                                regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
-                                weights_freq: Optional[str] = 'W-WED',  #'W-WED',
-                                turnover_rolling_period: int = 260,
-                                freq_turnover: str = 'B',
-                                freq_cost: str = 'B',
-                                cost_rolling_period: int = 260,
-                                factor_beta_span: int = 52,
-                                freq_beta: str = 'W-WED',
-                                vol_rolling_window: int = 13,
-                                freq_sharpe: str = 'B',
-                                freq_var: str = 'B',
-                                var_span: float = 33,
-                                sharpe_rolling_window: int = 260,
-                                add_benchmarks_to_navs: bool = False,
-                                figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
-                                fontsize: int = 5,
-                                weights_change_lag: int = 20,
-                                add_current_position_var_risk_sheet: bool = False,
-                                add_grouped_weights_sheet: bool = False,
-                                add_current_signal_report: bool = False,
-                                add_weight_change_report: bool = False,
-                                add_performance_risk_attribution_sheet: bool = False,
-                                add_grouped_exposures: bool = False,
-                                add_grouped_cum_pnl: bool = False,
-                                add_instrument_history_report: bool = False,
-                                y_limits_signal: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
-                                is_1y_exposures: bool = False,
-                                is_grouped: bool = False,
-                                dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
-                                is_unit_based_traded_volume: Optional[bool] = None,
-                                df_to_add: pd.DataFrame = None,
-                                factsheet_name: str = None,
-                                monthly_returns_heatmap_max_years: Optional[int] = 10,
-                                recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
-                                    DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
-                                ),
-                                turnover_computation_type: Optional[
-                                    qis.TurnoverComputationType
-                                ] = None,
-                                turnover_vols: Optional[pd.DataFrame] = None,
-                                **kwargs
-                                ) -> List[plt.Figure]:
+def generate_strategy_factsheet(
+    portfolio_data: PortfolioData,
+    benchmark_prices: Union[pd.DataFrame, pd.Series],
+    time_period: TimePeriod = None,
+    ytd_attribution_time_period: TimePeriod = qis.get_ytd_time_period(),
+    weight_report_time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+    regime_benchmark: str = None,  # default is set to benchmark_prices.columns[0]
+    weights_freq: Optional[str] = "W-WED",  #'W-WED',
+    turnover_rolling_period: int = 260,
+    freq_turnover: str = "B",
+    freq_cost: str = "B",
+    cost_rolling_period: int = 260,
+    factor_beta_span: int = 52,
+    freq_beta: str = "W-WED",
+    vol_rolling_window: int = 13,
+    freq_sharpe: str = "B",
+    freq_var: str = "B",
+    var_span: float = 33,
+    sharpe_rolling_window: int = 260,
+    add_benchmarks_to_navs: bool = False,
+    figsize: Tuple[float, float] = (8.5, 11.7),  # A4 for portrait
+    fontsize: int = 5,
+    weights_change_lag: int = 20,
+    add_current_position_var_risk_sheet: bool = False,
+    add_grouped_weights_sheet: bool = False,
+    add_current_signal_report: bool = False,
+    add_weight_change_report: bool = False,
+    add_performance_risk_attribution_sheet: bool = False,
+    add_grouped_exposures: bool = False,
+    add_grouped_cum_pnl: bool = False,
+    add_instrument_history_report: bool = False,
+    y_limits_signal: Tuple[Optional[float], Optional[float]] = (-1.0, 1.0),
+    is_1y_exposures: bool = False,
+    is_grouped: bool = False,
+    dd_legend_type: qis.DdLegendType = qis.DdLegendType.SIMPLE,
+    is_unit_based_traded_volume: Optional[bool] = None,
+    df_to_add: pd.DataFrame = None,
+    factsheet_name: str = None,
+    monthly_returns_heatmap_max_years: Optional[int] = 10,
+    recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+        DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+    ),
+    turnover_computation_type: Optional[qis.TurnoverComputationType] = None,
+    turnover_vols: Optional[pd.DataFrame] = None,
+    *,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> List[plt.Figure]:
     """
     multi-page factsheet for one strategy against a benchmark.
 
@@ -166,6 +187,11 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     computed at.
 
     Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+            where available. Fractional memberships belong in lookthrough_matrix.
         portfolio_data: the strategy; must carry weights and instrument pnl for the attribution
             panels, and ``covar_dict`` for the risk panels
         benchmark_prices: benchmark panel for the regressions and regime classification
@@ -225,6 +251,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     Returns:
         one figure per page, in page order
     """
+    group_data, lookthrough_matrix = resolve_reporting_inputs(
+        [portfolio_data], group_data, lookthrough_matrix)
     kwargs = factsheet_kwargs(kwargs)
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
@@ -241,7 +269,14 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         regime_benchmark = benchmark_prices.columns[0]
 
     if not is_grouped:
-        if len(portfolio_data.get_weights().columns) >= 10:  # otherwise tables look too bad
+        if (
+            len(
+                portfolio_data.get_weights(
+                    lookthrough_matrix=lookthrough_matrix, group_data=group_data
+                ).columns
+            )
+            >= 10
+        ):  # otherwise tables look too bad
             warnings.warn(
                 "Using portfolio groups for a report with at least 10 assets; "
                 "oversized asset panels show bottom/top selections.")
@@ -249,6 +284,8 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     is_grouped_for_summary_tables = _use_grouped_summary_tables(
         portfolio_data=portfolio_data,
         is_grouped=is_grouped,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
     )
 
     fig = plt.figure(figsize=figsize, constrained_layout=True)
@@ -357,7 +394,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
-    exposures = portfolio_data.get_weights(is_grouped=is_grouped, time_period=time_period, add_total=False)
+    exposures = portfolio_data.get_weights(
+        is_grouped=is_grouped,
+        time_period=time_period,
+        add_total=False,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
     ax = fig.add_subplot(gs[8:10, :2])
     if weights_freq is not None:
         exposures = exposures.resample(weights_freq).last()
@@ -372,12 +415,17 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
     # turnover
     ax = fig.add_subplot(gs[10:12, :2])
-    turnover = portfolio_data.get_turnover(time_period=time_period, roll_period=turnover_rolling_period,
-                                           freq=freq_turnover,
-                                           is_grouped=is_grouped,
-                                           turnover_computation_type=turnover_computation_type,
-                                           is_unit_based_traded_volume=is_unit_based_traded_volume,
-                                           vols=turnover_vols)
+    turnover = portfolio_data.get_turnover(
+        time_period=time_period,
+        roll_period=turnover_rolling_period,
+        freq=freq_turnover,
+        is_grouped=is_grouped,
+        turnover_computation_type=turnover_computation_type,
+        is_unit_based_traded_volume=is_unit_based_traded_volume,
+        vols=turnover_vols,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
     freq = freq_turnover or _infer_freq(turnover.index)
     is_volatility_normalized = (
         turnover_computation_type
@@ -412,10 +460,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     is_unit_based_costs = (
         True if is_unit_based_traded_volume is None else is_unit_based_traded_volume
     )
-    costs = portfolio_data.get_costs(time_period=time_period, roll_period=cost_rolling_period,
-                                     freq=freq_cost,
-                                     is_grouped=is_grouped,
-                                     is_unit_based_traded_volume=is_unit_based_costs)
+    costs = portfolio_data.get_costs(
+        time_period=time_period,
+        roll_period=cost_rolling_period,
+        freq=freq_cost,
+        is_grouped=is_grouped,
+        is_unit_based_traded_volume=is_unit_based_costs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
     freq = freq_cost or _infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
     plot_asset_time_series(df=costs, asset_additive=True,
@@ -436,20 +489,28 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         benchmark_price1 = benchmark_prices[regime_benchmark]
     if is_grouped:
         ax = fig.add_subplot(gs[:2, 2:])
-        portfolio_data.plot_ra_perf_table(ax=ax,
-                                          benchmark_price=benchmark_price1,
-                                          time_period=time_period,
-                                          perf_params=perf_params,
-                                          is_grouped=is_grouped_for_summary_tables,
-                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
+        portfolio_data.plot_ra_perf_table(
+            ax=ax,
+            benchmark_price=benchmark_price1,
+            time_period=time_period,
+            perf_params=perf_params,
+            is_grouped=is_grouped_for_summary_tables,
+            **qis.update_kwargs(kwargs, dict(fontsize=fontsize)),
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     else:  # plot two tables
         ax = fig.add_subplot(gs[0, 2:])
-        portfolio_data.plot_ra_perf_table(ax=ax,
-                                          benchmark_price=benchmark_price1,
-                                          time_period=time_period,
-                                          perf_params=perf_params,
-                                          is_grouped=is_grouped,
-                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
+        portfolio_data.plot_ra_perf_table(
+            ax=ax,
+            benchmark_price=benchmark_price1,
+            time_period=time_period,
+            perf_params=perf_params,
+            is_grouped=is_grouped,
+            **qis.update_kwargs(kwargs, dict(fontsize=fontsize)),
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         ax = fig.add_subplot(gs[1, 2:])
         # change regression to weekly
         time_period1 = _get_recent_ra_perf_table_time_period(
@@ -460,11 +521,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
         else:
             local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
-        portfolio_data.plot_ra_perf_table(ax=ax,
-                                          benchmark_price=benchmark_price1,
-                                          perf_params=perf_params,
-                                          is_grouped=is_grouped,
-                                          **local_kwargs)
+        portfolio_data.plot_ra_perf_table(
+            ax=ax,
+            benchmark_price=benchmark_price1,
+            perf_params=perf_params,
+            is_grouped=is_grouped,
+            **local_kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
 
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
@@ -487,20 +552,28 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
     ax = fig.add_subplot(gs[4:6, 2:])
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
                                      new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True))
-    portfolio_data.plot_periodic_returns(benchmark_prices=benchmark_price1,
-                                         is_grouped=is_grouped_for_summary_tables,
-                                         time_period=time_period,
-                                         ax=ax,
-                                         **local_kwargs)
+    portfolio_data.plot_periodic_returns(
+        benchmark_prices=benchmark_price1,
+        is_grouped=is_grouped_for_summary_tables,
+        time_period=time_period,
+        ax=ax,
+        **local_kwargs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
 
     # regime data
-    portfolio_data.plot_regime_data(is_grouped=is_grouped_for_summary_tables,
-                                    benchmark_price=benchmark_prices[regime_benchmark],
-                                    time_period=time_period,
-                                    perf_params=perf_params,
-                                    regime_classifier=regime_classifier,
-                                    ax=fig.add_subplot(gs[6:8, 2:]),
-                                    **kwargs)
+    portfolio_data.plot_regime_data(
+        is_grouped=is_grouped_for_summary_tables,
+        benchmark_price=benchmark_prices[regime_benchmark],
+        time_period=time_period,
+        perf_params=perf_params,
+        regime_classifier=regime_classifier,
+        ax=fig.add_subplot(gs[6:8, 2:]),
+        **kwargs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
 
     # perf attribution
     local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
@@ -558,36 +631,84 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         # current var grouped
         with sns.axes_style("whitegrid"):
             axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]), fig.add_subplot(gs[0, 3])]
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
-                                            is_grouped=True, is_correlated=False, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[0], **kwargs)
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
-                                            is_grouped=True, is_correlated=False, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[1], **kwargs)
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.LAST,
+                is_grouped=True,
+                is_correlated=False,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[0],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.MAX,
+                is_grouped=True,
+                is_correlated=False,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[1],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
 
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
-                                            is_grouped=True, is_correlated=True, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[2], **kwargs)
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
-                                            is_grouped=True, is_correlated=True, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[3], **kwargs)
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.LAST,
+                is_grouped=True,
+                is_correlated=True,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[2],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.MAX,
+                is_grouped=True,
+                is_correlated=True,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[3],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             align_y_limits_axs(axs=axs)
 
         # last / max var by instrument
         with sns.axes_style("whitegrid"):
             axs = [fig.add_subplot(gs[1, 0:2]), fig.add_subplot(gs[1, 2:4])]
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.LAST,
-                                            is_grouped=False, is_correlated=False, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[0], **kwargs)
-            portfolio_data.plot_current_var(snapshot_period=qis.SnapshotPeriod.MAX,
-                                            is_grouped=False, is_correlated=False, time_period=time_period,
-                                            freq=freq_var, vol_span=var_span,
-                                            ax=axs[1], **kwargs)
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.LAST,
+                is_grouped=False,
+                is_correlated=False,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[0],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+            portfolio_data.plot_current_var(
+                snapshot_period=qis.SnapshotPeriod.MAX,
+                is_grouped=False,
+                is_correlated=False,
+                time_period=time_period,
+                freq=freq_var,
+                vol_span=var_span,
+                ax=axs[1],
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             align_y_limits_axs(axs=axs)
 
         # best worst returns
@@ -618,30 +739,48 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
 
         # var attribution
         with sns.axes_style("whitegrid"):
-            portfolio_data.plot_var_stack(is_grouped=True, is_correlated=False,
-                                          time_period=time_period,
-                                          ax=fig.add_subplot(gs[3, :2]),
-                                          **kwargs)
-            portfolio_data.plot_var_stack(is_grouped=True, is_correlated=True,
-                                          time_period=time_period,
-                                          ax=fig.add_subplot(gs[3, 2:]),
-                                          **kwargs)
+            portfolio_data.plot_var_stack(
+                is_grouped=True,
+                is_correlated=False,
+                time_period=time_period,
+                ax=fig.add_subplot(gs[3, :2]),
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+            portfolio_data.plot_var_stack(
+                is_grouped=True,
+                is_correlated=True,
+                time_period=time_period,
+                ax=fig.add_subplot(gs[3, 2:]),
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
 
         # var time series - independent
         ax = fig.add_subplot(gs[4, :2])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=False,
-                                                  time_period=time_period,
-                                                  **kwargs)
+        portfolio_data.plot_portfolio_grouped_var(
+            ax=ax,
+            is_correlated=False,
+            time_period=time_period,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # var time series - correlted
         ax = fig.add_subplot(gs[4, 2:])
-        portfolio_data.plot_portfolio_grouped_var(ax=ax,
-                                                  is_correlated=True,
-                                                  time_period=time_period,
-                                                  **kwargs)
+        portfolio_data.plot_portfolio_grouped_var(
+            ax=ax,
+            is_correlated=True,
+            time_period=time_period,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
@@ -714,13 +853,17 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         """
         # vol regime data
         ax = fig.add_subplot(gs[6, 2:])
-        portfolio_data.plot_vol_regimes(ax=ax,
-                                        benchmark_price=benchmark_prices[regime_benchmark],
-                                        is_grouped=is_grouped,
-                                        time_period=time_period,
-                                        freq=regime_classifier.freq,
-                                        regime_classifier=regime_classifier,
-                                        **kwargs)
+        portfolio_data.plot_vol_regimes(
+            ax=ax,
+            benchmark_price=benchmark_prices[regime_benchmark],
+            is_grouped=is_grouped,
+            time_period=time_period,
+            freq=regime_classifier.freq,
+            regime_classifier=regime_classifier,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         """
         if len(benchmark_prices.columns) > 1:
             ax = fig.add_subplot(gs[12:14, 2:])
@@ -738,9 +881,15 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
             raise ValueError(f"need group data")
 
         total_column = 'Total'
-        grouped_weights_agg, grouped_weights_by_inst = portfolio_data.get_grouped_long_short_weights(time_period=time_period,
-                                                                                                     total_column=total_column,
-                                                                                                     weights_freq=None)
+        grouped_weights_agg, grouped_weights_by_inst = (
+            portfolio_data.get_grouped_long_short_weights(
+                time_period=time_period,
+                total_column=total_column,
+                weights_freq=None,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
 
         grouped_weights_agg, grouped_weights_by_inst = compact_groups(
             grouped_weights_agg, grouped_weights_by_inst)
@@ -931,7 +1080,13 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
         regime_classifier1 = regime_classifier
 
     if add_grouped_exposures:
-        grouped_weights_agg, grouped_weights_by_inst = portfolio_data.get_grouped_long_short_weights(time_period=time_period1)
+        grouped_weights_agg, grouped_weights_by_inst = (
+            portfolio_data.get_grouped_long_short_weights(
+                time_period=time_period1,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
         grouped_weights_agg, grouped_weights_by_inst = compact_groups(
             grouped_weights_agg, grouped_weights_by_inst)
         nrows = len(grouped_weights_agg.keys())
@@ -958,7 +1113,9 @@ def generate_strategy_factsheet(portfolio_data: PortfolioData,
                 ax.axhline(0, color='black', linewidth=0.5)
 
     if add_grouped_cum_pnl:
-        grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(time_period=time_period1)
+        grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(
+            time_period=time_period1, lookthrough_matrix=lookthrough_matrix, group_data=group_data
+        )
         grouped_pnls_agg, grouped_pnls_by_inst = compact_groups(
             grouped_pnls_agg, grouped_pnls_by_inst)
         nrows = len(grouped_pnls_agg.keys())

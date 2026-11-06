@@ -15,6 +15,8 @@ risk-contribution panels fall back to the covariance each member portfolio carri
 The same pair as a paginated A4 factsheet is ``strategy_benchmark_factsheet.py``.
 """
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import resolve_reporting_inputs
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -167,27 +169,32 @@ def _add_ex_post_benchmark_panels(
     )
 
 
-def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfolioData,
-                                              strategy_idx: int = 0,
-                                              benchmark_idx: int = 1,
-                                              ac_group_data: pd.Series = None,
-                                              ac_group_order: List[str] = None,
-                                              sub_ac_group_data: pd.Series = None,
-                                              sub_ac_group_order: List[str] = None,
-                                              turnover_groups: pd.Series = None,
-                                              turnover_order: List[str] = None,
-                                              risk_model: LinearModel = None,
-                                              covar_risk_model: Optional[RiskModel] = None,
-                                              time_period: TimePeriod = None,
-                                              perf_params: PerfParams = PERF_PARAMS,
-                                              regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                                              add_benchmarks_to_navs: bool = True,
-                                              tre_max_clip: Optional[float] = None,
-                                              figsize: Tuple[float, float] = (11.7, 8.3),
-                                              var_format: str = '{:.1%}',
-                                              add_titles: bool = True,
-                                              **kwargs
-                                              ) -> Tuple[Dict[str, plt.Figure], Dict[str, pd.DataFrame]]:
+def weights_tracking_error_report_by_ac_subac(
+    multi_portfolio_data: MultiPortfolioData,
+    strategy_idx: int = 0,
+    benchmark_idx: int = 1,
+    ac_group_data: pd.Series = None,
+    ac_group_order: List[str] = None,
+    sub_ac_group_data: pd.Series = None,
+    sub_ac_group_order: List[str] = None,
+    turnover_groups: pd.Series = None,
+    turnover_order: List[str] = None,
+    risk_model: LinearModel = None,
+    covar_risk_model: Optional[RiskModel] = None,
+    time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+    add_benchmarks_to_navs: bool = True,
+    tre_max_clip: Optional[float] = None,
+    figsize: Tuple[float, float] = (11.7, 8.3),
+    var_format: str = "{:.1%}",
+    add_titles: bool = True,
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    sub_ac_lookthrough_matrix: Optional[pd.DataFrame] = None,
+    turnover_lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> Tuple[Dict[str, plt.Figure], Dict[str, pd.DataFrame]]:
     """Build weights and tracking-error panels for a strategy and benchmark.
 
     ``risk_model`` and ``covar_risk_model`` are deliberately distinct. The former is the
@@ -196,6 +203,11 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
     and systematic/residual tracking-error decomposition.
 
     Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        sub_ac_lookthrough_matrix: Independent optional partition for sub-asset-class panels.
+        turnover_lookthrough_matrix: Independent optional partition attributing instrument turnover.
         multi_portfolio_data: Strategy and benchmark portfolios with shared report data.
         strategy_idx: Index of the strategy portfolio.
         benchmark_idx: Index of the benchmark portfolio.
@@ -222,6 +234,12 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
     Returns:
         Figure and DataFrame dictionaries keyed by panel name.
     """
+    ac_group_data, lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, ac_group_data, lookthrough_matrix)
+    sub_ac_group_data, sub_ac_lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, sub_ac_group_data, sub_ac_lookthrough_matrix)
+    turnover_groups, turnover_lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, turnover_groups, turnover_lookthrough_matrix)
     regime_benchmark = multi_portfolio_data.benchmark_prices.columns[0]
     benchmark_price = multi_portfolio_data.benchmark_prices[regime_benchmark]
 
@@ -284,18 +302,34 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         strategy_data = multi_portfolio_data.portfolio_datas[strategy_idx]
         strategy_ticker = strategy_data.ticker
         weight_kwargs = dict(is_grouped=True, time_period=time_period, add_total=False, is_input_weights=True)
-        strategy_exposures_ac = strategy_data.get_weights(group_data=ac_group_data, group_order=ac_group_order,
-                                                          **weight_kwargs)
-        strategy_exposures_subac = strategy_data.get_weights(group_data=sub_ac_group_data, group_order=sub_ac_group_order,
-                                                             **weight_kwargs)
+        strategy_exposures_ac = strategy_data.get_weights(
+            group_data=ac_group_data,
+            lookthrough_matrix=lookthrough_matrix,
+            group_order=ac_group_order,
+            **weight_kwargs,
+        )
+        strategy_exposures_subac = strategy_data.get_weights(
+            group_data=sub_ac_group_data,
+            lookthrough_matrix=sub_ac_lookthrough_matrix,
+            group_order=sub_ac_group_order,
+            **weight_kwargs,
+        )
 
         # benchmark weights
         benchmark_data = multi_portfolio_data.portfolio_datas[benchmark_idx]
         benchmark_ticker = benchmark_data.ticker
-        benchmark_exposures_ac = benchmark_data.get_weights(group_data=ac_group_data, group_order=ac_group_order,
-                                                            **weight_kwargs)
-        benchmark_exposures_subac = benchmark_data.get_weights(group_data=sub_ac_group_data, group_order=sub_ac_group_order,
-                                                               **weight_kwargs)
+        benchmark_exposures_ac = benchmark_data.get_weights(
+            group_data=ac_group_data,
+            lookthrough_matrix=lookthrough_matrix,
+            group_order=ac_group_order,
+            **weight_kwargs,
+        )
+        benchmark_exposures_subac = benchmark_data.get_weights(
+            group_data=sub_ac_group_data,
+            lookthrough_matrix=sub_ac_lookthrough_matrix,
+            group_order=sub_ac_group_order,
+            **weight_kwargs,
+        )
 
         # plot strategy and benchmark weights by ac
         kwargs = qis.update_kwargs(kwargs, dict(strategy_ticker=f"(B) {strategy_ticker}",
@@ -382,21 +416,35 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                          time_period=time_period)
         strategy_risk_contributions_ac = strategy_data.compute_risk_contributions_implied_by_covar(
             group_data=ac_group_data,
+            lookthrough_matrix=lookthrough_matrix,
             group_order=ac_group_order,
-            **rc_kwargs)
-        strategy_risk_contributions_subac = strategy_data.compute_risk_contributions_implied_by_covar(
-            group_data=sub_ac_group_data,
-            group_order=sub_ac_group_order,
-            **rc_kwargs)
+            **rc_kwargs,
+        )
+        strategy_risk_contributions_subac = (
+            strategy_data.compute_risk_contributions_implied_by_covar(
+                group_data=sub_ac_group_data,
+                lookthrough_matrix=sub_ac_lookthrough_matrix,
+                group_order=sub_ac_group_order,
+                **rc_kwargs,
+            )
+        )
 
-        benchmark_risk_contributions_ac = benchmark_data.compute_risk_contributions_implied_by_covar(
-            group_data=ac_group_data,
-            group_order=ac_group_order,
-            **rc_kwargs)
-        benchmark_risk_contributions_subac = benchmark_data.compute_risk_contributions_implied_by_covar(
-            group_data=sub_ac_group_data,
-            group_order=sub_ac_group_order,
-            **rc_kwargs)
+        benchmark_risk_contributions_ac = (
+            benchmark_data.compute_risk_contributions_implied_by_covar(
+                group_data=ac_group_data,
+                lookthrough_matrix=lookthrough_matrix,
+                group_order=ac_group_order,
+                **rc_kwargs,
+            )
+        )
+        benchmark_risk_contributions_subac = (
+            benchmark_data.compute_risk_contributions_implied_by_covar(
+                group_data=sub_ac_group_data,
+                lookthrough_matrix=sub_ac_lookthrough_matrix,
+                group_order=sub_ac_group_order,
+                **rc_kwargs,
+            )
+        )
 
         # stack for ac
         fig, axs = plt.subplots(1, 2, figsize=figsize, tight_layout=True)
@@ -436,15 +484,23 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
             **kwargs)
 
         # brinson by asset class
-        totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
-            multi_portfolio_data.compute_brinson_attribution(strategy_idx=strategy_idx,
-                                                             benchmark_idx=benchmark_idx,
-                                                             time_period=time_period,
-                                                             group_data=ac_group_data,
-                                                             group_order=ac_group_order,
-                                                             freq=None,
-                                                             total_column='Total Sum',
-                                                             is_exclude_interaction_term=True)
+        (
+            totals_table,
+            active_total,
+            grouped_allocation_return,
+            grouped_selection_return,
+            grouped_interaction_return,
+        ) = multi_portfolio_data.compute_brinson_attribution(
+            strategy_idx=strategy_idx,
+            benchmark_idx=benchmark_idx,
+            time_period=kwargs.get("brinson_time_period", time_period),
+            group_data=ac_group_data,
+            lookthrough_matrix=lookthrough_matrix,
+            group_order=ac_group_order,
+            freq=None,
+            total_column="Total Sum",
+            is_exclude_interaction_term=True,
+        )
         figs['brinson_table_ac'] = qis.plot_brinson_totals_table(totals_table=totals_table, **kwargs)
         dfs['brinson_table_ac'] = totals_table
 
@@ -487,15 +543,23 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                                                     index=grouped_selection_return.index, regime_classifier=regime_classifier)
 
         # brinson by sub-asset class
-        totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
-            multi_portfolio_data.compute_brinson_attribution(strategy_idx=strategy_idx,
-                                                             benchmark_idx=benchmark_idx,
-                                                             time_period=time_period,
-                                                             group_data=sub_ac_group_data,
-                                                             group_order=sub_ac_group_order,
-                                                             freq=None,
-                                                             total_column='Total Sum',
-                                                             is_exclude_interaction_term=True)
+        (
+            totals_table,
+            active_total,
+            grouped_allocation_return,
+            grouped_selection_return,
+            grouped_interaction_return,
+        ) = multi_portfolio_data.compute_brinson_attribution(
+            strategy_idx=strategy_idx,
+            benchmark_idx=benchmark_idx,
+            time_period=kwargs.get("brinson_time_period", time_period),
+            group_data=sub_ac_group_data,
+            lookthrough_matrix=sub_ac_lookthrough_matrix,
+            group_order=sub_ac_group_order,
+            freq=None,
+            total_column="Total Sum",
+            is_exclude_interaction_term=True,
+        )
         figs['brinson_table_subac'] = qis.plot_brinson_totals_table(totals_table=totals_table, **kwargs)
         dfs['brinson_table_subac'] = totals_table
 
@@ -552,8 +616,10 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                 benchmark_weights=benchmark_input_weights,
                 portfolio_weights=strategy_input_weights,
                 group_data=ac_group_data,
-                total_column='Total',
-                strict=False)
+                lookthrough_matrix=lookthrough_matrix,
+                total_column="Total",
+                strict=False,
+            )
             if tre_max_clip is not None:
                 group_columns = grouped_tre.columns.drop('Total', errors='ignore')
                 grouped_tre[group_columns] = grouped_tre[group_columns].clip(upper=tre_max_clip)
@@ -575,26 +641,30 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
                     regime_classifier=regime_classifier)
             dfs['ac_tracking_error'] = grouped_tre
         else:
-            multi_portfolio_data.plot_tre_time_series(strategy_idx=strategy_idx,
-                                                      benchmark_idx=benchmark_idx,
-                                                      is_grouped=True,
-                                                      group_data=ac_group_data,
-                                                      group_order=ac_group_order,
-                                                      regime_benchmark=regime_benchmark,
-                                                      regime_classifier=regime_classifier,
-                                                      tre_max_clip=tre_max_clip,
-                                                      title=title,
-                                                      ax=ax,
-                                                      time_period=time_period,
-                                                      **kwargs)
-            dfs['ac_tracking_error'] = (
-                multi_portfolio_data.compute_tracking_error_implied_by_covar(
-                    strategy_idx=strategy_idx,
-                    benchmark_idx=benchmark_idx,
-                    is_grouped=True,
-                    group_data=ac_group_data,
-                    group_order=ac_group_order,
-                    total_column='Total'))
+            multi_portfolio_data.plot_tre_time_series(
+                strategy_idx=strategy_idx,
+                benchmark_idx=benchmark_idx,
+                is_grouped=True,
+                group_data=ac_group_data,
+                lookthrough_matrix=lookthrough_matrix,
+                group_order=ac_group_order,
+                regime_benchmark=regime_benchmark,
+                regime_classifier=regime_classifier,
+                tre_max_clip=tre_max_clip,
+                title=title,
+                ax=ax,
+                time_period=time_period,
+                **kwargs,
+            )
+            dfs["ac_tracking_error"] = multi_portfolio_data.compute_tracking_error_implied_by_covar(
+                strategy_idx=strategy_idx,
+                benchmark_idx=benchmark_idx,
+                is_grouped=True,
+                group_data=ac_group_data,
+                lookthrough_matrix=lookthrough_matrix,
+                group_order=ac_group_order,
+                total_column="Total",
+            )
 
         ex_ante_tre = dfs['ac_tracking_error']['Total']
         if time_period is not None:
@@ -640,28 +710,34 @@ def weights_tracking_error_report_by_ac_subac(multi_portfolio_data: MultiPortfol
         # group turnover
         fig, ax = plt.subplots(1, 1, figsize=figsize, tight_layout=True)
         figs['group_turnover'] = fig
-        multi_portfolio_data.portfolio_datas[strategy_idx].plot_turnover(ax=ax,
-                                                                         time_period=time_period,
-                                                                         regime_benchmark=regime_benchmark,
-                                                                         regime_classifier=regime_classifier,
-                                                                         is_grouped=True,
-                                                                         group_data=turnover_groups,
-                                                                         group_order=turnover_order,
-                                                                         add_total=False,
-                                                                         **kwargs)
+        multi_portfolio_data.portfolio_datas[strategy_idx].plot_turnover(
+            ax=ax,
+            time_period=time_period,
+            regime_benchmark=regime_benchmark,
+            regime_classifier=regime_classifier,
+            is_grouped=True,
+            group_data=turnover_groups,
+            lookthrough_matrix=turnover_lookthrough_matrix,
+            group_order=turnover_order,
+            add_total=False,
+            **kwargs,
+        )
         if regime_benchmark is not None:
             multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                     index=grouped_selection_return.index, regime_classifier=regime_classifier)
         if not add_titles:
             ax.title.set_visible(False)
 
-        dfs['ac_turnover'] = multi_portfolio_data.portfolio_datas[strategy_idx].get_turnover(is_agg=False,
-                                                                                             is_grouped=True,
-                                                                                             group_data=turnover_groups,
-                                                                                             group_order=turnover_order,
-                                                                                             time_period=time_period,
-                                                                                             add_total=False,
-                                                                                             **kwargs)
+        dfs["ac_turnover"] = multi_portfolio_data.portfolio_datas[strategy_idx].get_turnover(
+            is_agg=False,
+            is_grouped=True,
+            group_data=turnover_groups,
+            lookthrough_matrix=turnover_lookthrough_matrix,
+            group_order=turnover_order,
+            time_period=time_period,
+            add_total=False,
+            **kwargs,
+        )
 
         # pdf of returns
         freqs = dict(Monthly='ME', Quarterly='QE', Annual='YE')

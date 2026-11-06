@@ -43,6 +43,10 @@ from __future__ import annotations
 # packages
 import numpy as np
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import (
+    aggregate_grouped_data, split_grouped_data,
+)
 from qis.utils._pandas_compat import infer_freq as _infer_freq
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -54,7 +58,6 @@ from enum import Enum
 # qis
 import qis as qis
 from qis import TimePeriod, PerfStat, PerfParams, RegimeData, EnumMap, BenchmarkReturnsQuantilesRegime, RollingPerfStat
-import qis.utils.df_groups as dfg
 import qis.utils.df_agg as dfa
 import qis.perfstats.returns as ret
 import qis.perfstats.perf_stats as rpt
@@ -177,7 +180,7 @@ class PortfolioData:
     correctly but has nothing to attribute, so pass the panels if attribution is wanted.
 
     ``instrument_pnl``, when not given, is reconstructed as
-    ``prices.ffill().pct_change() * weights.shift(1)`` — arithmetic returns on lagged weights,
+    ``prices.ffill().pct_change() * weights.shift(1)`` â€” arithmetic returns on lagged weights,
     valued on last observed marks so a resumed quote books its full move. Pass it
     explicitly if the backtester computed pnl on a different convention.
 
@@ -436,13 +439,25 @@ class PortfolioData:
         navs = ret.returns_to_nav(returns=pnl, constant_trade_level=constant_trade_level)
         return navs
 
-    def get_group_navs(self,
-                       time_period: TimePeriod = None,
-                       constant_trade_level: bool = False,
-                       is_add_group_total: bool = False
-                       ) -> Optional[pd.DataFrame]:
+    def get_group_navs(
+        self,
+        time_period: TimePeriod = None,
+        constant_trade_level: bool = False,
+        is_add_group_total: bool = False,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Optional[pd.DataFrame]:
         """
         group total will exclude transaction costs so it is not equal to portfolio nav
+
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
         """
         if is_add_group_total:
             total_column = str(self.nav.name)
@@ -453,20 +468,42 @@ class PortfolioData:
             print(f"instruments p&l is not available for time_period={time_period.to_str()}")
             group_navs = None
         else:
-            grouped_pnl = dfg.agg_df_by_groups_ax1(df=df,
-                                                   group_data=self.group_data,
-                                                   agg_func=np.nansum,
-                                                   total_column=total_column,
-                                                   group_order=self.group_order)
+            grouped_pnl = aggregate_grouped_data(
+                df=df,
+                group_data=self.group_data if group_data is None else group_data,
+                agg_func=np.nansum,
+                total_column=total_column,
+                group_order=self.group_order if lookthrough_matrix is None else None,
+                lookthrough_matrix=lookthrough_matrix,
+            )
             group_navs = ret.returns_to_nav(returns=grouped_pnl, constant_trade_level=constant_trade_level)
         return group_navs
 
-    def get_total_nav_with_group_navs(self, time_period: TimePeriod = None) -> pd.DataFrame:
+    def get_total_nav_with_group_navs(
+        self,
+        time_period: TimePeriod = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
         """
         group total will exclude transaction costs so it is not equal to portfolio nav
+
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
         """
         total_nav = self.get_portfolio_nav(time_period=time_period)
-        group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
+        group_navs = self.get_group_navs(
+            time_period=time_period,
+            is_add_group_total=False,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         prices = pd.concat([total_nav, group_navs], axis=1, sort=True)
         return prices
 
@@ -476,16 +513,28 @@ class PortfolioData:
             input_weights = time_period.locate(input_weights)
         return input_weights
 
-    def get_weights(self,
-                    is_input_weights: bool = False,
-                    columns: List[str] = None,
-                    time_period: TimePeriod = None,
-                    is_grouped: bool = False,
-                    add_total: bool = False,
-                    freq: Optional[str] = 'W-WED',
-                    group_data: pd.Series = None,
-                    group_order: List[str] = None
-                    ) -> pd.DataFrame:
+    def get_weights(
+        self,
+        is_input_weights: bool = False,
+        columns: List[str] = None,
+        time_period: TimePeriod = None,
+        is_grouped: bool = False,
+        add_total: bool = False,
+        freq: Optional[str] = "W-WED",
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_input_weights and self.input_weights is not None and isinstance(self.input_weights, pd.DataFrame):
             weights = self.input_weights.copy()
         else:
@@ -496,13 +545,16 @@ class PortfolioData:
         if is_grouped:
             if group_data is None:
                 group_data = self.group_data
-            if group_order is None:
+            if group_order is None and lookthrough_matrix is None:
                 group_order = self.group_order
-            weights = dfg.agg_df_by_groups_ax1(df=weights,
-                                               group_data=group_data,
-                                               agg_func=np.nansum,
-                                               total_column=self.ticker if add_total else None,
-                                               group_order=group_order)
+            weights = aggregate_grouped_data(
+                df=weights,
+                group_data=group_data,
+                agg_func=np.nansum,
+                total_column=self.ticker if add_total else None,
+                group_order=group_order,
+                lookthrough_matrix=lookthrough_matrix,
+            )
         elif columns is not None:
             weights = weights[columns]
 
@@ -511,12 +563,16 @@ class PortfolioData:
 
         return weights
 
-    def get_grouped_long_short_weights(self,
-                                       time_period: TimePeriod = None,
-                                       total_name: str = 'Total',
-                                       weights_freq: Optional[str] = 'W-WED',
-                                       total_column: Optional[str] = None
-                                       ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+    def get_grouped_long_short_weights(
+        self,
+        time_period: TimePeriod = None,
+        total_name: str = "Total",
+        weights_freq: Optional[str] = "W-WED",
+        total_column: Optional[str] = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
         """Computes grouped net long/short exposures by instrument groups.
 
         Groups portfolio weights by predefined instrument categories and calculates
@@ -524,6 +580,11 @@ class PortfolioData:
         net short positions for each group.
 
         Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
             time_period: Time period for which to calculate exposures. If None,
                 uses the full available time series.
             total_name: Column name for the total exposure aggregation.
@@ -545,14 +606,17 @@ class PortfolioData:
             represent short positions. Net long sums only positive values,
             net short sums only negative values.
         """
-        group_dict = dfg.get_group_dict(group_data=self.group_data,
-                                        group_order=self.group_order,
-                                        total_column=total_column)
         all_exposures = self.get_weights(time_period=time_period, freq=weights_freq)
+        pieces = split_grouped_data(
+            all_exposures,
+            self.group_data if group_data is None else group_data,
+            self.group_order if lookthrough_matrix is None else None,
+            total_column,
+            lookthrough_matrix=lookthrough_matrix,
+        )
         grouped_weights_by_inst = {}
         grouped_weights_agg = {}
-        for group, tickers in group_dict.items():
-            exposures_by_inst = all_exposures[tickers]
+        for group, exposures_by_inst in pieces.items():
             grouped_weights_by_inst[group] = exposures_by_inst
             total = dfa.df_nansum(exposures_by_inst, axis=1).rename(total_name)
             net_long = dfa.df_nansum_positive(exposures_by_inst, axis=1).rename('Net Long')
@@ -560,51 +624,88 @@ class PortfolioData:
             grouped_weights_agg[group] = pd.concat([total, net_long, net_short], axis=1, sort=True)
         return grouped_weights_agg, grouped_weights_by_inst
 
-    def get_grouped_cum_pnls(self,
-                             total_name: str = 'Total',
-                             time_period: TimePeriod = None
-                             ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+    def get_grouped_cum_pnls(
+        self,
+        total_name: str = "Total",
+        time_period: TimePeriod = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
         """
         compute grouped net long / short exposues
-        """
-        group_dict = dfg.get_group_dict(group_data=self.group_data,
-                                        group_order=self.group_order,
-                                        total_column=None)
 
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         pnls = self.get_instruments_pnl(time_period=time_period, is_compounded=False).fillna(0.0)
-        all_exposures = self.get_weights(time_period=time_period, freq=None)
+        all_exposures = self.get_weights(
+            time_period=time_period,
+            freq=None,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         all_exposures = all_exposures.reindex(index=pnls.index, method='ffill').ffill()
         pnl_positive_exp = pnls.where(all_exposures > 0.0, other=0.0)
         pnl_negative_exp = pnls.where(all_exposures < 0.0, other=0.0)
 
+        labels = self.group_data if group_data is None else group_data
+        pieces = split_grouped_data(
+            pnls, labels, self.group_order if lookthrough_matrix is None else None,
+            lookthrough_matrix=lookthrough_matrix
+        )
+        positive = split_grouped_data(
+            pnl_positive_exp, labels, self.group_order if lookthrough_matrix is None else None,
+            lookthrough_matrix=lookthrough_matrix
+        )
+        negative = split_grouped_data(
+            pnl_negative_exp, labels, self.group_order if lookthrough_matrix is None else None,
+            lookthrough_matrix=lookthrough_matrix
+        )
         grouped_pnls_by_inst = {}
         grouped_pnls_agg = {}
-        for group, tickers in group_dict.items():
-            pnls_by_inst = pnls[tickers]
+        for group, pnls_by_inst in pieces.items():
             grouped_pnls_by_inst[group] = pnls_by_inst.cumsum(axis=0)
             total = dfa.df_nansum(pnls_by_inst, axis=1).rename(total_name)
-            net_long = dfa.df_nansum(pnl_positive_exp[tickers], axis=1).rename('Net Long')
-            net_short = dfa.df_nansum(pnl_negative_exp[tickers], axis=1).rename('Net Short')
+            net_long = dfa.df_nansum(positive[group], axis=1).rename('Net Long')
+            net_short = dfa.df_nansum(negative[group], axis=1).rename('Net Short')
             grouped_pnls_agg[group] = pd.concat([total, net_long, net_short],
                                                 axis=1, sort=True).cumsum(axis=0)
         return grouped_pnls_agg, grouped_pnls_by_inst
 
-    def get_turnover(self,
-                     is_agg: bool = False,
-                     is_grouped: bool = False,
-                     group_data: pd.Series = None,
-                     group_order: List[str] = None,
-                     time_period: TimePeriod = None,
-                     roll_period: Optional[int] = 260,
-                     is_vol_adjusted: bool = False,
-                     add_total: bool = True,
-                     vol_span: int = 33,
-                     freq: Optional[str] = None,
-                     is_unit_based_traded_volume: Optional[bool] = None,
-                     turnover_computation_type: Optional[TurnoverComputationType] = None,
-                     vols: Optional[pd.DataFrame] = None,
-                     **kwargs
-                     ) -> Union[pd.DataFrame, pd.Series]:
+    def get_turnover(
+        self,
+        is_agg: bool = False,
+        is_grouped: bool = False,
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        time_period: TimePeriod = None,
+        roll_period: Optional[int] = 260,
+        is_vol_adjusted: bool = False,
+        add_total: bool = True,
+        vol_span: int = 33,
+        freq: Optional[str] = None,
+        is_unit_based_traded_volume: Optional[bool] = None,
+        turnover_computation_type: Optional[TurnoverComputationType] = None,
+        vols: Optional[pd.DataFrame] = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> Union[pd.DataFrame, pd.Series]:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         turnover_computation_type = resolve_turnover_computation_type(
             default=self.turnover_computation_type,
             computation_type=turnover_computation_type,
@@ -639,13 +740,16 @@ class PortfolioData:
         elif is_grouped:  # agg by groups
             if group_data is None:
                 group_data = self.group_data
-            if group_order is None:
+            if group_order is None and lookthrough_matrix is None:
                 group_order = self.group_order
-            turnover = dfg.agg_df_by_groups_ax1(df=turnover,
-                                                group_data=group_data,
-                                                agg_func=np.nansum,
-                                                total_column=str(self.nav.name) if add_total else None,
-                                                group_order=group_order)
+            turnover = aggregate_grouped_data(
+                df=turnover,
+                group_data=group_data,
+                agg_func=np.nansum,
+                total_column=str(self.nav.name) if add_total else None,
+                group_order=group_order,
+                lookthrough_matrix=lookthrough_matrix,
+            )
             turnover.loc[all_missing_turnover] = np.nan
         else:
             if add_total:
@@ -662,18 +766,27 @@ class PortfolioData:
                 turnover = time_period.locate(turnover)
         return turnover
 
-    def get_costs(self,
-                  is_agg: bool = False,
-                  is_grouped: bool = False,
-                  time_period: TimePeriod = None,
-                  add_total: bool = True,
-                  is_unit_based_traded_volume: Optional[bool] = None,
-                  roll_period: Optional[int] = 260,
-                  freq: Optional[str] = None
-                  ) -> Union[pd.DataFrame, pd.Series]:
+    def get_costs(
+        self,
+        is_agg: bool = False,
+        is_grouped: bool = False,
+        time_period: TimePeriod = None,
+        add_total: bool = True,
+        is_unit_based_traded_volume: Optional[bool] = None,
+        roll_period: Optional[int] = 260,
+        freq: Optional[str] = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Union[pd.DataFrame, pd.Series]:
         """Return realized costs in raw currency or NAV-normalized units.
 
         Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
             is_agg: Aggregate costs across instruments when true.
             is_grouped: Aggregate instruments using the portfolio's group metadata.
             time_period: Optional date interval applied after aggregation.
@@ -699,11 +812,14 @@ class PortfolioData:
         if is_agg:
             costs = pd.Series(np.nansum(costs, axis=1), index=costs.index, name=self.nav.name)
         elif is_grouped:  # agg by groups
-            costs = dfg.agg_df_by_groups_ax1(costs,
-                                             group_data=self.group_data,
-                                             agg_func=np.nansum,
-                                             total_column=str(self.nav.name) if add_total else None,
-                                             group_order=self.group_order)
+            costs = aggregate_grouped_data(
+                costs,
+                group_data=self.group_data if group_data is None else group_data,
+                agg_func=np.nansum,
+                total_column=str(self.nav.name) if add_total else None,
+                group_order=self.group_order if lookthrough_matrix is None else None,
+                lookthrough_matrix=lookthrough_matrix,
+            )
         else:
             if add_total:
                 costs = pd.concat([costs.sum(axis=1).rename(self.nav.name), costs],
@@ -1201,47 +1317,69 @@ class PortfolioData:
             distribution_yield_rolling = time_period.locate(distribution_yield_rolling)
         return distributions_by_instrument_yield_rolling, distribution_yield, distribution_yield_rolling
 
-    def compute_portfolio_vars(self,
-                               is_correlated: bool = True,
-                               time_period: TimePeriod = None,
-                               freq: str = 'B',
-                               total_column: Optional[str] = 'Total',
-                               vol_span: Union[int, float] = 33,  # span in number of freq-returns
-                               group_data: pd.Series = None,
-                               group_order: List[str] = None
-                               ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+    def compute_portfolio_vars(
+        self,
+        is_correlated: bool = True,
+        time_period: TimePeriod = None,
+        freq: str = "B",
+        total_column: Optional[str] = "Total",
+        vol_span: Union[int, float] = 33,  # span in number of freq-returns
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame]]:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if group_data is None:
             group_data = self.group_data
-        if group_order is None:
+        if group_order is None and lookthrough_matrix is None:
             group_order = self.group_order
         if is_correlated:
-            portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(prices=self.prices,
-                                                                            weights=self.get_weights(freq=freq),
-                                                                            group_data=group_data,
-                                                                            group_order=group_order,
-                                                                            freq=freq,
-                                                                            vol_span=vol_span,
-                                                                            # span in number of freq-returns
-                                                                            total_column=total_column,
-                                                                            time_period=time_period)
+            portfolio_vars = qis.compute_portfolio_correlated_var_by_groups(
+                prices=self.prices,
+                weights=self.get_weights(
+                    freq=freq, lookthrough_matrix=lookthrough_matrix, group_data=group_data
+                ),
+                group_data=group_data,
+                group_order=group_order,
+                freq=freq,
+                vol_span=vol_span,
+                # span in number of freq-returns
+                total_column=total_column,
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+            )
             instrument_vars = None
         else:
-            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(prices=self.prices,
-                                                                                          weights=self.get_weights(freq=freq),
-                                                                                          group_data=group_data,
-                                                                                          group_order=group_order,
-                                                                                          freq=freq,
-                                                                                          vol_span=vol_span,
-                                                                                          # span in number of freq-returns
-                                                                                          total_column=total_column,
-                                                                                          time_period=time_period)
+            instrument_vars, portfolio_vars = qis.compute_portfolio_independent_var_by_ac(
+                prices=self.prices,
+                weights=self.get_weights(
+                    freq=freq, lookthrough_matrix=lookthrough_matrix, group_data=group_data
+                ),
+                group_data=group_data,
+                group_order=group_order,
+                freq=freq,
+                vol_span=vol_span,
+                # span in number of freq-returns
+                total_column=total_column,
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+            )
         return portfolio_vars, instrument_vars
 
     def compute_ex_anti_portfolio_vol_implied_by_covar(self,
                                                        covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
                                                        freq: Optional[str] = None
                                                        ) -> pd.Series:
-        """Ex-ante portfolio volatility sqrt(w' Σ w) implied by dated covariance matrices.
+        """Ex-ante portfolio volatility sqrt(w' Î£ w) implied by dated covariance matrices.
 
         With ``freq=None`` the volatility is evaluated on each covariance date with the input
         weights (the realised weights when the input was not a DataFrame) selected as of that
@@ -1289,15 +1427,18 @@ class PortfolioData:
         portfolio_vol = pd.Series(portfolio_vol, name=self.ticker)
         return portfolio_vol
 
-    def compute_risk_contributions_implied_by_covar(self,
-                                                    covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
-                                                    group_data: pd.Series = None,
-                                                    group_order: List[str] = None,
-                                                    freq: Optional[str] = None,
-                                                    normalise: bool = False,
-                                                    time_period: TimePeriod = None
-                                                    ) -> pd.DataFrame:
-        """Euler risk contributions w_i (Σ w)_i / sqrt(w' Σ w) implied by dated covariances.
+    def compute_risk_contributions_implied_by_covar(
+        self,
+        covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        freq: Optional[str] = None,
+        normalise: bool = False,
+        time_period: TimePeriod = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
+        """Euler risk contributions w_i (Î£ w)_i / sqrt(w' Î£ w) implied by dated covariances.
 
         With ``freq=None`` the contributions are evaluated on each covariance date with the
         input weights (the realised weights when the input was not a DataFrame) selected as of
@@ -1307,6 +1448,9 @@ class PortfolioData:
         covariance at or before that date.
 
         Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
             covar_dict: Covariance matrix per date; ``self.covar_dict`` when None.
             group_data: Optional group of each instrument; contributions are summed by group.
             group_order: Order of the groups.
@@ -1322,13 +1466,21 @@ class PortfolioData:
         Raises:
             ValueError: If no covariance is supplied or stored.
         """
+        if lookthrough_matrix is not None and group_data is None:
+            group_data = self.group_data
         if covar_dict is None:
             if self.covar_dict is None:
                 raise ValueError(f"must provide covar_dict")
             else:
                 covar_dict = self.covar_dict
         is_input_weights = True if freq is None else False
-        strategy_weights = self.get_weights(freq=freq, is_input_weights=is_input_weights, time_period=time_period)
+        strategy_weights = self.get_weights(
+            freq=freq,
+            is_input_weights=is_input_weights,
+            time_period=time_period,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         covar_index = list(covar_dict.keys())
         strategy_rc = {}
         if freq is None:  # weights as of each covariance date
@@ -1346,14 +1498,20 @@ class PortfolioData:
 
         strategy_rc = pd.DataFrame.from_dict(strategy_rc, orient='index')
         unknown_risk = strategy_rc.isna().all(axis=1)
-        restore_unknown = unknown_risk.any() and (group_data is not None or normalise)
+        restore_unknown = unknown_risk.any() and (
+            group_data is not None or lookthrough_matrix is not None or normalise)
         if restore_unknown:
             # The generic helpers treat missing scores as zero; object-backed pd.NA
             # rows can also fail inside them. Both operate row-locally, so temporary
             # zero rows cannot affect known risk. Restore the unknown rows afterwards.
             strategy_rc = strategy_rc.mask(unknown_risk, 0.0, axis=0)
-        if group_data is not None:
-            strategy_rc = dfg.agg_df_by_groups_ax1(strategy_rc, group_data=group_data, group_order=group_order)
+        if group_data is not None or lookthrough_matrix is not None:
+            strategy_rc = aggregate_grouped_data(
+                strategy_rc,
+                group_data=group_data,
+                group_order=group_order,
+                lookthrough_matrix=lookthrough_matrix,
+            )
         if normalise:
             strategy_rc = qis.df_to_weight_allocation_sum1(strategy_rc)
         if restore_unknown:
@@ -1401,16 +1559,30 @@ class PortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=prices.index,
                                     regime_classifier=regime_classifier)
 
-    def plot_group_nav(self,
-                       regime_benchmark: str = None,
-                       time_period: TimePeriod = None,
-                       add_benchmarks: bool = False,
-                       regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
-                       ax: plt.Subplot = None,
-                       **kwargs
-                       ) -> None:
+    def plot_group_nav(
+        self,
+        regime_benchmark: str = None,
+        time_period: TimePeriod = None,
+        add_benchmarks: bool = False,
+        regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
 
-        total_group_navs = self.get_total_nav_with_group_navs(time_period=time_period)
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        total_group_navs = self.get_total_nav_with_group_navs(
+            time_period=time_period, lookthrough_matrix=lookthrough_matrix, group_data=group_data
+        )
         if add_benchmarks and self.benchmark_prices is not None:
             benchmark_prices = self.benchmark_prices.reindex(index=total_group_navs.index, method='ffill')
             total_group_navs = pd.concat([total_group_navs, benchmark_prices], axis=1, sort=True)
@@ -1495,20 +1667,38 @@ class PortfolioData:
                                                 **kwargs)
         return ra_perf_table
 
-    def plot_ra_perf_table(self,
-                           benchmark_price: Union[pd.Series, pd.DataFrame] = None,
-                           benchmark: str = None,
-                           is_grouped: bool = True,
-                           time_period: TimePeriod = None,
-                           perf_params: PerfParams = None,
-                           perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
-                           title: str = None,
-                           ax: plt.Subplot = None,
-                           **kwargs
-                           ) -> None:
+    def plot_ra_perf_table(
+        self,
+        benchmark_price: Union[pd.Series, pd.DataFrame] = None,
+        benchmark: str = None,
+        is_grouped: bool = True,
+        time_period: TimePeriod = None,
+        perf_params: PerfParams = None,
+        perf_columns: List[PerfStat] = rpt.BENCHMARK_TABLE_COLUMNS,
+        title: str = None,
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_grouped:
             total_nav = self.get_portfolio_nav(time_period=time_period)
-            group_navs = self.get_group_navs(time_period=time_period, is_add_group_total=False)
+            group_navs = self.get_group_navs(
+                time_period=time_period,
+                is_add_group_total=False,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             prices = pd.concat([total_nav, group_navs], axis=1, sort=True)
             for_title = 'with portfolio groups'
             rows_edge_lines = [len(prices.columns)]
@@ -1545,26 +1735,47 @@ class PortfolioData:
                                              **kwargs)
         else:
             title = title or f"RA performance table {for_title}: {qis.get_time_period(prices).to_str()}"
-            ppt.plot_ra_perf_table(prices=prices,
-                                   perf_params=perf_params,
-                                   perf_columns=rpt.COMPACT_TABLE_COLUMNS,
-                                   title=title,
-                                   rotation_for_columns_headers=0,
-                                   column_header='Portfolio',
-                                   ax=ax,
-                                   **kwargs)
+            ppt.plot_ra_perf_table(
+                prices=prices,
+                perf_params=perf_params,
+                perf_columns=rpt.COMPACT_TABLE_COLUMNS,
+                title=title,
+                rotation_for_columns_headers=0,
+                column_header="Portfolio",
+                ax=ax,
+                **kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
 
-    def plot_returns_scatter(self,
-                             benchmark_price: pd.Series,
-                             is_grouped: bool = True,
-                             time_period: TimePeriod = None,
-                             title: str = None,
-                             freq: str = 'QE',
-                             ax: plt.Subplot = None,
-                             **kwargs
-                             ) -> None:
+    def plot_returns_scatter(
+        self,
+        benchmark_price: pd.Series,
+        is_grouped: bool = True,
+        time_period: TimePeriod = None,
+        title: str = None,
+        freq: str = "QE",
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_grouped:
-            prices = self.get_total_nav_with_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             title = title or f"Scatterplot of {freq}-freq returns by groups vs {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
@@ -1579,13 +1790,17 @@ class PortfolioData:
                                                      'first_color_fixed': False,
                                                      'ci': None,
                                                      'markersize': 6})
-        prs.plot_returns_scatter(prices=prices,
-                                 benchmark=str(benchmark_price.name),
-                                 freq=freq,
-                                 order=2,
-                                 title=title,
-                                 ax=ax,
-                                 **local_kwargs)
+        prs.plot_returns_scatter(
+            prices=prices,
+            benchmark=str(benchmark_price.name),
+            freq=freq,
+            order=2,
+            title=title,
+            ax=ax,
+            **local_kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
 
     def plot_monthly_returns_heatmap(self,
                                      time_period: TimePeriod = None,
@@ -1601,19 +1816,36 @@ class PortfolioData:
                                  ax=ax,
                                  **kwargs)
 
-    def plot_periodic_returns(self,
-                              benchmark_prices: Union[pd.DataFrame, pd.Series] = None,
-                              is_grouped: bool = True,
-                              time_period: TimePeriod = None,
-                              heatmap_freq: str = 'YE',
-                              date_format: str = '%Y',
-                              transpose: bool = True,
-                              title: str = None,
-                              ax: plt.Subplot = None,
-                              **kwargs
-                              ) -> None:
+    def plot_periodic_returns(
+        self,
+        benchmark_prices: Union[pd.DataFrame, pd.Series] = None,
+        is_grouped: bool = True,
+        time_period: TimePeriod = None,
+        heatmap_freq: str = "YE",
+        date_format: str = "%Y",
+        transpose: bool = True,
+        title: str = None,
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_grouped:
-            prices = self.get_total_nav_with_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             title = title or f"{heatmap_freq}-returns by groups"
         else:
             prices = self.get_portfolio_nav(time_period=time_period).to_frame()
@@ -1634,23 +1866,39 @@ class PortfolioData:
                                         hline_rows=hline_rows,
                                         **qis.update_kwargs(kwargs, dict(freq=heatmap_freq)))
 
-    def plot_regime_data(self,
-                         benchmark_price: pd.Series,
-                         is_grouped: bool = True,
-                         regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
-                         time_period: TimePeriod = None,
-                         var_format: Optional[str] = None,
-                         is_conditional_sharpe: bool = True,
-                         legend_loc: Optional[str] = 'upper center',
-                         title: str = None,
-                         perf_params: PerfParams = None,
-                         regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                         ax: plt.Subplot = None,
-                         **kwargs
-                         ) -> plt.Figure:
+    def plot_regime_data(
+        self,
+        benchmark_price: pd.Series,
+        is_grouped: bool = True,
+        regime_data_to_plot: RegimeData = RegimeData.REGIME_SHARPE,
+        time_period: TimePeriod = None,
+        var_format: Optional[str] = None,
+        is_conditional_sharpe: bool = True,
+        legend_loc: Optional[str] = "upper center",
+        title: str = None,
+        perf_params: PerfParams = None,
+        regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> plt.Figure:
+        """Grouped report using Series labels and optional static look-through fractions.
 
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_grouped:
-            prices = self.get_total_nav_with_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             title = title or (f"Sharpe ratio attribution by groups to {str(benchmark_price.name)} "
                               f"Bear/Normal/Bull regimes of {regime_classifier.freq} returns")
         else:
@@ -1663,31 +1911,51 @@ class PortfolioData:
                                 prices],
                                axis=1, sort=True)
 
-        fig = qis.plot_regime_data(regime_classifier=regime_classifier,
-                                   prices=prices,
-                                   benchmark=str(benchmark_price.name),
-                                   is_conditional_sharpe=is_conditional_sharpe,
-                                   regime_data_to_plot=regime_data_to_plot,
-                                   var_format=var_format or '{:.2f}',
-                                   legend_loc=legend_loc,
-                                   perf_params=perf_params,
-                                   title=title,
-                                   ax=ax,
-                                   **kwargs)
+        fig = qis.plot_regime_data(
+            regime_classifier=regime_classifier,
+            prices=prices,
+            benchmark=str(benchmark_price.name),
+            is_conditional_sharpe=is_conditional_sharpe,
+            regime_data_to_plot=regime_data_to_plot,
+            var_format=var_format or "{:.2f}",
+            legend_loc=legend_loc,
+            perf_params=perf_params,
+            title=title,
+            ax=ax,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         return fig
 
-    def plot_vol_regimes(self,
-                         benchmark_price: pd.Series,
-                         is_grouped: bool = True,
-                         time_period: TimePeriod = None,
-                         title: str = None,
-                         freq: str = 'ME',
-                         ax: plt.Subplot = None,
-                         **kwargs
-                         ) -> plt.Figure:
+    def plot_vol_regimes(
+        self,
+        benchmark_price: pd.Series,
+        is_grouped: bool = True,
+        time_period: TimePeriod = None,
+        title: str = None,
+        freq: str = "ME",
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> plt.Figure:
+        """Grouped report using Series labels and optional static look-through fractions.
 
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
         if is_grouped:
-            prices = self.get_total_nav_with_group_navs(time_period=time_period)
+            prices = self.get_total_nav_with_group_navs(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
             title = title or f"{freq}-returns by groups conditional on vols {str(benchmark_price.name)}"
         else:
             prices = self.get_portfolio_nav(time_period=time_period)
@@ -1921,23 +2189,40 @@ class PortfolioData:
         if add_zero_line:
             ax.axhline(0, color='black', lw=1)
 
-    def plot_portfolio_grouped_var(self,
-                                   is_correlated: bool = True,
-                                   regime_benchmark: str = None,
-                                   time_period: TimePeriod = None,
-                                   freq: str = 'B',
-                                   title: str = None,
-                                   total_column: Optional[str] = 'Total',
-                                   vol_span: int = 33,  # span in number of freq-returns
-                                   regime_classifier: BenchmarkReturnsQuantilesRegime = None,
-                                   ax: plt.Subplot = None,
-                                   **kwargs
-                                   ) -> None:
-        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
-                                                                      time_period=time_period,
-                                                                      freq=freq,
-                                                                      total_column=total_column,
-                                                                      vol_span=vol_span)
+    def plot_portfolio_grouped_var(
+        self,
+        is_correlated: bool = True,
+        regime_benchmark: str = None,
+        time_period: TimePeriod = None,
+        freq: str = "B",
+        title: str = None,
+        total_column: Optional[str] = "Total",
+        vol_span: int = 33,  # span in number of freq-returns
+        regime_classifier: BenchmarkReturnsQuantilesRegime = None,
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(
+            is_correlated=is_correlated,
+            time_period=time_period,
+            freq=freq,
+            total_column=total_column,
+            vol_span=vol_span,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         if is_correlated:
             title = title or f"Correlated {freq}-freq 99%-VAR with {vol_span}-span ewma covar"
         else:
@@ -1955,18 +2240,36 @@ class PortfolioData:
             self.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=portfolio_vars.index,
                                     regime_classifier=regime_classifier)
 
-    def plot_current_weights(self,
-                             is_grouped: bool = False,
-                             add_top_bar_values: Optional[bool] = None,
-                             time_period: TimePeriod = None,
-                             title: str = None,
-                             group_data: pd.Series = None,
-                             group_order: List[str] = None,
-                             ax: plt.Subplot = None,
-                             **kwargs
-                             ) -> None:
-        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped,
-                                   group_data=group_data, group_order=group_order)
+    def plot_current_weights(
+        self,
+        is_grouped: bool = False,
+        add_top_bar_values: Optional[bool] = None,
+        time_period: TimePeriod = None,
+        title: str = None,
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        ax: plt.Subplot = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        weights = self.get_weights(
+            is_input_weights=True,
+            freq=None,
+            is_grouped=is_grouped,
+            group_data=group_data,
+            group_order=group_order,
+            lookthrough_matrix=lookthrough_matrix,
+        )
         if time_period is not None:
             weights_1 = time_period.locate(weights)
             if len(weights_1.index) > 0:
@@ -1996,15 +2299,34 @@ class PortfolioData:
                       ax=ax,
                       **kwargs)
 
-    def plot_last_weights_change(self,
-                                 is_grouped: bool = False,
-                                 title: str = None,
-                                 add_top_bar_values: Optional[bool] = None,
-                                 weights_change_lag: Optional[int] = None,
-                                 ax: plt.Subplot = None,
-                                 **kwargs
-                                 ) -> None:
-        weights = self.get_weights(is_input_weights=True, freq=None, is_grouped=is_grouped)
+    def plot_last_weights_change(
+        self,
+        is_grouped: bool = False,
+        title: str = None,
+        add_top_bar_values: Optional[bool] = None,
+        weights_change_lag: Optional[int] = None,
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        weights = self.get_weights(
+            is_input_weights=True,
+            freq=None,
+            is_grouped=is_grouped,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         weights_1 = weights.iloc[-1, :]
         if len(weights.index) > 1:
             if weights_change_lag is not None:
@@ -2037,24 +2359,41 @@ class PortfolioData:
                       ax=ax,
                       **kwargs)
 
-    def plot_current_var(self,
-                         snapshot_period: SnapshotPeriod = SnapshotPeriod.LAST,
-                         is_grouped: bool = False,
-                         is_correlated: bool = True,
-                         time_period: TimePeriod = None,
-                         freq: str = 'B',
-                         title: str = None,
-                         add_top_bar_values: Optional[bool] = None,
-                         total_column: Optional[str] = 'Total',
-                         vol_span: Union[int, float] = 33,  # span in number of freq-returns
-                         ax: plt.Subplot = None,
-                         **kwargs
-                         ) -> None:
-        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
-                                                                      time_period=time_period,
-                                                                      freq=freq,
-                                                                      total_column=total_column,
-                                                                      vol_span=vol_span)
+    def plot_current_var(
+        self,
+        snapshot_period: SnapshotPeriod = SnapshotPeriod.LAST,
+        is_grouped: bool = False,
+        is_correlated: bool = True,
+        time_period: TimePeriod = None,
+        freq: str = "B",
+        title: str = None,
+        add_top_bar_values: Optional[bool] = None,
+        total_column: Optional[str] = "Total",
+        vol_span: Union[int, float] = 33,  # span in number of freq-returns
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(
+            is_correlated=is_correlated,
+            time_period=time_period,
+            freq=freq,
+            total_column=total_column,
+            vol_span=vol_span,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         if is_grouped:
             if snapshot_period == SnapshotPeriod.LAST:
                 var_1 = portfolio_vars.iloc[-1, :]
@@ -2113,22 +2452,39 @@ class PortfolioData:
                       ax=ax,
                       **kwargs)
 
-    def plot_var_stack(self,
-                       is_grouped: bool = True,
-                       is_correlated: bool = True,
-                       time_period: TimePeriod = None,
-                       freq: str = 'B',
-                       title: str = None,
-                       stack_freq: Optional[str] = 'W-WED',
-                       vol_span: int = 33,  # span in number of freq-returns
-                       ax: plt.Subplot = None,
-                       **kwargs
-                       ) -> None:
-        portfolio_vars, instrument_vars = self.compute_portfolio_vars(is_correlated=is_correlated,
-                                                                      time_period=time_period,
-                                                                      freq=freq,
-                                                                      total_column=None,
-                                                                      vol_span=vol_span)
+    def plot_var_stack(
+        self,
+        is_grouped: bool = True,
+        is_correlated: bool = True,
+        time_period: TimePeriod = None,
+        freq: str = "B",
+        title: str = None,
+        stack_freq: Optional[str] = "W-WED",
+        vol_span: int = 33,  # span in number of freq-returns
+        ax: plt.Subplot = None,
+        *,
+        group_data: Optional[pd.Series] = None,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        portfolio_vars, instrument_vars = self.compute_portfolio_vars(
+            is_correlated=is_correlated,
+            time_period=time_period,
+            freq=freq,
+            total_column=None,
+            vol_span=vol_span,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         if is_grouped:
             var_1 = portfolio_vars
             if is_correlated:
@@ -2183,38 +2539,51 @@ class PortfolioData:
                        ax=axs[1],
                        **kwargs)
 
-    def plot_turnover(self,
-                      regime_benchmark: str = None,
-                      is_agg: bool = False,
-                      is_grouped: bool = False,
-                      group_data: pd.Series = None,
-                      group_order: List[str] = None,
-                      time_period: TimePeriod = None,
-                      turnover_rolling_period: Optional[int] = 260,
-                      freq_turnover: Optional[str] = 'B',
-                      add_total: bool = True,
-                      title: str = None,
-                      regime_classifier: BenchmarkReturnsQuantilesRegime = None,
-                      ax: plt.Subplot = None,
-                      turnover_computation_type: Optional[
-                          TurnoverComputationType
-                      ] = None,
-                      is_unit_based_traded_volume: Optional[bool] = None,
-                      vols: Optional[pd.DataFrame] = None,
-                      **kwargs
-                      ) -> None:
-        turnover = self.get_turnover(is_agg=is_agg,
-                                     is_grouped=is_grouped,
-                                     group_data=group_data,
-                                     group_order=group_order,
-                                     time_period=time_period,
-                                     roll_period=turnover_rolling_period,
-                                     add_total=add_total,
-                                     freq=freq_turnover,
-                                     turnover_computation_type=turnover_computation_type,
-                                     is_unit_based_traded_volume=is_unit_based_traded_volume,
-                                     vols=vols,
-                                     **kwargs)
+    def plot_turnover(
+        self,
+        regime_benchmark: str = None,
+        is_agg: bool = False,
+        is_grouped: bool = False,
+        group_data: pd.Series = None,
+        group_order: List[str] = None,
+        time_period: TimePeriod = None,
+        turnover_rolling_period: Optional[int] = 260,
+        freq_turnover: Optional[str] = "B",
+        add_total: bool = True,
+        title: str = None,
+        regime_classifier: BenchmarkReturnsQuantilesRegime = None,
+        ax: plt.Subplot = None,
+        turnover_computation_type: Optional[TurnoverComputationType] = None,
+        is_unit_based_traded_volume: Optional[bool] = None,
+        vols: Optional[pd.DataFrame] = None,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+        **kwargs,
+    ) -> None:
+        """Grouped report using Series labels and optional static look-through fractions.
+
+        Args:
+            lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+                are finite, nonnegative and sum to one; omitted rows use group_data.
+                None preserves categorical reporting. This is an accounting split.
+            group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+                where available. Fractional memberships belong in lookthrough_matrix.
+        """
+        turnover = self.get_turnover(
+            is_agg=is_agg,
+            is_grouped=is_grouped,
+            group_data=group_data,
+            group_order=group_order,
+            time_period=time_period,
+            roll_period=turnover_rolling_period,
+            add_total=add_total,
+            freq=freq_turnover,
+            turnover_computation_type=turnover_computation_type,
+            is_unit_based_traded_volume=is_unit_based_traded_volume,
+            vols=vols,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+        )
         if not turnover.empty:
             freq = _infer_freq(turnover.index)
             is_volatility_normalized = (

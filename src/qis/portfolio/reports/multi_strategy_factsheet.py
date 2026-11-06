@@ -16,6 +16,8 @@ the same page rendered as HTML is ``multi_strategy_factsheet_pybloqs.py``.
 """
 # packages
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import resolve_reporting_inputs
 import matplotlib.pyplot as plt
 from typing import List, Optional, Tuple
 # qis
@@ -36,24 +38,27 @@ from qis.portfolio.reports.strategy_factsheet import (
 )
 
 
-def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
-                                       time_period: TimePeriod = None,
-                                       perf_params: PerfParams = PERF_PARAMS,
-                                       regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                                       regime_benchmark: str = None,
-                                       backtest_name: str = None,
-                                       heatmap_freq: str = 'YE',
-                                       add_benchmarks_to_navs: bool = False,
-                                       figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                       group_data: pd.Series = None,
-                                       add_group_exposures_and_pnl: bool = False,
-                                       add_strategy_factsheets: bool = False,
-                                       fontsize: int = 5,
-                                       recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
-                                           DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
-                                       ),
-                                       **kwargs
-                                       ) -> List[plt.Figure]:
+def generate_multi_portfolio_factsheet(
+    multi_portfolio_data: MultiPortfolioData,
+    time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+    regime_benchmark: str = None,
+    backtest_name: str = None,
+    heatmap_freq: str = "YE",
+    add_benchmarks_to_navs: bool = False,
+    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+    group_data: pd.Series = None,
+    add_group_exposures_and_pnl: bool = False,
+    add_strategy_factsheets: bool = False,
+    fontsize: int = 5,
+    recent_ra_perf_table_start_date: Optional[pd.Timestamp] = (
+        DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
+    ),
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> List[plt.Figure]:
     """
     factsheet comparing several structurally different strategies, as a list of A4 figures.
 
@@ -64,6 +69,9 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     hundred-line legend.
 
     Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
         multi_portfolio_data: the portfolios to compare
         time_period: reporting window. None uses the full common history
         recent_ra_perf_table_start_date: start of the second risk-adjusted performance table in
@@ -87,15 +95,19 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
     Returns:
         the pages, in order, ready for :func:`save_figs_to_pdf`
     """
+    group_data, lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, group_data, lookthrough_matrix)
     kwargs = factsheet_kwargs(kwargs)
-    if group_data is not None:
+    if group_data is not None or lookthrough_matrix is not None:
         is_grouped = True
     else:
         is_grouped = False
     is_grouped_for_summary_tables = _use_grouped_summary_tables(
         portfolio_data=multi_portfolio_data.portfolio_datas[0],
         is_grouped=is_grouped,
-        panel_names='the Sharpe-ratio panels',
+        panel_names="the Sharpe-ratio panels",
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
     )
 
     if regime_benchmark is None and multi_portfolio_data.benchmark_prices is not None:
@@ -233,28 +245,40 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
                                          **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
 
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
-        multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2]),
-                                              is_grouped=is_grouped_for_summary_tables,
-                                              time_period=time_period,
-                                              perf_params=perf_params,
-                                              regime_classifier=regime_classifier,
-                                              benchmark=multi_portfolio_data.benchmark_prices.columns[0],
-                                              **kwargs)
-        multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 3]),
-                                              is_grouped=is_grouped_for_summary_tables,
-                                              time_period=time_period,
-                                              perf_params=perf_params,
-                                              regime_classifier=regime_classifier,
-                                              benchmark=multi_portfolio_data.benchmark_prices.columns[1],
-                                              **kwargs)
+        multi_portfolio_data.plot_regime_data(
+            ax=fig.add_subplot(gs[4, 2]),
+            is_grouped=is_grouped_for_summary_tables,
+            time_period=time_period,
+            perf_params=perf_params,
+            regime_classifier=regime_classifier,
+            benchmark=multi_portfolio_data.benchmark_prices.columns[0],
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
+        multi_portfolio_data.plot_regime_data(
+            ax=fig.add_subplot(gs[4, 3]),
+            is_grouped=is_grouped_for_summary_tables,
+            time_period=time_period,
+            perf_params=perf_params,
+            regime_classifier=regime_classifier,
+            benchmark=multi_portfolio_data.benchmark_prices.columns[1],
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     else:
-        multi_portfolio_data.plot_regime_data(ax=fig.add_subplot(gs[4, 2:]),
-                                              is_grouped=is_grouped_for_summary_tables,
-                                              time_period=time_period,
-                                              perf_params=perf_params,
-                                              regime_classifier=regime_classifier,
-                                              benchmark=multi_portfolio_data.benchmark_prices.columns[0],
-                                              **kwargs)
+        multi_portfolio_data.plot_regime_data(
+            ax=fig.add_subplot(gs[4, 2:]),
+            is_grouped=is_grouped_for_summary_tables,
+            time_period=time_period,
+            perf_params=perf_params,
+            regime_classifier=regime_classifier,
+            benchmark=multi_portfolio_data.benchmark_prices.columns[0],
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
         # take first two benchmarks
         benchmark_prices = multi_portfolio_data.benchmark_prices.iloc[:, :2]
@@ -279,24 +303,31 @@ def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
 
     figs = [fig]
     if add_group_exposures_and_pnl:
-        figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(time_period=time_period,
-                                                                  regime_benchmark=regime_benchmark,
-                                                                  regime_classifier=regime_classifier,
-                                                                  **kwargs)
+        figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(
+            time_period=time_period,
+            regime_benchmark=regime_benchmark,
+            regime_classifier=regime_classifier,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         figs.append(figs1)
 
     if add_strategy_factsheets:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
-            figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                                    benchmark_prices=multi_portfolio_data.benchmark_prices,
-                                                    perf_params=perf_params,
-                                                    regime_classifier=regime_classifier,
-                                                    add_grouped_exposures=is_grouped,
-                                                    time_period=time_period,
-                                                    recent_ra_perf_table_start_date=(
-                                                        recent_ra_perf_table_start_date
-                                                    ),
-                                                    **kwargs
-                                                    ))
+            figs.append(
+                generate_strategy_factsheet(
+                    portfolio_data=portfolio_data,
+                    benchmark_prices=multi_portfolio_data.benchmark_prices,
+                    perf_params=perf_params,
+                    regime_classifier=regime_classifier,
+                    add_grouped_exposures=is_grouped,
+                    time_period=time_period,
+                    recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
+                    **kwargs,
+                    lookthrough_matrix=lookthrough_matrix,
+                    group_data=group_data,
+                )
+            )
     figs = qis.to_flat_list(figs)
     return figs

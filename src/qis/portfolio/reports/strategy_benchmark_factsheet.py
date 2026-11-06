@@ -19,6 +19,8 @@ risk contributions on the same pair is ``strategy_benchmark_tre_factsheet.py``.
 import numpy as np
 # packages
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import resolve_reporting_inputs
 from qis.utils._pandas_compat import infer_freq as _infer_freq
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -49,30 +51,34 @@ from qis.plots.utils import set_spines, set_y_limits
 _RecentStart = Optional[pd.Timestamp]
 
 
-def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfolioData,
-                                              strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
-                                              benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
-                                              time_period: TimePeriod = None,
-                                              perf_params: PerfParams = PERF_PARAMS,
-                                              regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                                              backtest_name: str = None,
-                                              add_benchmarks_to_navs: bool = False,
-                                              add_brinson_attribution: bool = True,
-                                              add_exposures_pnl_attribution: bool = False,
-                                              add_strategy_factsheet: bool = False,
-                                              add_grouped_exposures: bool = False,  # for strategy factsheet
-                                              add_grouped_cum_pnl: bool = False,  # for strategy factsheet
-                                              add_tracking_error_table: bool = False,
-                                              add_exposures_comp: bool = False,
-                                              is_grouped: Optional[bool] = True,
-                                              figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                              fontsize: int = 5,
-                                              add_joint_instrument_history_report: bool = False,
-                                              recent_ra_perf_table_start_date: _RecentStart = (
-                                                  DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
-                                              ),
-                                              **kwargs
-                                              ) -> List[plt.Figure]:
+def generate_strategy_benchmark_factsheet_plt(
+    multi_portfolio_data: MultiPortfolioData,
+    strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
+    benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
+    time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+    backtest_name: str = None,
+    add_benchmarks_to_navs: bool = False,
+    add_brinson_attribution: bool = True,
+    add_exposures_pnl_attribution: bool = False,
+    add_strategy_factsheet: bool = False,
+    add_grouped_exposures: bool = False,  # for strategy factsheet
+    add_grouped_cum_pnl: bool = False,  # for strategy factsheet
+    add_tracking_error_table: bool = False,
+    add_exposures_comp: bool = False,
+    is_grouped: Optional[bool] = True,
+    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+    fontsize: int = 5,
+    add_joint_instrument_history_report: bool = False,
+    recent_ra_perf_table_start_date: _RecentStart = (DEFAULT_RECENT_RA_PERF_TABLE_START_DATE),
+    brinson_time_period: Optional[TimePeriod] = None,
+    brinson_group_data: Optional[pd.Series] = None,
+    *,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> List[plt.Figure]:
     """
     factsheet comparing one strategy against one benchmark, as a list of A4 figures.
 
@@ -87,6 +93,11 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     fees, funding or other cash flows absent from instrument P&L.
 
     Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+            where available. Fractional memberships belong in lookthrough_matrix.
         multi_portfolio_data: the portfolios, strategy and benchmark among them
         strategy_idx: position of the strategy within ``multi_portfolio_data``
         benchmark_idx: position of the benchmark within ``multi_portfolio_data``
@@ -97,6 +108,10 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         regime_classifier: how benchmark returns are mapped to regimes
         backtest_name: title of the report
         add_benchmarks_to_navs: include the benchmarks as additional lines in the performance panels
+        brinson_time_period: Independent attribution window. None uses time_period.
+            The first shared NAV is its baseline; earlier returns are excluded.
+        brinson_group_data: Legacy alias for report-wide group_data Series labels.
+            Use lookthrough_matrix for fractional memberships.
         add_brinson_attribution: add the allocation / selection decomposition, with interaction
             assigned entirely to instrument selection
         add_exposures_pnl_attribution: add the exposure and P&L attribution pages
@@ -120,6 +135,15 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         comparison pages are closed in pyplot but remain drawable and saveable. Other pages
         remain open for the caller to close after use; unrelated figures are left open.
     """
+    if brinson_group_data is not None:
+        if not isinstance(brinson_group_data, pd.Series):
+            raise TypeError("brinson_group_data must be a Series; use lookthrough_matrix")
+        if group_data is not None and not group_data.equals(brinson_group_data):
+            raise ValueError("Pass group_data or legacy brinson_group_data, not conflicting labels")
+        group_data = brinson_group_data
+    group_data, lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, group_data, lookthrough_matrix)
+    brinson_group_data = group_data
     kwargs = factsheet_kwargs(kwargs)
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
@@ -127,18 +151,34 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
         raise ValueError(f"must be at least two strategies")
 
     if is_grouped is None:
-        if len(multi_portfolio_data.portfolio_datas[0].get_weights().columns) >= 10:  # otherwise tables look too bad
+        if (
+            len(
+                multi_portfolio_data.portfolio_datas[0]
+                .get_weights(lookthrough_matrix=lookthrough_matrix, group_data=group_data)
+                .columns
+            )
+            >= 10
+        ):  # otherwise tables look too bad
             is_grouped = True
         else:
             is_grouped = False
     else:
         if is_grouped is False:
-            if len(multi_portfolio_data.portfolio_datas[0].get_weights().columns) >= 10:  # tables look too bad
+            if (
+                len(
+                    multi_portfolio_data.portfolio_datas[0]
+                    .get_weights(lookthrough_matrix=lookthrough_matrix, group_data=group_data)
+                    .columns
+                )
+                >= 10
+            ):  # tables look too bad
                 is_grouped = True
     is_grouped_for_summary_tables = _use_grouped_summary_tables(
         portfolio_data=multi_portfolio_data.portfolio_datas[strategy_idx],
         is_grouped=is_grouped and not add_benchmarks_to_navs,
-        panel_names='the RA performance panels',
+        panel_names="the RA performance panels",
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
     )
 
     # set reporting time period here
@@ -236,12 +276,16 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                     regime_classifier=regime_classifier,
                                     **kwargs)
 
-    multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[0:2, 2:]),
-                                               benchmark_price=benchmark_price,
-                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                               perf_params=perf_params,
-                                               is_grouped=is_grouped_for_summary_tables,
-                                               **qis.update_kwargs(kwargs, dict(fontsize=fontsize)))
+    multi_portfolio_data.plot_ac_ra_perf_table(
+        ax=fig.add_subplot(gs[0:2, 2:]),
+        benchmark_price=benchmark_price,
+        add_benchmarks_to_navs=add_benchmarks_to_navs,
+        perf_params=perf_params,
+        is_grouped=is_grouped_for_summary_tables,
+        **qis.update_kwargs(kwargs, dict(fontsize=fontsize)),
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
 
     time_period1 = _get_recent_ra_perf_table_time_period(
         time_period=time_period,
@@ -253,12 +297,16 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     else:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
 
-    multi_portfolio_data.plot_ac_ra_perf_table(ax=fig.add_subplot(gs[2:4, 2:]),
-                                               benchmark_price=benchmark_price,
-                                               add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                               perf_params=perf_params,
-                                               is_grouped=is_grouped_for_summary_tables,
-                                               **local_kwargs)
+    multi_portfolio_data.plot_ac_ra_perf_table(
+        ax=fig.add_subplot(gs[2:4, 2:]),
+        benchmark_price=benchmark_price,
+        add_benchmarks_to_navs=add_benchmarks_to_navs,
+        perf_params=perf_params,
+        is_grouped=is_grouped_for_summary_tables,
+        **local_kwargs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
 
     # periodic returns
     local_kwargs = qis.update_kwargs(kwargs=kwargs,
@@ -278,14 +326,18 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                              multi_portfolio_data.benchmark_prices.columns[1]: fig.add_subplot(gs[6:8, 3])}
     for benchmark_, ax_ in benchmark_prices_.items():
         post_title = f"Sharpe in {benchmark_} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
-        multi_portfolio_data.plot_regime_data(benchmark=benchmark_,
-                                              add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                              is_grouped=False,
-                                              title=f"{post_title}",
-                                              perf_params=perf_params,
-                                              regime_classifier=regime_classifier,
-                                              ax=ax_,
-                                              **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
+        multi_portfolio_data.plot_regime_data(
+            benchmark=benchmark_,
+            add_benchmarks_to_navs=add_benchmarks_to_navs,
+            is_grouped=False,
+            title=f"{post_title}",
+            perf_params=perf_params,
+            regime_classifier=regime_classifier,
+            ax=ax_,
+            **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)),
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
 
     # vol regimes
     """
@@ -320,39 +372,90 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
                                                   **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
 
     if add_brinson_attribution:
+        brinson_period = time_period if brinson_time_period is None else brinson_time_period
+        brinson_kwargs = qis.update_kwargs(kwargs, dict(time_period=brinson_period))
+        if lookthrough_matrix is not None:
+            brinson_kwargs.setdefault('col_widths', [4.5] + [2.0] * 7)
+            brinson_kwargs.setdefault('var_format', '{:.1%}')
+        shared = pd.concat([
+            multi_portfolio_data.portfolio_datas[strategy_idx].nav,
+            multi_portfolio_data.portfolio_datas[benchmark_idx].nav,
+        ], axis=1, join='inner').dropna()
+        shared = brinson_period.locate(shared)
+        if len(shared) < 2:
+            raise ValueError('Brinson requires at least two shared NAV observations')
+        period_label = f'{shared.index[0]:%d%b%Y} - {shared.index[-1]:%d%b%Y}'
         with sns.axes_style("darkgrid"):
             fig1 = plt.figure(figsize=figsize, constrained_layout=True)
             this_name = backtest_name if backtest_name is not None else ''
             cost_basis = 'Net' if kwargs.get('is_net', False) else 'Gross'
             fig1.suptitle(
-                f'{this_name} Brinson performance attribution report\n'
+                f'{this_name} Brinson performance attribution report: {period_label}\n'
                 f'{cost_basis} of realised trading costs. '
                 'Interaction returns added 100% to instrument selection',
                 fontweight='bold', fontsize=8, color='blue')
+            if lookthrough_matrix is not None:
+                # Reserve a stable heading band across both PDF and raster draws.
+                fig1.get_layout_engine().set(rect=(0.0, 0.0, 1.0, 0.94))
+                fig1._suptitle.set_position((0.5, 0.99))
+                fig1._suptitle.set_in_layout(False)
             figs.append(fig1)
             gs = fig1.add_gridspec(nrows=3, ncols=2, wspace=0.0, hspace=0.0)
-            axs = [fig1.add_subplot(gs[0, 0]), fig1.add_subplot(gs[1, 0]),
+            large_partition = (lookthrough_matrix is not None
+                               and len(lookthrough_matrix.columns) > 6)
+            table_spec = gs[:2, 0] if large_partition else gs[0, 0]
+            active_spec = gs[2, 0] if large_partition else gs[1, 0]
+            axs = [fig1.add_subplot(table_spec), fig1.add_subplot(active_spec),
                    fig1.add_subplot(gs[0, 1]), fig1.add_subplot(gs[1, 1]),
                    fig1.add_subplot(gs[2, 1])]
-            multi_portfolio_data.plot_brinson_attribution(strategy_idx=strategy_idx,
-                                                          benchmark_idx=benchmark_idx,
-                                                          freq=None,
-                                                          axs=axs,
-                                                          total_column='Total Sum',
-                                                          is_exclude_interaction_term=True,
-                                                          **kwargs)
-            brinson_index = time_period.locate(multi_portfolio_data.benchmark_prices).index
+            multi_portfolio_data.plot_brinson_attribution(
+                strategy_idx=strategy_idx,
+                benchmark_idx=benchmark_idx,
+                freq=None,
+                axs=axs,
+                total_column="Total Sum",
+                is_exclude_interaction_term=True,
+                group_data=brinson_group_data,
+                **brinson_kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+            )
+            brinson_index = shared.index
             for ax in axs[1:]:
                 multi_portfolio_data.add_regime_shadows(
                     ax=ax,
                     regime_benchmark=regime_benchmark,
                     index=brinson_index,
                     regime_classifier=regime_classifier)
-        # add exposure diff
-        multi_portfolio_data.plot_exposures_diff(ax=fig1.add_subplot(gs[2, 0]),
-                                                 regime_benchmark=regime_benchmark,
-                                                 regime_classifier=regime_classifier,
-                                                 **kwargs)
+        # Exposure comparison uses the same attribution period and classification.
+        exposure_ax = None if large_partition else fig1.add_subplot(gs[2, 0])
+        if large_partition:
+            pass  # The separate look-through factsheet carries the exposure bars.
+        elif brinson_group_data is not None or lookthrough_matrix is not None:
+            from qis.portfolio.reports.lookthrough_exposures import _exposure_tables
+            pair = MultiPortfolioData([
+                multi_portfolio_data.portfolio_datas[strategy_idx],
+                multi_portfolio_data.portfolio_datas[benchmark_idx]])
+            average, _, _ = _exposure_tables(
+                pair,
+                time_period=brinson_period,
+                group_data=group_data,
+                lookthrough_matrix=lookthrough_matrix,
+            )
+            difference = average.iloc[:, 0] - average.iloc[:, 1]
+            qis.plot_bars(difference, stacked=False, is_horizontal=True,
+                          annotate_totals=False, is_sns=False, fontsize=fontsize,
+                          xvar_format='{:.0%}', yvar_format='{:.0%}',
+                          title='Average look-through active weights',
+                          legend_loc=None, ax=exposure_ax)
+        else:
+            multi_portfolio_data.plot_exposures_diff(
+                ax=exposure_ax,
+                regime_benchmark=regime_benchmark,
+                regime_classifier=regime_classifier,
+                **brinson_kwargs,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
 
     if add_tracking_error_table:
         tre_table = multi_portfolio_data.compute_tracking_error_table(strategy_idx=strategy_idx,
@@ -377,15 +480,23 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if add_exposures_comp:
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
         benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
-        strategy_weights, benchmark_weights = multi_portfolio_data.get_aligned_weights(strategy_idx=strategy_idx,
-                                                                                       benchmark_idx=benchmark_idx,
-                                                                                       is_grouped=is_grouped,
-                                                                                       **kwargs)
+        strategy_weights, benchmark_weights = multi_portfolio_data.get_aligned_weights(
+            strategy_idx=strategy_idx,
+            benchmark_idx=benchmark_idx,
+            is_grouped=is_grouped,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
 
-        strategy_turnover, benchmark_turnover = multi_portfolio_data.get_aligned_turnover(strategy_idx=strategy_idx,
-                                                                                          benchmark_idx=benchmark_idx,
-                                                                                          is_grouped=is_grouped,
-                                                                                          **kwargs)
+        strategy_turnover, benchmark_turnover = multi_portfolio_data.get_aligned_turnover(
+            strategy_idx=strategy_idx,
+            benchmark_idx=benchmark_idx,
+            is_grouped=is_grouped,
+            **kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
         exposure_scores = strategy_weights.subtract(benchmark_weights).ffill().iloc[-1]
         exposure_names = tail_index(exposure_scores, kwargs['asset_tail_count'])
         exposure_title = selection_title(
@@ -419,17 +530,37 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
     if add_exposures_pnl_attribution:
         strategy_name = multi_portfolio_data.portfolio_datas[strategy_idx].ticker
         benchmark_name = multi_portfolio_data.portfolio_datas[benchmark_idx].ticker
-        strategy_grouped_exposures_agg, strategy_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_long_short_weights(time_period=time_period)
+        strategy_grouped_exposures_agg, strategy_grouped_exposures_by_inst = (
+            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_long_short_weights(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
 
-        benchmark_grouped_exposures_agg, benchmark_grouped_exposures_by_inst = \
-            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_long_short_weights(time_period=time_period)
+        benchmark_grouped_exposures_agg, benchmark_grouped_exposures_by_inst = (
+            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_long_short_weights(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
 
-        strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst \
-            = multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(time_period=time_period)
+        strategy_grouped_pnls_agg, strategy_grouped_pnls_by_inst = (
+            multi_portfolio_data.portfolio_datas[strategy_idx].get_grouped_cum_pnls(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
 
-        benchmark_grouped_pnls_agg, benchmark_grouped_pnls_by_inst \
-            = multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_cum_pnls(time_period=time_period)
+        benchmark_grouped_pnls_agg, benchmark_grouped_pnls_by_inst = (
+            multi_portfolio_data.portfolio_datas[benchmark_idx].get_grouped_cum_pnls(
+                time_period=time_period,
+                lookthrough_matrix=lookthrough_matrix,
+                group_data=group_data,
+            )
+        )
 
         scores = pd.Series({
             group: pnl['Total'].iloc[-1] - benchmark_grouped_pnls_agg[group]['Total'].iloc[-1]
@@ -488,42 +619,59 @@ def generate_strategy_benchmark_factsheet_plt(multi_portfolio_data: MultiPortfol
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
-            figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                                    benchmark_prices=multi_portfolio_data.benchmark_prices,
-                                                    perf_params=perf_params,
-                                                    regime_classifier=regime_classifier,
-                                                    add_grouped_exposures=add_grouped_exposures,
-                                                    add_grouped_cum_pnl=add_grouped_cum_pnl,
-                                                    is_grouped=is_grouped,
-                                                    recent_ra_perf_table_start_date=(
-                                                        recent_ra_perf_table_start_date
-                                                    ),
-                                                    **kwargs  # time period will be in kwargs
-                                                    ))
+            figs.append(
+                generate_strategy_factsheet(
+                    portfolio_data=portfolio_data,
+                    benchmark_prices=multi_portfolio_data.benchmark_prices,
+                    perf_params=perf_params,
+                    regime_classifier=regime_classifier,
+                    add_grouped_exposures=add_grouped_exposures,
+                    add_grouped_cum_pnl=add_grouped_cum_pnl,
+                    is_grouped=is_grouped,
+                    recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
+                    **kwargs,  # time period will be in kwargs
+                    lookthrough_matrix=lookthrough_matrix,
+                    group_data=group_data,
+                )
+            )
         figs = qis.to_flat_list(figs)
 
     return figs
 
 
-def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortfolioData,
-                                                strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
-                                                benchmark_idx: int = 1, # benchmark is multi_portfolio_data[benchmark_idx]
-                                                time_period: TimePeriod = None,
-                                                perf_params: PerfParams = PERF_PARAMS,
-                                                regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
-                                                backtest_name: str = None,
-                                                weight_freq: Optional[str] = 'ME',
-                                                add_strategy_factsheet: bool = False,
-                                                add_grouped_exposures: bool = False,  # for strategy factsheet
-                                                add_grouped_cum_pnl: bool = False,  # for strategy factsheet
-                                                figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                                is_long_only: bool = False,
-                                                fontsize: int = 8,
-                                                **kwargs
-                                                ) -> List[plt.Figure]:
+def generate_strategy_benchmark_active_perf_plt(
+    multi_portfolio_data: MultiPortfolioData,
+    strategy_idx: int = 0,  # strategy is multi_portfolio_data[strategy_idx]
+    benchmark_idx: int = 1,  # benchmark is multi_portfolio_data[benchmark_idx]
+    time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = BenchmarkReturnsQuantilesRegime(),
+    backtest_name: str = None,
+    weight_freq: Optional[str] = "ME",
+    add_strategy_factsheet: bool = False,
+    add_grouped_exposures: bool = False,  # for strategy factsheet
+    add_grouped_cum_pnl: bool = False,  # for strategy factsheet
+    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+    is_long_only: bool = False,
+    fontsize: int = 8,
+    *,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> List[plt.Figure]:
     """
     display 2*2 plot with nav and Brinson attribution
+
+
+    Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+            where available. Fractional memberships belong in lookthrough_matrix.
     """
+    group_data, lookthrough_matrix = resolve_reporting_inputs(
+        multi_portfolio_data.portfolio_datas, group_data, lookthrough_matrix)
     if len(multi_portfolio_data.portfolio_datas) == 1:
         raise ValueError(f"must be at least two strategies")
 
@@ -556,12 +704,21 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
                                   title='Cumulative performance',
                                   **kwargs)
 
-    totals_table, active_total, grouped_allocation_return, grouped_selection_return, grouped_interaction_return = \
-        multi_portfolio_data.compute_brinson_attribution(strategy_idx=strategy_idx,
-                                                         benchmark_idx=benchmark_idx,
-                                                         freq=None,
-                                                         time_period=time_period,
-                                                         is_exclude_interaction_term=True)
+    (
+        totals_table,
+        active_total,
+        grouped_allocation_return,
+        grouped_selection_return,
+        grouped_interaction_return,
+    ) = multi_portfolio_data.compute_brinson_attribution(
+        strategy_idx=strategy_idx,
+        benchmark_idx=benchmark_idx,
+        freq=None,
+        time_period=time_period,
+        is_exclude_interaction_term=True,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
 
     datas = {'Active total return (Brinson attribution)': (active_total.cumsum(axis=0), fig.add_subplot(gs[0, 1])),
              'Asset class allocation return': (grouped_allocation_return.cumsum(axis=0), fig.add_subplot(gs[1, 1])),
@@ -586,36 +743,49 @@ def generate_strategy_benchmark_active_perf_plt(multi_portfolio_data: MultiPortf
     else:
         local_kwargs = qis.update_kwargs(kwargs, dict(add_hue_to_legend_title=False))
     ax = fig.add_subplot(gs[1, 0])
-    multi_portfolio_data.plot_weights_boxplot(strategy_idx=strategy_idx,
-                                              benchmark_idx=benchmark_idx,
-                                              freq=weight_freq,
-                                              is_grouped=True,
-                                              title=f"Boxplot of weights by groups at {weight_freq}-freq",
-                                              ax=ax,
-                                              **local_kwargs)
+    multi_portfolio_data.plot_weights_boxplot(
+        strategy_idx=strategy_idx,
+        benchmark_idx=benchmark_idx,
+        freq=weight_freq,
+        is_grouped=True,
+        title=f"Boxplot of weights by groups at {weight_freq}-freq",
+        ax=ax,
+        **local_kwargs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
     if is_long_only:
         set_y_limits(ax=ax, y_limits=(0, None))
     ax = fig.add_subplot(gs[2, 0])
-    multi_portfolio_data.plot_weights_boxplot(strategy_idx=strategy_idx,
-                                              benchmark_idx=benchmark_idx,
-                                              freq=weight_freq,
-                                              is_grouped=False,
-                                              title=f"Boxplot of weights by instruments at {weight_freq}-freq",
-                                              ax=ax,
-                                              **local_kwargs)
+    multi_portfolio_data.plot_weights_boxplot(
+        strategy_idx=strategy_idx,
+        benchmark_idx=benchmark_idx,
+        freq=weight_freq,
+        is_grouped=False,
+        title=f"Boxplot of weights by instruments at {weight_freq}-freq",
+        ax=ax,
+        **local_kwargs,
+        lookthrough_matrix=lookthrough_matrix,
+        group_data=group_data,
+    )
     if is_long_only:
         set_y_limits(ax=ax, y_limits=(0, None))
 
     if add_strategy_factsheet:
         for portfolio_data in multi_portfolio_data.portfolio_datas:
-            figs.append(generate_strategy_factsheet(portfolio_data=portfolio_data,
-                                                    benchmark_prices=multi_portfolio_data.benchmark_prices,
-                                                    perf_params=perf_params,
-                                                    regime_classifier=regime_classifier,
-                                                    add_grouped_exposures=add_grouped_exposures,
-                                                    add_grouped_cum_pnl=add_grouped_cum_pnl,
-                                                    **kwargs  # time period will be in kwargs
-                                                    ))
+            figs.append(
+                generate_strategy_factsheet(
+                    portfolio_data=portfolio_data,
+                    benchmark_prices=multi_portfolio_data.benchmark_prices,
+                    perf_params=perf_params,
+                    regime_classifier=regime_classifier,
+                    add_grouped_exposures=add_grouped_exposures,
+                    add_grouped_cum_pnl=add_grouped_cum_pnl,
+                    **kwargs,  # time period will be in kwargs
+                    lookthrough_matrix=lookthrough_matrix,
+                    group_data=group_data,
+                )
+            )
         figs = qis.to_flat_list(figs)
     return figs
 

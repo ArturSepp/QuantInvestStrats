@@ -197,5 +197,7 @@ def compact_groups(aggregates, instruments, max_groups=MAX_GROUPS_FOR_DETAIL_PAN
     else:
         aggregate = pd.concat(aggregates.values()).groupby(level=0).sum(min_count=1)
         assets = pd.concat(instruments.values(), axis=1, sort=True)
+        if not assets.columns.is_unique:
+            assets = assets.T.groupby(level=0, sort=False).sum(min_count=1).T
     label = f'All instruments ({num_groups} groups)'
     return {label: aggregate}, {label: assets}

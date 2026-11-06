@@ -235,6 +235,11 @@ def plot_brinson_totals_table(
         (8, 'black')   # After attribution columns
     ]
 
+    # Equal-width separator coordinates do not apply to custom-width tables.
+    # Preserve the actual cell borders instead of drawing lines through values.
+    if kwargs.get('col_widths') is not None:
+        columns_edge_lines = None
+
     # Format all numeric values according to specified format
     totals_table_formatted = qis.df_to_str(df=totals_table, var_format=var_format)
 

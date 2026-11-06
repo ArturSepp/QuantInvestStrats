@@ -10,7 +10,7 @@ myst:
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-09-13](https://github.com/ArturSepp/QuantInvestStrats/commit/29fb6ce856e4480d9643508842a7ef5beff56cf9)*
 
-Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis â€” Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 Brinson attribution decomposes a portfolio's return relative to a benchmark into
@@ -90,6 +90,61 @@ portfolio history conventions. This is appropriate only for inactive/missing
 holdings: supply complete P&L and weights for live positions. Every instrument
 requires a classification; infinite inputs and duplicate identifiers are rejected.
 Preferred group order is preserved, with additional observed groups appended.
+
+### Fractional look-through and reporting windows
+
+Keep `group_data` as an instrument-indexed Series of ordinary classifications and
+pass a static instrument-by-sleeve DataFrame separately as `lookthrough_matrix`.
+Each supplied row must contain finite nonnegative fractions summing to one
+(absolute tolerance 1e-10). Rows omitted from the matrix retain their ordinary
+Series label. No exposures are inferred and no row is normalised. A matrix may
+cover the union of instruments used by several portfolios. Conflicting ordinary
+labels for a shared instrument require explicit labels or an explicit matrix row.
+
+The same resolved partition splits beginning-of-period weights and arithmetic
+instrument contributions before group returns and BHB effects are calculated.
+A 52% private-equity, 16% private-debt, 22% hedge-fund and 10% insurance-linked
+split attributes those fractions of a mixed fund's observed return. It does not
+identify the four sleeves' separate underlying returns.
+
+The auxiliary inputs flow through `PortfolioData`, `MultiPortfolioData`, the
+strategy, multi-strategy and strategy/benchmark factsheets, and `qis.factsheet`.
+`PortfolioData.group_data` remains a Series; no backtest or saved portfolio is
+modified. Without `lookthrough_matrix`, the existing categorical calculations,
+portfolio NAV, trading-cost and turnover totals are unchanged. Passing a
+DataFrame through `group_data` is rejected with guidance to use the separate
+parameter. The low-level `asset_class_data` keyword remains an alias for Series
+labels; the exposure helper's `group_loadings` remains an alias for a complete
+matrix. Do not supply both an alias and its replacement.
+
+Exposure, P&L, attributed instrument turnover, and attributed instrument costs
+use the same fractions. These trading panels describe the fund's trading, not
+unobserved trading inside the fund. Group NAV statistics compound the split
+contributions before computing performance. Standalone sleeve VaR and tracking
+error use fractional positions with the original covariance and are not additive.
+Euler risk contributions are split additively and reconcile to total risk.
+`RiskModel.compute_tre_by_group_loadings_at_date` remains a separate general
+interface: its loadings may be signed or overlapping and need not sum to one.
+
+`generate_strategy_benchmark_factsheet_plt` accepts `brinson_time_period` independently
+of its overall reporting period. The first shared NAV in the selected window is
+the baseline, not an attributed return. For a 31 December 2020 baseline, the first
+included return is the next native observation. All Brinson panels use this
+window. The legacy `brinson_group_data` Series keyword is an alias for report-wide
+`group_data`; use `lookthrough_matrix` for fractional overrides.
+
+`generate_lookthrough_exposures_factsheet` uses the same labels and optional matrix.
+Grouped horizontal bars compare the native-observation mean of beginning weights
+with realised end-date holdings, including drift. The tracking-error report has
+three independent grids: `lookthrough_matrix` for asset classes,
+`sub_ac_lookthrough_matrix` for sub-asset classes, and `turnover_lookthrough_matrix`
+for instrument-turnover attribution. Pass each explicitly when all three grids
+require fractional reporting.
+
+Static fractions are a descriptive accounting assumption. Supplying today's
+fractions over a historical window does not establish point-in-time underlying
+holdings. Dated partitions and constituent-level realised returns are outside
+this interface.
 
 ## Methodology
 
@@ -293,7 +348,7 @@ are the numerical contract; the example is the reader-facing reproduction path.
 
 ## References
 
-1. Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). Determinants of Portfolio Performance. *Financial Analysts Journal*, 42(4), 39–44. [DOI: 10.2469/faj.v42.n4.39](https://doi.org/10.2469/faj.v42.n4.39).
-2. Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10–22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
+1. Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). Determinants of Portfolio Performance. *Financial Analysts Journal*, 42(4), 39â€“44. [DOI: 10.2469/faj.v42.n4.39](https://doi.org/10.2469/faj.v42.n4.39).
+2. Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10â€“22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
 3. R-Finance contributors. PortfolioAttribution. Software. [Frongello linking implementation](https://github.com/R-Finance/PortfolioAttribution/blob/master/R/Frongello.R). Supplemental implementation reference.
 4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).

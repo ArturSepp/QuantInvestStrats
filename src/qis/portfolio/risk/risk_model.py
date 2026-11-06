@@ -28,6 +28,8 @@ from typing import Dict, Optional, Union
 import numpy as np
 import pandas as pd
 
+from qis.portfolio.attribution.group_exposures import resolve_group_partition
+
 from qis.portfolio.risk.contributions import fill_unavailable_unheld
 from qis.portfolio.risk.factor_groups import FactorGroupSpec
 from qis.perfstats.config import ReturnTypes
@@ -472,14 +474,17 @@ class RiskModel:
         variance = float(active_weights @ covar @ active_weights)
         return float(np.sqrt(variance))
 
-    def compute_tre_at_date(self,
-                            benchmark_weights: pd.Series,
-                            portfolio_weights: pd.Series,
-                            date: pd.Timestamp,
-                            group_data: Optional[pd.Series] = None,
-                            total_column: str = 'Total',
-                            strict: bool = True,
-                            ) -> Union[float, pd.Series]:
+    def compute_tre_at_date(
+        self,
+        benchmark_weights: pd.Series,
+        portfolio_weights: pd.Series,
+        date: pd.Timestamp,
+        group_data: Optional[pd.Series] = None,
+        total_column: str = "Total",
+        strict: bool = True,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Union[float, pd.Series]:
         """Compute ex-ante tracking error on one covariance date.
 
         For active weights ``d = w_p - w_b``, tracking error is
@@ -497,6 +502,8 @@ class RiskModel:
             total_column: Label for total tracking error when groups are returned.
                 Must differ from the aligned group labels, including ``'Unassigned'``.
             strict: If True, reject material weights outside the covariance universe.
+            lookthrough_matrix: Optional strict static accounting partition; omitted
+                rows use group_data. Does not alter generic group_loadings semantics.
 
         Returns:
             Total tracking error as a float, or total and standalone group
@@ -507,6 +514,12 @@ class RiskModel:
             ValueError: If weights or model data violate the alignment policy, or
                 ``total_column`` duplicates an aligned group label.
         """
+        if lookthrough_matrix is not None:
+            partition = resolve_group_partition(
+                group_data, self._covar_at_date(date).index, lookthrough_matrix)
+            return self.compute_tre_by_group_loadings_at_date(
+                benchmark_weights, portfolio_weights, date, partition,
+                total_column=total_column, strict=strict)
         covar = self._covar_at_date(date)
         benchmark = self._align_weights(
             weights=benchmark_weights,
@@ -598,13 +611,16 @@ class RiskModel:
                 covar=covar)
         return pd.Series(results, dtype=float)
 
-    def compute_tre_history(self,
-                            benchmark_weights: WeightInput,
-                            portfolio_weights: WeightInput,
-                            group_data: Optional[pd.Series] = None,
-                            total_column: str = 'Total',
-                            strict: bool = True,
-                            ) -> Union[pd.Series, pd.DataFrame]:
+    def compute_tre_history(
+        self,
+        benchmark_weights: WeightInput,
+        portfolio_weights: WeightInput,
+        group_data: Optional[pd.Series] = None,
+        total_column: str = "Total",
+        strict: bool = True,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> Union[pd.Series, pd.DataFrame]:
         """Compute ex-ante tracking error on the covariance date grid.
 
         Dated weights are selected as-of each covariance date using forward
@@ -620,6 +636,8 @@ class RiskModel:
             total_column: Label for total tracking error when groups are returned.
                 Must differ from the aligned group labels, including ``'Unassigned'``.
             strict: If True, reject material weights outside the covariance universe.
+            lookthrough_matrix: Optional strict static accounting partition; omitted
+                rows use group_data. Does not alter generic group_loadings semantics.
 
         Returns:
             A Series named ``'Tracking error'``, or a DataFrame containing total
@@ -644,10 +662,12 @@ class RiskModel:
                 date=date,
                 group_data=group_data,
                 total_column=total_column,
-                strict=strict)
+                strict=strict,
+                lookthrough_matrix=lookthrough_matrix,
+            )
             for date in self.dates
         }
-        if group_data is None:
+        if group_data is None and lookthrough_matrix is None:
             return pd.Series(results, name='Tracking error', dtype=float)
         return pd.DataFrame.from_dict(results, orient='index')
 
@@ -977,13 +997,16 @@ class RiskModel:
         }
         return pd.DataFrame.from_dict(results, orient='index')
 
-    def compute_marginal_tre_at_date(self,
-                                     benchmark_weights: pd.Series,
-                                     portfolio_weights: pd.Series,
-                                     date: pd.Timestamp,
-                                     group_data: Optional[pd.Series] = None,
-                                     strict: bool = True,
-                                     ) -> pd.DataFrame:
+    def compute_marginal_tre_at_date(
+        self,
+        benchmark_weights: pd.Series,
+        portfolio_weights: pd.Series,
+        date: pd.Timestamp,
+        group_data: Optional[pd.Series] = None,
+        strict: bool = True,
+        *,
+        lookthrough_matrix: Optional[pd.DataFrame] = None,
+    ) -> pd.DataFrame:
         """Compute canonical Euler marginal tracking-error contributions.
 
         With active weights ``d = w_p - w_b`` and
@@ -1005,6 +1028,8 @@ class RiskModel:
             group_data: Optional group label per asset. Missing labels become
                 ``'Unassigned'``.
             strict: If True, reject material weights outside the covariance universe.
+            lookthrough_matrix: Optional strict static accounting partition; omitted
+                rows use group_data. Does not alter generic group_loadings semantics.
 
         Returns:
             Per-asset DataFrame, or a DataFrame with ``Total`` and group rows.
@@ -1056,6 +1081,19 @@ class RiskModel:
             contributions['mcte_systematic'] = systematic_mcte
             contributions['mcte_residual'] = residual_mcte
 
+        if lookthrough_matrix is not None:
+            partition = resolve_group_partition(group_data, covar.index, lookthrough_matrix)
+            if 'Total' in partition:
+                raise ValueError("Total label cannot also be a reporting group")
+            grouped = {'Total': contributions.sum(axis=0, skipna=False)}
+            for group, fractions in partition.items():
+                members = fractions[fractions.ne(0.0)]
+                grouped[group] = contributions.loc[members.index].mul(
+                    members, axis=0).sum(axis=0, skipna=False)
+            result = pd.DataFrame.from_dict(grouped, orient='index')
+            if np.isnan(tracking_error):
+                result.loc[:, :] = np.nan
+            return result
         if group_data is None:
             return contributions
         groups = self._align_groups(group_data=group_data, date=date, total_column='Total')

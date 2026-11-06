@@ -117,20 +117,24 @@ def _returns_to_navs(returns: Union[pd.Series, pd.DataFrame]) -> Union[pd.Series
     return pd.concat([base, navs])
 
 
-def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfolioData"],
-              benchmark_prices: Optional[Union[pd.Series, pd.DataFrame]] = None,
-              benchmark: Optional[str] = None,
-              reporting_frequency: Union[str, "ReportingFrequency"] = 'monthly',
-              time_period: Optional["TimePeriod"] = None,
-              kind: Optional[str] = None,
-              data_is_returns: bool = False,
-              long_threshold_years: float = 5.0,
-              add_rates_data: bool = False,
-              file_name: Optional[str] = None,
-              local_path: Optional[str] = None,
-              factsheet_name: Optional[str] = None,
-              **kwargs
-              ) -> Union[str, List[plt.Figure]]:
+def factsheet(
+    data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfolioData"],
+    benchmark_prices: Optional[Union[pd.Series, pd.DataFrame]] = None,
+    benchmark: Optional[str] = None,
+    reporting_frequency: Union[str, "ReportingFrequency"] = "monthly",
+    time_period: Optional["TimePeriod"] = None,
+    kind: Optional[str] = None,
+    data_is_returns: bool = False,
+    long_threshold_years: float = 5.0,
+    add_rates_data: bool = False,
+    file_name: Optional[str] = None,
+    local_path: Optional[str] = None,
+    factsheet_name: Optional[str] = None,
+    *,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> Union[str, List[plt.Figure]]:
     """
     Render the appropriate qis factsheet across a chosen reporting frequency in a single call.
 
@@ -149,6 +153,11 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
     the full-control API.
 
     Args:
+        lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
+            are finite, nonnegative and sum to one; omitted rows use group_data.
+            None preserves categorical reporting. This is an accounting split.
+        group_data: Ordinary instrument labels as a Series; defaults to portfolio metadata
+            where available. Fractional memberships belong in lookthrough_matrix.
         data: prices or returns, PortfolioData, or MultiPortfolioData; drives archetype
             selection
         benchmark_prices: reference prices; required for the strategy (PortfolioData) report
@@ -198,6 +207,10 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
             raise TypeError(f"unsupported data type {type(data)!r}; pass prices/returns, "
                             f"PortfolioData or MultiPortfolioData (or set kind=)")
 
+    if kind == KIND_MULTI_ASSET and lookthrough_matrix is not None:
+        raise ValueError("lookthrough_matrix requires PortfolioData or MultiPortfolioData")
+    if group_data is not None and not isinstance(group_data, pd.Series):
+        raise TypeError("group_data must be a pandas Series; use lookthrough_matrix")
     # normalise raw price/return input for the multi-asset path
     prices = None
     if kind == KIND_MULTI_ASSET:
@@ -227,27 +240,39 @@ def factsheet(data: Union[pd.Series, pd.DataFrame, "PortfolioData", "MultiPortfo
     if kind == KIND_STRATEGY:
         if benchmark_prices is None:
             raise ValueError("kind='strategy' (PortfolioData) requires benchmark_prices")
-        result = generate_strategy_factsheet(portfolio_data=data,
-                                             benchmark_prices=benchmark_prices,
-                                             time_period=time_period,
-                                             factsheet_name=factsheet_name,
-                                             **report_kwargs)
+        result = generate_strategy_factsheet(
+            portfolio_data=data,
+            benchmark_prices=benchmark_prices,
+            time_period=time_period,
+            factsheet_name=factsheet_name,
+            **report_kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     elif kind == KIND_STRATEGY_BENCHMARK:
         if not isinstance(data, MultiPortfolioData):
             raise TypeError("kind='strategy_benchmark' requires a MultiPortfolioData (strategy + benchmark)")
-        result = generate_strategy_benchmark_factsheet_plt(multi_portfolio_data=data,
-                                                           time_period=time_period,
-                                                           backtest_name=factsheet_name,
-                                                           **report_kwargs)
+        result = generate_strategy_benchmark_factsheet_plt(
+            multi_portfolio_data=data,
+            time_period=time_period,
+            backtest_name=factsheet_name,
+            **report_kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     elif kind == KIND_MULTI_STRATEGY:
         if not isinstance(data, MultiPortfolioData):
             raise TypeError("kind='multi_strategy' requires a MultiPortfolioData")
-        result = generate_multi_portfolio_factsheet(multi_portfolio_data=data,
-                                                    time_period=time_period,
-                                                    backtest_name=factsheet_name,
-                                                    **report_kwargs)
+        result = generate_multi_portfolio_factsheet(
+            multi_portfolio_data=data,
+            time_period=time_period,
+            backtest_name=factsheet_name,
+            **report_kwargs,
+            lookthrough_matrix=lookthrough_matrix,
+            group_data=group_data,
+        )
     elif kind == KIND_MULTI_ASSET:
-        result = generate_multi_asset_factsheet(prices=prices,
+        result = generate_multi_asset_factsheet(prices=prices, group_data=group_data,
                                                 benchmark_prices=benchmark_prices,
                                                 benchmark=benchmark,
                                                 time_period=time_period,

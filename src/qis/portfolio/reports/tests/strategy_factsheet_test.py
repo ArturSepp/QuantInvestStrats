@@ -848,7 +848,8 @@ def test_generate_strategy_benchmark_factsheet_labels_brinson_trading_cost_basis
         net = bool(is_net)
         assert calls == [(net, pytest.approx(expected[net], abs=1e-12))]
         assert page._suptitle.get_text() == (
-            f'{backtest_name or ""} Brinson performance attribution report\n'
+            f'{backtest_name or ""} Brinson performance attribution report: '
+            '31Dec2020 - 30Jun2021\n'
             f'{basis} of realised trading costs. '
             'Interaction returns added 100% to instrument selection'
         )

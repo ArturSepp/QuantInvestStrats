@@ -35,24 +35,27 @@ from qis.plots.utils import compute_heatmap_colors, get_df_table_size
 _Date = Optional[pd.Timestamp]
 
 
-def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiPortfolioData,
-                                                    time_period: TimePeriod = None,
-                                                    time_period_last: TimePeriod = None,
-                                                    perf_params: PerfParams = PERF_PARAMS,
-                                                    regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
-                                                    benchmark: str = None,
-                                                    backtest_name: str = None,
-                                                    heatmap_freq: str = 'YE',
-                                                    param_name: Optional[str] = 'gamma',
-                                                    fontsize: int = 4,
-                                                    recent_ra_perf_table_start_date: _Date = (
-                                                        DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
-                                                    ),
-                                                    **kwargs
-                                                    ) -> p.VStack:
+def generate_multi_portfolio_factsheet_with_pybloqs(
+    multi_portfolio_data: MultiPortfolioData,
+    time_period: TimePeriod = None,
+    time_period_last: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
+    benchmark: str = None,
+    backtest_name: str = None,
+    heatmap_freq: str = "YE",
+    param_name: Optional[str] = "gamma",
+    fontsize: int = 4,
+    recent_ra_perf_table_start_date: _Date = (DEFAULT_RECENT_RA_PERF_TABLE_START_DATE),
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> p.VStack:
     """
     this one is well suited for large backtests with over 100 strategies
     """
+    if lookthrough_matrix is not None:
+        raise ValueError("lookthrough_matrix is supported by the portfolio matplotlib factsheets")
     if time_period is None:
         raise ValueError(f"pass non none time_period")
     if time_period_last is None:
@@ -246,19 +249,24 @@ def generate_multi_portfolio_factsheet_with_pybloqs(multi_portfolio_data: MultiP
     return report
 
 
-def generate_multi_portfolio_factsheet(multi_portfolio_data: MultiPortfolioData,
-                                       time_period: TimePeriod = None,
-                                       perf_params: PerfParams = PERF_PARAMS,
-                                       regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
-                                       regime_benchmark: str = None,
-                                       backtest_name: str = None,
-                                       heatmap_freq: str = 'YE',
-                                       figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                       is_grouped: bool = False,
-                                       fontsize: int = 5,
-                                       **kwargs
-                                       ) -> plt.Figure:
+def generate_multi_portfolio_factsheet(
+    multi_portfolio_data: MultiPortfolioData,
+    time_period: TimePeriod = None,
+    perf_params: PerfParams = PERF_PARAMS,
+    regime_classifier: BenchmarkReturnsQuantilesRegime = regime_classifier,
+    regime_benchmark: str = None,
+    backtest_name: str = None,
+    heatmap_freq: str = "YE",
+    figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+    is_grouped: bool = False,
+    fontsize: int = 5,
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+    **kwargs,
+) -> plt.Figure:
     """Build the fallback report through its canonical multi-strategy implementation."""
+    if lookthrough_matrix is not None:
+        kwargs["lookthrough_matrix"] = lookthrough_matrix
     from qis.portfolio.reports.multi_strategy_factsheet_pybloqs import (
         generate_multi_portfolio_factsheet as _generate_multi_portfolio_factsheet,
     )

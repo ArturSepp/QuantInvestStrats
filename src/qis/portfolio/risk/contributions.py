@@ -17,6 +17,8 @@ covariance carries. The factor-structured version through time is ``factor_model
 """
 import numpy as np
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import resolve_group_partition
 from typing import Union, Tuple
 
 
@@ -135,10 +137,13 @@ def compute_portfolio_risk_contribution_ratios(
 
 
 def compute_group_portfolio_risk_contribution_ratios(
-        weights: pd.Series,
-        covar: pd.DataFrame,
-        groups: pd.Series,
-        ) -> pd.Series:
+    weights: pd.Series,
+    covar: pd.DataFrame,
+    groups: pd.Series = None,
+    *,
+    lookthrough_matrix: pd.DataFrame = None,
+    group_data: pd.Series = None,
+) -> pd.Series:
     """Aggregate normalized Euler risk contributions over supplied groups.
 
     Group labels may represent statistical clusters, sectors, asset classes, or
@@ -150,7 +155,9 @@ def compute_group_portfolio_risk_contribution_ratios(
     Args:
         weights: Asset weights, which may cover a superset of covariance assets.
         covar: Labelled covariance matrix defining the risk universe.
-        groups: One group label for every covariance asset.
+        groups: Legacy name for the group_data Series.
+        group_data: Ordinary Series labels; cannot be combined with groups.
+        lookthrough_matrix: Optional static fractional partition overrides.
 
     Returns:
         Normalized group risk contributions in first-seen group order.
@@ -160,12 +167,24 @@ def compute_group_portfolio_risk_contribution_ratios(
         TypeError: If ``groups`` is not a Series.
         ValueError: If covariance or group labels cannot define a complete partition.
     """
-    if not isinstance(groups, pd.Series):
+    if group_data is not None:
+        if groups is not None:
+            raise ValueError("Pass group_data or legacy groups, not both")
+        groups = group_data
+    if lookthrough_matrix is None and not isinstance(groups, pd.Series):
         raise TypeError("groups must be a pandas Series")
     if covar.empty or covar.shape[0] != covar.shape[1]:
         raise ValueError("covar must be non-empty and square")
     if not covar.index.equals(covar.columns) or not covar.index.is_unique:
         raise ValueError("covar index and columns must be identical unique asset labels")
+    if lookthrough_matrix is not None:
+        partition = resolve_group_partition(groups, covar.index, lookthrough_matrix)
+        contributions = compute_portfolio_risk_contribution_ratios(weights=weights, covar=covar)
+        result = {}
+        for group, fractions in partition.items():
+            members = fractions[fractions.ne(0.0)]
+            result[group] = (contributions.loc[members.index] * members).sum(skipna=False)
+        return pd.Series(result, name="risk_contribution")
     if not groups.index.is_unique:
         raise ValueError("group asset labels must be unique")
 

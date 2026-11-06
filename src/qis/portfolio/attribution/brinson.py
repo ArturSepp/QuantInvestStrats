@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from qis.utils.df_groups import agg_df_by_groups_ax1
+from qis.portfolio.attribution.group_exposures import resolve_group_partition
 
 
 def _link_effects(
@@ -28,12 +29,20 @@ def _link_effects(
 
 
 def compute_brinson_attribution_table(
-        benchmark_pnl: pd.DataFrame, strategy_pnl: pd.DataFrame,
-        strategy_weights: pd.DataFrame, benchmark_weights: pd.DataFrame,
-        asset_class_data: pd.Series, group_order: Optional[Sequence[str]] = None,
-        total_column: str = 'Total Sum', is_exclude_interaction_term: bool = True,
-        strategy_name: str = 'Strategy', benchmark_name: str = 'Benchmark',
-        *, is_linked: bool = True,
+    benchmark_pnl: pd.DataFrame,
+    strategy_pnl: pd.DataFrame,
+    strategy_weights: pd.DataFrame,
+    benchmark_weights: pd.DataFrame,
+    asset_class_data: Optional[pd.Series] = None,
+    group_order: Optional[Sequence[str]] = None,
+    total_column: str = "Total Sum",
+    is_exclude_interaction_term: bool = True,
+    strategy_name: str = "Strategy",
+    benchmark_name: str = "Benchmark",
+    *,
+    is_linked: bool = True,
+    group_data: Optional[pd.Series] = None,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Compute BHB attribution from weighted arithmetic return contributions.
 
@@ -54,7 +63,11 @@ def compute_brinson_attribution_table(
         strategy_pnl: Strategy contributions on the same basis and return dates.
         strategy_weights: Beginning-of-period strategy weights corresponding to the P&L.
         benchmark_weights: Beginning-of-period benchmark weights corresponding to the P&L.
-        asset_class_data: Group label indexed by canonical instrument identifier.
+        asset_class_data: Legacy alias for the ordinary group_data Series.
+        group_data: Ordinary instrument labels; must remain a Series.
+        lookthrough_matrix: Static instrument-by-sleeve overrides. Supplied rows are
+            finite, nonnegative and sum to one. Omitted rows use group_data. Fractions
+            split BOTH weights and contributions, not separate underlying returns.
         group_order: Preferred group order; other observed groups are appended.
         total_column: Name reserved for the total row and effect-series total column.
         is_exclude_interaction_term: Include interaction in selection when True.
@@ -75,30 +88,52 @@ def compute_brinson_attribution_table(
             missing classifications, infinite inputs, a conflicting total label,
             or a linked portfolio return at or below -100%.
     """
+    if asset_class_data is not None:
+        if group_data is not None:
+            raise ValueError("Pass group_data or legacy asset_class_data, not both")
+        group_data = asset_class_data
+    if group_data is not None and not isinstance(group_data, pd.Series):
+        raise TypeError("group_data must be a pandas Series; use lookthrough_matrix")
     frames = (strategy_pnl, benchmark_pnl, strategy_weights, benchmark_weights)
     index = strategy_pnl.index
     if (len(index) == 0 or not index.is_unique or not index.is_monotonic_increasing
             or any(not frame.index.equals(index) for frame in frames)):
         raise ValueError('Brinson inputs require identical, ordered, unique return dates')
-    if any(not frame.columns.is_unique for frame in frames) or not asset_class_data.index.is_unique:
+    if any(not frame.columns.is_unique for frame in frames) or (
+            group_data is not None and not group_data.index.is_unique):
         raise ValueError('Brinson instrument identifiers must be unique')
     assets = strategy_pnl.columns
     for frame in frames[1:]:
         assets = assets.union(frame.columns, sort=False)
     if len(assets) == 0:
         raise ValueError('Brinson requires at least one instrument')
-    groups = asset_class_data.reindex(assets)
-    if groups.isna().any():
-        raise ValueError('Every attribution instrument requires an asset-class label')
-    if groups.eq(total_column).any():
-        raise ValueError('The Brinson total label cannot also be an asset-class label')
+    is_fractional = lookthrough_matrix is not None
+    if is_fractional:
+        groups = resolve_group_partition(group_data, assets, lookthrough_matrix, group_order)
+        if total_column in groups.columns:
+            raise ValueError('The Brinson total label cannot also be an asset-class label')
+        if group_order is not None:
+            order = [name for name in dict.fromkeys(group_order) if name in groups]
+            order.extend(name for name in groups if name not in order)
+            groups = groups.loc[:, order]
+    else:
+        if group_data is None:
+            raise ValueError("Brinson requires group_data or lookthrough_matrix")
+        groups = group_data.reindex(assets)
+        if groups.isna().any():
+            raise ValueError('Every attribution instrument requires an asset-class label')
+        if groups.eq(total_column).any():
+            raise ValueError('The Brinson total label cannot also be an asset-class label')
     grouped = []
     for frame in frames:
         aligned = frame.reindex(columns=assets).fillna(0.0)
         if not np.isfinite(aligned.to_numpy(dtype=float)).all():
             raise ValueError('Brinson inputs must be finite')
-        grouped.append(agg_df_by_groups_ax1(
-            aligned, group_data=groups, group_order=group_order))
+        if is_fractional:
+            grouped.append(aligned.dot(groups))
+        else:
+            grouped.append(agg_df_by_groups_ax1(
+                aligned, group_data=groups, group_order=group_order))
     sp, bp, sw, bw = grouped
     sr = sp.div(sw.where(sw.ne(0.0))).fillna(0.0)
     br = bp.div(bw.where(bw.ne(0.0))).fillna(0.0)

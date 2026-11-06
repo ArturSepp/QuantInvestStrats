@@ -20,6 +20,10 @@ Decomposing a covariance already in hand is ``contributions.py``; the recursion 
 import warnings
 import numpy as np
 import pandas as pd
+
+from qis.portfolio.attribution.group_exposures import (
+    aggregate_grouped_data, split_grouped_data,
+)
 from numba import njit
 from typing import Union, Optional, List, Tuple
 
@@ -277,16 +281,19 @@ def compute_portfolio_var_np(returns: np.ndarray,
     return portfolio_vol
 
 
-def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
-                                               weights: pd.DataFrame,
-                                               group_data: Optional[pd.Series] = None,
-                                               group_order: List[str] = None,
-                                               total_column: Optional[str] = 'Total',
-                                               freq: Optional[str] = 'B',
-                                               vol_span: int = 33,  # span in number of freq-retunrs
-                                               time_period: da.TimePeriod = None,
-                                               mean_adj_type: MeanAdjType = MeanAdjType.NONE
-                                               ) -> pd.DataFrame:
+def compute_portfolio_correlated_var_by_groups(
+    prices: pd.DataFrame,
+    weights: pd.DataFrame,
+    group_data: Optional[pd.Series] = None,
+    group_order: List[str] = None,
+    total_column: Optional[str] = "Total",
+    freq: Optional[str] = "B",
+    vol_span: int = 33,  # span in number of freq-retunrs
+    time_period: da.TimePeriod = None,
+    mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
     """Computes portfolio VaR accounting for correlations, optionally grouped by categories.
 
     The one-period 99% VaR on date t is VAR99 * sqrt(w_t' Σ_t w_t): the weights of date t
@@ -305,6 +312,7 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
         vol_span: EWM span for volatility estimation (default 33).
         time_period: Optional time period filter, applied after estimation.
         mean_adj_type: Type of mean adjustment to apply.
+        lookthrough_matrix: Optional static partition overriding ordinary labels.
 
     Returns:
         DataFrame of VaR values by group over time, as decimal fractions of NAV per period.
@@ -313,7 +321,13 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
 
     weights, returns = weights.align(other=returns, join='inner')
 
-    if group_data is not None:
+    if lookthrough_matrix is not None:
+        ac_exposures_dict = split_grouped_data(
+            weights, group_data, group_order, total_column, lookthrough_matrix=lookthrough_matrix
+        )
+        # Split positions only: original instrument returns enter every sleeve covariance.
+        ac_returns_dict = {g: returns.loc[:, w.columns] for g, w in ac_exposures_dict.items()}
+    elif group_data is not None:
         ac_exposures_dict = dfg.split_df_by_groups(df=weights, group_data=group_data, group_order=group_order,
                                                    total_column=total_column)
         ac_returns_dict = dfg.split_df_by_groups(df=returns, group_data=group_data, group_order=group_order,
@@ -324,6 +338,9 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
 
     portfolio_vars = {}
     for (ac, ac_exposure), (ac, ac_returns) in zip(ac_exposures_dict.items(), ac_returns_dict.items()):
+        if ac_exposure.shape[1] == 0:
+            portfolio_vars[ac] = pd.Series(0.0, index=weights.index)
+            continue
         portfolio_vars[ac] = compute_portfolio_vol(returns=ac_returns,
                                                    weights=ac_exposure,
                                                    span=vol_span,
@@ -337,16 +354,19 @@ def compute_portfolio_correlated_var_by_groups(prices: pd.DataFrame,
     return portfolio_vars
 
 
-def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
-                                            weights: pd.DataFrame,
-                                            group_data: Optional[pd.Series] = None,
-                                            group_order: List[str] = None,
-                                            total_column: Optional[str] = 'Total',
-                                            freq: Optional[str] = 'B',
-                                            vol_span: int = 33,  # span in number of freq-retunrs
-                                            time_period: da.TimePeriod = None,
-                                            mean_adj_type: MeanAdjType = MeanAdjType.NONE
-                                            ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def compute_portfolio_independent_var_by_ac(
+    prices: pd.DataFrame,
+    weights: pd.DataFrame,
+    group_data: Optional[pd.Series] = None,
+    group_order: List[str] = None,
+    total_column: Optional[str] = "Total",
+    freq: Optional[str] = "B",
+    vol_span: int = 33,  # span in number of freq-retunrs
+    time_period: da.TimePeriod = None,
+    mean_adj_type: MeanAdjType = MeanAdjType.NONE,
+    *,
+    lookthrough_matrix: Optional[pd.DataFrame] = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Computes the undiversified portfolio VaR: the sum of standalone instrument VaRs.
 
     Instrument i contributes ``VAR99 * abs(w_{i,t}) * σ_{i,t}``, where σ²_{i,t} is the diagonal
@@ -366,6 +386,7 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
         vol_span: EWM span for volatility estimation (default 33).
         time_period: Optional time period filter, applied after estimation.
         mean_adj_type: Type of mean adjustment to apply.
+        lookthrough_matrix: Optional static partition overriding ordinary labels.
 
     Returns:
         Tuple of (instrument-level VaR DataFrame, aggregated VaR by group DataFrame, or the
@@ -384,7 +405,15 @@ def compute_portfolio_independent_var_by_ac(prices: pd.DataFrame,
 
     instrument_vars = VAR99 * vols.mul(np.abs(weights))
 
-    if group_data is not None:
+    if lookthrough_matrix is not None:
+        ac_vars = aggregate_grouped_data(
+            instrument_vars,
+            group_data,
+            group_order,
+            total_column,
+            lookthrough_matrix=lookthrough_matrix,
+        )
+    elif group_data is not None:
         ac_vars = dfg.agg_df_by_groups(df=instrument_vars,
                                        group_data=group_data,
                                        group_order=group_order,

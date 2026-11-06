@@ -133,3 +133,6 @@ from qis.portfolio.stress import (
     PortfolioAccounting, PositionRole, ReportingBasis, ResponseProvenance,
     HistorySource, ReturnBasis, HistoricalScenarioSelection, AccountAssetClass,
 )
+
+from qis.portfolio.attribution.group_exposures import compute_lookthrough_exposures
+from qis.portfolio.reports.lookthrough_exposures import generate_lookthrough_exposures_factsheet

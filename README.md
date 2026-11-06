@@ -2,7 +2,7 @@
 
 *Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2022-12-30](https://github.com/ArturSepp/QuantInvestStrats/commit/b5a876000b63b15a3c95ff06e5add4f60beceadc)*
 
-Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
+Implemented in [qis â€” Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 **Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in
@@ -19,7 +19,7 @@ Quantitative Investment Strategies covers time-series and cross-sectional perfor
 drift-aware portfolio histories, ex-ante and ex-post risk, and reproducible reports. Bring your
 own strategy logic and weight targets; `qis` measures, backtests, analyses, and reports them.
 
-**Install:** `pip install qis` · **Import:** `qis` · **Status:** Beta
+**Install:** `pip install qis` Â· **Import:** `qis` Â· **Status:** Beta
 
 [![PyPI](https://img.shields.io/pypi/v/qis?style=flat-square)](https://pypi.org/project/qis/)
 [![JOSS DOI](https://joss.theoj.org/papers/10.21105/joss.11400/status.svg)](https://doi.org/10.21105/joss.11400)
@@ -34,9 +34,9 @@ own strategy logic and weight targets; `qis` measures, backtests, analyses, and 
 in Python*, [Journal of Open Source Software, 11(126), 11400](https://doi.org/10.21105/joss.11400).
 See [Citation](#citation) for the BibTeX entries.
 
-**Documentation:** [quantinveststrats.readthedocs.io](https://quantinveststrats.readthedocs.io/en/stable/) ·
-[offline quickstart](examples/getting_started/offline_quickstart.py) ·
-[factsheet gallery](docs/gallery.md) ·
+**Documentation:** [quantinveststrats.readthedocs.io](https://quantinveststrats.readthedocs.io/en/stable/) Â·
+[offline quickstart](examples/getting_started/offline_quickstart.py) Â·
+[factsheet gallery](docs/gallery.md) Â·
 [resource/output configuration](src/qis/README.md)
 
 ---
@@ -56,8 +56,8 @@ transaction costs. The backtester does not generate a strategy's target schedule
 [worked backtesting example](docs/portfolio_backtesting.md#worked-example) and
 [offline allocation workflow](docs/quickstart.md#complete-checked-workflow).
 
-**Factsheet reporting.** Four report archetypes — multi-asset, strategy, strategy versus
-benchmark, and multi-strategy parameter sweeps — produce reproducible multi-page factsheets, with
+**Factsheet reporting.** Four report archetypes â€” multi-asset, strategy, strategy versus
+benchmark, and multi-strategy parameter sweeps â€” produce reproducible multi-page factsheets, with
 optional PyBloqs HTML/PDF rendering. See the [factsheet gallery](docs/gallery.md) and
 [offline reporting quickstart](docs/factsheets.md#quick-start).
 
@@ -74,7 +74,7 @@ source marks and shared underlying risk, splits factor-family scenarios, ranks h
 months and exports the standard report with additive Euler risk tables. See the
 [instrument portfolio guide and offline examples](docs/portfolio_stress.md).
 Single-factor observed-index models support native point changes (such as VIX),
-currency-independent regressors and portfolio prediction R².
+currency-independent regressors and portfolio prediction RÂ².
 
 **Documentation checked against the code.** The core dependency list is checked against
 `pyproject.toml`; README Python blocks are parsed for unresolved names; repository examples are
@@ -83,7 +83,7 @@ vendor are run. Network-backed examples remain subject to their providers. See t
 [quickstart's checked results](docs/quickstart.md#what-the-result-establishes) and
 [contributor validation commands](CONTRIBUTING.md#development-setup).
 
-### When to use it — and when not
+### When to use it â€” and when not
 
 Use `qis` for performance and risk statistics on price panels, backtests of supplied weight
 schedules with costs, ex-ante and ex-post tracking error, regime-conditional analytics, and
@@ -169,8 +169,8 @@ PEP 735 groups rather than a `dev` extra; see [Testing](#testing) and
 
 Performance, backtest and report figures are only comparable when the return frequency, the
 risk-free-rate treatment, the rebalancing convention and the annualisation factor are stated.
-`qis` holds those conventions in one place — `PerfParams`, `TimePeriod`, the backtester and the
-report functions share them — so that a statistic in a factsheet, a backtest and a research
+`qis` holds those conventions in one place â€” `PerfParams`, `TimePeriod`, the backtester and the
+report functions share them â€” so that a statistic in a factsheet, a backtest and a research
 exhibit is the same number computed the same way. The package is the base analytics layer of
 the stack listed under [Ecosystem](#ecosystem).
 
@@ -217,7 +217,7 @@ data contract and conventions.
 
 | Area | What the package computes |
 |---|---|
-| Performance statistics | Total, annualised and excess returns, volatility, Sharpe with and without a cash rate, Sortino, Calmar, maximum drawdown, skewness and kurtosis, and benchmark alpha/beta/R² — the `PerfStat` columns of `plot_ra_perf_table` and `plot_ra_perf_table_benchmark`, with frequencies and the cash rate set in `PerfParams` |
+| Performance statistics | Total, annualised and excess returns, volatility, Sharpe with and without a cash rate, Sortino, Calmar, maximum drawdown, skewness and kurtosis, and benchmark alpha/beta/RÂ² â€” the `PerfStat` columns of `plot_ra_perf_table` and `plot_ra_perf_table_benchmark`, with frequencies and the cash rate set in `PerfParams` |
 | Backtesting | `generate_static_weights_schedule` builds live-universe-aware target schedules; `backtest_model_portfolio` holds units between rebalancings and applies transaction costs and an implementation lag; `PortfolioData` holds the result and plots NAV, weights, turnover and costs |
 | Ex-ante risk | `qis.RiskModel`: tracking error, standalone group risk, factor exposures, benchmark beta and loadings, systematic/residual decomposition and Euler marginal contributions, with fractional, overlapping or signed loading matrices |
 | Ex-post risk | `compute_ewma_realised_tracking_error` (conditional annualised series), `compute_te_ir_errors` and `compute_info_ratio_table` (whole-sample TE and IR), EWMA beta and alpha; `weights_tracking_error_report_by_ac_subac` brings ex-ante and realised views together |
@@ -226,7 +226,7 @@ data contract and conventions.
 | Regimes | Bear/Normal/Bull conditional tables; `qis.regimes` for regime Sharpe nulls, the convexity premium, overlay frontiers, regime betas and regime-mixture covariances |
 | Market data and FX | `FxRatesData`: cross rates, covered-interest-parity forward premia, carry decomposition, reference-currency and FX-hedged translation of multi-asset panels, single- and multi-asset hedging reports; `FactorsData` for tradable-factor prices |
 | Models | Numba EWM kernels, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, block bootstrap of price paths, return unsmoothing and de-levering, infrequent-return interpolation |
-| Reporting | Multi-asset, strategy, strategy-versus-benchmark and multi-strategy factsheets; Brinson–Hood–Beebower attribution with Frongello linking; optional PyBloqs HTML/PDF rendering |
+| Reporting | Multi-asset, strategy, strategy-versus-benchmark and multi-strategy factsheets; Brinsonâ€“Hoodâ€“Beebower attribution with Frongello linking; optional PyBloqs HTML/PDF rendering |
 
 ## Five-minute quickstart <a name="offline-quickstart"></a>
 
@@ -279,12 +279,12 @@ source with no saved notebook outputs.
 ### Highlighted examples
 
 All previews below are generated from the current QIS report APIs using fixed synthetic data for
-2018–2025. Selected panels keep the README readable; the linked scripts generate full reports.
+2018â€“2025. Selected panels keep the README readable; the linked scripts generate full reports.
 The volatility-parity portfolios rebalance monthly, implement targets one business day later and
 pay 10 bp per unit traded. See the [offline figure producer](tools/docs_analytics/readme.py) and
 [generation record](docs/images/analytics_manifest.json) for exact inputs and source hashes.
 
-**1. Visualisation of price data and the risk-adjusted performance table** <a name="price"></a> —
+**1. Visualisation of price data and the risk-adjusted performance table** <a name="price"></a> â€”
 [`examples/perfstats/quickstart.py`](examples/perfstats/quickstart.py) (network-backed, Yahoo
 data). The preview uses the same table API on the fixed synthetic universe, with a constant 3%
 annual cash-rate input, monthly risk statistics and quarterly excess-return regression.
@@ -349,13 +349,13 @@ fig, _ = qis.plot_ra_perf_table_benchmark(prices=prices,
 ```
 ![Current performance statistics and benchmark regression on the synthetic universe](docs/images/readme_performance_table.png)
 
-**2. Multi-asset factsheet** <a name="multiassets"></a> — cross-sectional comparison of the
+**2. Multi-asset factsheet** <a name="multiassets"></a> â€” cross-sectional comparison of the
 risk-adjusted performance of several assets. Run
 [`examples/factsheets/multi_assets.py`](examples/factsheets/multi_assets.py).
 
 ![Current multi-asset factsheet comparing synthetic returns, drawdowns and risk statistics](docs/images/readme_multi_asset.png)
 
-**3. Strategy factsheet** <a name="strategy"></a> — performance, risk and trading statistics for
+**3. Strategy factsheet** <a name="strategy"></a> â€” performance, risk and trading statistics for
 a backtested or actual strategy passed as a `PortfolioData` object. Run
 [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py). The portfolio targets use a
 63-observation volatility estimator; the risk appendix labels the sampling grid and window of
@@ -366,10 +366,10 @@ and Sharpe statistics have no cash-rate adjustment.
 ![Current volatility-parity risk appendix: 99% value-at-risk, attribution and rolling beta](docs/images/readme_strategy_risk.png)
 ![Current volatility-parity targets, target changes, turnover and realised trading costs](docs/images/readme_strategy_positions.png)
 
-**4. Strategy benchmark factsheet** <a name="strategybenchmark"></a> — performance and marginal
+**4. Strategy benchmark factsheet** <a name="strategybenchmark"></a> â€” performance and marginal
 comparison of a strategy against a benchmark strategy, each passed as a `PortfolioData` object.
 Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
-[Brinson–Hood–Beebower attribution](docs/brinson_attribution.md) uses native-period effects
+[Brinsonâ€“Hoodâ€“Beebower attribution](docs/brinson_attribution.md) uses native-period effects
 linked with Frongello's method; interaction is folded into selection, background colours show
 benchmark return regimes, and the attribution is gross of realised trading costs while the
 comparison NAVs are net of them.
@@ -377,7 +377,7 @@ comparison NAVs are net of them.
 ![Current volatility-parity portfolio compared with an equal-weight synthetic benchmark](docs/images/readme_strategy_benchmark.png)
 ![Current Brinson allocation and selection effects with benchmark-regime background colours](docs/images/readme_brinson.png)
 
-**5. Multi-strategy factsheet** <a name="multistrategy"></a> — sensitivity of a backtested
+**5. Multi-strategy factsheet** <a name="multistrategy"></a> â€” sensitivity of a backtested
 strategy to a parameter or set of parameters. Run
 [`examples/factsheets/multi_strategy.py`](examples/factsheets/multi_strategy.py). The preview
 compares 21-, 63- and 126-observation volatility estimators on the same inputs.
@@ -391,15 +391,15 @@ intentionally separate from the installed `qis` package. The [`examples/README.m
 index lists every script with a one-line description; examples that need a Bloomberg terminal
 are flagged inline.
 
-- [`examples/getting_started`](examples/getting_started) — the first chart and the offline quickstart.
-- [`examples/perfstats`](examples/perfstats) — performance metrics on price series: Sharpe vs Sortino across return frequencies, rolling performance, bond-ETF risk/return frontier, multi-figure performance reports, miss-best-worst-days impact, infrequent-returns interpolation, and an end-to-end de-levering / unsmoothing walkthrough on a bundled BDC vs private-credit dataset.
-- [`examples/models`](examples/models) — numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
-- [`examples/regimes`](examples/regimes) — bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
-- [`examples/portfolios`](examples/portfolios) — backtests using `backtest_model_portfolio`: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, offline ex-ante and ex-post tracking-error workflows, and the instrument, observed-index and financed-account stress reports.
-- [`examples/factsheets`](examples/factsheets) — full multi-page factsheets for simulated and actual strategies, cross-sectional asset-class comparisons, multi-strategy parameter sweeps, and optional PyBloqs-rendered variants.
-- [`examples/plots`](examples/plots) — plotting primitives: dual-axis figures, scatter with regression diagnostics, cluster dendrograms.
-- [`examples/utils`](examples/utils) — date schedules and rolling calendars: option / futures roll generation via `generate_fixed_maturity_rolls`.
-- [`examples/case_studies`](examples/case_studies) — VIX beta to equities and bonds, VIX term-structure correlation with SPX, conditional returns on the front-month short-VIX strategy, credit-spread regression vs equity / rates.
+- [`examples/getting_started`](examples/getting_started) â€” the first chart and the offline quickstart.
+- [`examples/perfstats`](examples/perfstats) â€” performance metrics on price series: Sharpe vs Sortino across return frequencies, rolling performance, bond-ETF risk/return frontier, multi-figure performance reports, miss-best-worst-days impact, infrequent-returns interpolation, and an end-to-end de-levering / unsmoothing walkthrough on a bundled BDC vs private-credit dataset.
+- [`examples/models`](examples/models) â€” numba-vs-pandas EWM kernel benchmarks, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, intraday/overnight return decomposition, rolling correlations, and block bootstrap of price paths.
+- [`examples/regimes`](examples/regimes) â€” bull/bear/normal Sharpe attribution, conditional return boxplots by VIX regime, calendar-month seasonality, US election regime study.
+- [`examples/portfolios`](examples/portfolios) â€” backtests using `backtest_model_portfolio`: balanced 60/40 with and without a BTC sleeve, constant-notional short, leveraged-ETF combinations, long/short pairs, vol-target / trend-following parameter sweeps, offline ex-ante and ex-post tracking-error workflows, and the instrument, observed-index and financed-account stress reports.
+- [`examples/factsheets`](examples/factsheets) â€” full multi-page factsheets for simulated and actual strategies, cross-sectional asset-class comparisons, multi-strategy parameter sweeps, and optional PyBloqs-rendered variants.
+- [`examples/plots`](examples/plots) â€” plotting primitives: dual-axis figures, scatter with regression diagnostics, cluster dendrograms.
+- [`examples/utils`](examples/utils) â€” date schedules and rolling calendars: option / futures roll generation via `generate_fixed_maturity_rolls`.
+- [`examples/case_studies`](examples/case_studies) â€” VIX beta to equities and bonds, VIX term-structure correlation with SPX, conditional returns on the front-month short-VIX strategy, credit-spread regression vs equity / rates.
 
 ### From method to implementation
 
@@ -411,7 +411,7 @@ are flagged inline.
 | Financed-account stress: borrowing, gross-asset allocations, P&L on net equity | `qis.portfolio.stress` | [`account_equity_stress.py`](examples/portfolios/account_equity_stress.py): `run_local(Locals.REPORT, with_beta_intervals=True)` uses YAML output and caller-supplied 95% beta intervals; see the [portfolio stress guide](docs/portfolio_stress.md#run-the-offline-account-example) |
 | Observed-index single-factor stress with native point changes (VIX) | `qis.portfolio.stress` | [`observed_index_stress.py`](examples/portfolios/observed_index_stress.py), `instrument_portfolio_stress.run_local(Locals.CHECK, case='vix')` |
 | Convexity premium and smart diversification (Sepp and Kastenholz 2026) | `qis.regimes`, `qis.SmartDiversificationReport` | [convexity premium chapter](docs/convexity_premium.md) |
-| Brinson–Hood–Beebower attribution with Frongello linking | strategy benchmark factsheet | [`brinson_attribution.py`](examples/portfolios/brinson_attribution.py) |
+| Brinsonâ€“Hoodâ€“Beebower attribution with Frongello linking | strategy benchmark factsheet | [`brinson_attribution.py`](examples/portfolios/brinson_attribution.py) |
 
 ## Testing
 
@@ -459,7 +459,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.44.7},
+  version={5.44.8},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```
@@ -468,8 +468,8 @@ If you use QIS in your research, please cite the paper:
 
 Sepp, A. (2026). qis: reproducible performance analytics and portfolio backtesting in Python.
 *Journal of Open Source Software, 11*(126), 11400.
-[DOI: 10.21105/joss.11400](https://doi.org/10.21105/joss.11400) ·
-[Read the paper](https://joss.theoj.org/papers/10.21105/joss.11400) ·
+[DOI: 10.21105/joss.11400](https://doi.org/10.21105/joss.11400) Â·
+[Read the paper](https://joss.theoj.org/papers/10.21105/joss.11400) Â·
 [Download the PDF](https://joss.theoj.org/papers/10.21105/joss.11400.pdf)
 
 ```bibtex
@@ -524,7 +524,7 @@ dependency of `stochvolmodels`.
 
 ## License
 
-MIT — see [LICENSE.txt](LICENSE.txt).
+MIT â€” see [LICENSE.txt](LICENSE.txt).
 
 ## Disclaimer <a name="disclaimer"></a>
 
