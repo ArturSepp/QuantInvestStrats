@@ -24,8 +24,10 @@ import qis as qis
 from qis import TimePeriod, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.signal_data import StrategySignalData
-from qis.portfolio._asset_display import factsheet_kwargs, plot_asset_bars
-from qis.plots.utils import TrendLine, set_y_limits
+from qis.portfolio._asset_display import (
+    MAX_GROUPS_FOR_DETAIL_PANELS, factsheet_kwargs, plot_asset_bars,
+)
+from qis.plots.utils import set_y_limits
 from qis.utils.df_str import date_to_str
 
 
@@ -42,14 +44,15 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
     kwargs = factsheet_kwargs(kwargs)
     strategy_signal_data = portfolio_data.strategy_signal_data
     if strategy_signal_data is None:
-        raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
+        raise ValueError("portfolio_data.strategy_signal_data must be provided")
 
     if is_grouped:
-        predictions_g, fitted_models_g, prediction_period = strategy_signal_data.estimate_signal_changes_by_groups(
-            group_data=portfolio_data.group_data,
-            group_order=portfolio_data.group_order,
-            time_period=time_period,
-            sample_size=sample_size)
+        predictions_g, fitted_models_g, prediction_period = (
+            strategy_signal_data.estimate_signal_changes_by_groups(
+                group_data=portfolio_data.group_data,
+                group_order=portfolio_data.group_order,
+                time_period=time_period,
+                sample_size=sample_size))
 
         group_preds = {}
         agg_preds = {}
@@ -65,7 +68,8 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                     df_ac = pd.concat([df_mom, df[['target_vol_change', 'port_leverage_change']]],
                                       axis=1, sort=False)
             else:
-                df_ac = df[['momentum_change', 'carry_change', 'target_vol_change', 'port_leverage_change', 'residual']]
+                df_ac = df[['momentum_change', 'carry_change', 'target_vol_change',
+                            'port_leverage_change', 'residual']]
             group_preds[group] = df_ac.copy()
             if group_deflator is not None and group in group_deflator.keys():
                 df_ac *= group_deflator[group]
@@ -79,18 +83,19 @@ def generate_weight_change_report(portfolio_data: PortfolioData,
                 this += f"{key}={deflator:0.2f}"
             post_agg = f" (using deflator for {this})"
         preds_dict = {f"Total by groups {post_agg}": agg_preds}
-        if len(group_preds) > 6:
+        if len(group_preds) > MAX_GROUPS_FOR_DETAIL_PANELS:
             preds_dict['All instruments'] = pd.concat(group_preds.values())
         else:
             preds_dict.update(group_preds)
 
         with sns.axes_style('darkgrid'):
-            fig, axs = plt.subplots(len(preds_dict.keys())//2+len(preds_dict.keys())%2, 2, figsize=figsize, tight_layout=True)
+            fig, axs = plt.subplots(len(preds_dict.keys())//2+len(preds_dict.keys())%2, 2,
+                                    figsize=figsize, tight_layout=True)
             axs = qis.to_flat_list(axs)
             weight_freq = _infer_freq(strategy_signal_data.weights.index)
 
-            qis.set_suptitle(fig, title=f"{portfolio_data.ticker} Attribution of changes in weights for period "
-                                        f"{prediction_period.to_str()}"
+            qis.set_suptitle(fig, title=f"{portfolio_data.ticker} Attribution of changes in weights"
+                                        f" for period {prediction_period.to_str()}"
                                         f" using last {sample_size} {weight_freq}-freq periods",
                              fontweight="bold", fontsize=8, color='blue')
 
@@ -121,12 +126,13 @@ def generate_current_signal_report(portfolio_data: PortfolioData,
     kwargs = factsheet_kwargs(kwargs)
     strategy_signal_data = portfolio_data.strategy_signal_data
     if strategy_signal_data is None:
-        raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
+        raise ValueError("portfolio_data.strategy_signal_data must be provided")
 
-    agg_by_group_dict = strategy_signal_data.get_current_signal_by_groups(group_data=portfolio_data.group_data,
-                                                                          group_order=portfolio_data.group_order)
+    agg_by_group_dict = strategy_signal_data.get_current_signal_by_groups(
+        group_data=portfolio_data.group_data, group_order=portfolio_data.group_order)
 
-    if len(agg_by_group_dict) > 6:
+    num_groups = len(agg_by_group_dict) - int('Total by groups' in agg_by_group_dict)
+    if num_groups > MAX_GROUPS_FOR_DETAIL_PANELS:
         agg_by_group_dict = {
             'Total by groups': agg_by_group_dict['Total by groups'],
             'All instruments': pd.concat([value for key, value in agg_by_group_dict.items()
@@ -156,13 +162,14 @@ def generate_current_signal_report(portfolio_data: PortfolioData,
     return fig
 
 
-def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: StrategySignalData,
-                                                     time_period: TimePeriod,
-                                                     figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
-                                                     fontsize: int = 4,
-                                                     regime_classifier: BenchmarkReturnsQuantilesRegime = None,
-                                                     **kwargs
-                                                     ) -> List[plt.Figure]:
+def generate_strategy_signal_factsheet_by_instrument(
+        strategy_signal_data: StrategySignalData,
+        time_period: TimePeriod,
+        figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+        fontsize: int = 4,
+        regime_classifier: BenchmarkReturnsQuantilesRegime = None,
+        **kwargs
+        ) -> List[plt.Figure]:
     """Plot signal, volatility, leverage and weight histories for each instrument.
 
     Args:
@@ -181,7 +188,7 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
         ValueError: if strategy_signal_data is None
     """
     if strategy_signal_data is None:
-        raise ValueError(f"portfolio_data.strategy_signal_data must be provided")
+        raise ValueError("portfolio_data.strategy_signal_data must be provided")
 
     navs = qis.returns_to_nav(returns=np.expm1(strategy_signal_data.log_returns))
     if time_period is not None:
@@ -232,9 +239,10 @@ def generate_strategy_signal_factsheet_by_instrument(strategy_signal_data: Strat
                                      legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
                                      ax=axs[idx][0],
                                      **kwargs)
-            qis.add_bnb_regime_shadows(ax=axs[idx][0],
-                                       pivot_prices=navs[instrument].reindex(index=df.index, method='ffill'),
-                                       regime_classifier=regime_classifier)
+            qis.add_bnb_regime_shadows(
+                ax=axs[idx][0],
+                pivot_prices=navs[instrument].reindex(index=df.index, method='ffill'),
+                regime_classifier=regime_classifier)
 
             qis.plot_histogram(df=df1,
                                # trend_line=TrendLine.ZERO_SHADOWS,

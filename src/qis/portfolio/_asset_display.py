@@ -10,6 +10,9 @@ import pandas as pd
 import textwrap
 
 
+MAX_GROUPS_FOR_DETAIL_PANELS = 10
+
+
 def wrap_title(title, ax, fontsize):
     """Keep long metric/date labels inside their factsheet panel."""
     from qis.plots.utils import estimate_axis_width
@@ -177,13 +180,16 @@ def price_tails(prices, count, title):
         title, prices.shape[1], len(selected), count, 'total return')
 
 
-def compact_groups(aggregates, instruments, max_groups=6):
+def compact_groups(aggregates, instruments, max_groups=MAX_GROUPS_FOR_DETAIL_PANELS):
     """Use an all-instrument panel when individual groups would crowd a single page.
 
     Aggregate dictionaries contain additive Total/Net Long/Net Short series. The
-    existing Total group, when present, already includes every other group.
+    existing Total group, when present, already includes every other group and
+    does not count towards the display limit. Preserve ordinary asset-class
+    panels (up to ten groups); only larger universes need the compact fallback.
     """
-    if len(aggregates) <= max_groups:
+    num_groups = len(aggregates) - int('Total' in aggregates)
+    if num_groups <= max_groups:
         return aggregates, instruments
     if 'Total' in aggregates:
         aggregate = aggregates['Total']
@@ -191,5 +197,5 @@ def compact_groups(aggregates, instruments, max_groups=6):
     else:
         aggregate = pd.concat(aggregates.values()).groupby(level=0).sum(min_count=1)
         assets = pd.concat(instruments.values(), axis=1, sort=True)
-    label = f'All instruments ({len(aggregates)} groups)'
+    label = f'All instruments ({num_groups} groups)'
     return {label: aggregate}, {label: assets}

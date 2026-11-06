@@ -94,14 +94,24 @@ def test_factsheet_attribution_keeps_zero_contributors_in_bottom_tail(monkeypatc
     np.testing.assert_array_equal(captured[0].iloc[:10], np.zeros(10))
 
 
-def test_compact_groups_never_double_counts_total():
-    instruments = {f'G{i}': pd.DataFrame({f'A{i}': [i, -i]}) for i in range(10)}
-    instruments['Total'] = pd.concat(instruments.values(), axis=1)
+@pytest.mark.parametrize('num_groups', [6, 7, 10, 11])
+@pytest.mark.parametrize('with_total', [False, True])
+def test_compact_groups_counts_asset_classes_not_total(num_groups, with_total):
+    instruments = {f'G{i}': pd.DataFrame({f'A{i}': [i, -i]}) for i in range(num_groups)}
+    all_assets = pd.concat(instruments.values(), axis=1)
+    if with_total:
+        instruments['Total'] = all_assets
     aggregates = {key: value.sum(axis=1).to_frame('Total')
                   for key, value in instruments.items()}
     reduced, assets = compact_groups(aggregates, instruments)
-    pd.testing.assert_frame_equal(next(iter(reduced.values())), aggregates['Total'])
-    pd.testing.assert_frame_equal(next(iter(assets.values())), instruments['Total'])
+    if num_groups <= 10:
+        assert reduced is aggregates
+        assert assets is instruments
+    else:
+        assert list(reduced) == [f'All instruments ({num_groups} groups)']
+        pd.testing.assert_frame_equal(next(iter(reduced.values())),
+                                      all_assets.sum(axis=1).to_frame('Total'))
+        pd.testing.assert_frame_equal(next(iter(assets.values())), all_assets)
 
 
 def test_brinson_display_keeps_full_totals_and_additive_remainder(monkeypatch):

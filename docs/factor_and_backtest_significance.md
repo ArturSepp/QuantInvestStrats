@@ -2,9 +2,9 @@
 myst:
   html_meta:
     description: >-
-      Source-only qis significance tests for supplied return means, regression alphas and
-      paired Sharpe differences, with Holm/BHY corrections, stationary-bootstrap p-values
-      and explicit finite-sample validation limits.
+      qis significance tests for supplied return means, regression alphas and paired Sharpe
+      differences, with Holm/BHY corrections, stationary-bootstrap p-values, a catalogue of
+      every hypothesis test in qis and explicit finite-sample validation limits.
 ---
 
 # Significance tests for factors and backtests
@@ -18,10 +18,12 @@ A significance test measures evidence against a specified null hypothesis, condi
 sample, model and assumptions. A family correction addresses testing several supplied hypotheses;
 it does not reconstruct an unrecorded search for successful strategies.
 
-> **Pitfall.** The family interfaces in this chapter are **source-only development interfaces**,
-> not top-level exports in `qis.__all__` or a verified released API. Correctness and reference
-> checks do not establish nominal size or coverage, and the maintainer's finite-sample
-> validation study did not meet all of its predeclared gates for either intercept estimator.
+> **Pitfall.** The family interfaces in this chapter ship with qis 5.44.6 and later as
+> **submodule-only development interfaces**: import them from their `qis.perfstats` and
+> `qis.utils` submodules, not from `qis.*`. They are not in `qis.__all__` or the API reference
+> and carry no stability guarantee beyond the CHANGELOG. Correctness and reference checks do not
+> establish nominal size or coverage, and the maintainer's finite-sample validation study did
+> not meet all of its predeclared gates for either intercept estimator.
 
 ## Overview
 
@@ -43,6 +45,33 @@ The optional stationary bootstrap changes the marginal p-values of the mean and 
 It does not implement bootstrap Sharpe inference, simultaneous intervals, a maximum-statistic
 test, or a rerun of strategy selection. Factor-return means and time-series alphas are not
 cross-sectional prices of factor risk.
+
+### Hypothesis tests in qis
+
+The table lists every hypothesis test that qis computes. The first five rows are the
+submodule-only interfaces of this chapter and carry the qualification limits of the Pitfall
+above; the other rows are `qis.*` exports documented in the linked chapters. A test without a
+family correction reports marginal statistics only.
+
+| Null hypothesis | Inference | Family correction | Entry point | Chapter |
+|---|---|---|---|---|
+| Each supplied mean equals zero | Bartlett HAC or AR(1)-prewhitened standard error, normal reference | Holm or BHY | `qis.perfstats.significance.compute_mean_significance` | This chapter |
+| Each alpha against supplied factors equals zero | Common-sample OLS, Bartlett HAC or AR(1)-prewhitened standard error | Holm or BHY | `qis.perfstats.significance.compute_alpha_significance` | This chapter |
+| Each candidate's Sharpe ratio equals one fixed benchmark's | Ledoit–Wolf delta method, Bartlett HAC | Holm or BHY | `qis.perfstats.significance.compute_sharpe_significance` | This chapter |
+| Each mean or alpha equals zero, with bootstrap p-values | Studentised circular stationary bootstrap, HAC refitted in every draw | Holm or BHY | `qis.perfstats.bootstrap_significance.compute_bootstrap_mean_significance`, `compute_bootstrap_alpha_significance` | This chapter |
+| Any declared family of supplied p-values | Supplied marginal p-values | Holm or BHY | `qis.perfstats.multiple_testing.adjust_pvalues` | This chapter |
+| Two Sharpe ratios are equal | Ledoit–Wolf delta method, Bartlett HAC | None | `qis.sharpe_difference_test` | [Sharpe ratios](performance_analytics_and_sharpe.md#paired-hac-test-of-a-sharpe-difference) |
+| A sample mean equals zero | Sample mean over its IID standard error | None | `qis.compute_desc_table(..., is_add_tstat=True)` | [Sharpe ratios](performance_analytics_and_sharpe.md) |
+| An EWMA-WLS regression alpha equals zero | Bartlett HAC, normal reference | None | `qis.estimate_ewma_alpha_beta_hac` | [Regression and HAC inference](regression_and_hac.md) |
+| A pooled cross-sectional signal slope equals zero | OLS t-statistic charging one residual degree of freedom per date | None | `qis.estimate_signal_diagnostics` | [Signal diagnostics](signal_diagnostics.md) |
+| The mean information coefficient equals zero | t-statistic of the per-date IC series | None | `qis.estimate_ic_ir` | [Signal diagnostics](signal_diagnostics.md) |
+| The summed lagged Dimson slopes equal zero | Classical OLS t-statistic, a screening statistic | None | `qis.estimate_dimson_beta` | [Serial dependence](serial_dependence.md) |
+
+qis does not compute the probabilistic or deflated Sharpe ratio, the minimum track record
+length, the probability of backtest overfitting, White's reality check, Hansen's test of
+superior predictive ability, a Romano–Wolf stepdown maximum-statistic test, or Ljung–Box and
+Box–Pierce portmanteau tests; for the last two use `statsmodels.stats.diagnostic.acorr_ljungbox`.
+No function corrects for a research search that was not recorded as a declared family.
 
 ## Inputs, notation, and assumptions
 
@@ -429,12 +458,11 @@ call's generation settings as the provenance of this particular matrix.
 
 ## Implementation in qis
 
-The names below exist in the development submodules, but are not new `qis.*` exports. An installed
-release may not contain these modules; no released support floor is asserted here. Use a checkout
-containing the linked source when reproducing the examples. Documenting the interfaces does not
-promote them or complete their outstanding qualification.
-The source-only modules and this new chapter must be committed together before publication;
-their GitHub source links do not establish that an installed release already includes them.
+The modules below ship with qis 5.44.6 and later. Import them from their submodules: they are
+not `qis.*` exports, so the generated API reference does not list them, and they carry no
+stability guarantee beyond the CHANGELOG. Documenting the interfaces does not promote them or
+complete their outstanding qualification; see
+[Interpretation and limitations](#interpretation-and-limitations).
 
 | Submodule | Entry points | Contract |
 |---|---|---|
