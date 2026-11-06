@@ -7,8 +7,18 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.44.7] - 2026-11-06
+
+### Added
+
+- Catalogue hypothesis tests in qis and clarify that the significance development interfaces
+  ship from 5.44.6 through explicit submodule imports.
+
 ### Fixed
 
+- Retain individual asset-class panels for up to ten groups in strategy factsheets and
+  signal/weight-change reports, excluding total panels from the group limit. Preserve the
+  compact fallback for larger universes.
 - Reject residual-risk labels that would replace a factor contribution in
   `LinearModel.compute_factor_risk_contribution`, including its public `EwmLinearModel`
   interface. Choose a distinct residual label to retain every component; nonconflicting
