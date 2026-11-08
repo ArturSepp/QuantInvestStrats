@@ -362,10 +362,10 @@ def test_database_guards_retain_history(master, source):
 
 
 def test_example_runs_without_files(capsys, tmp_path, monkeypatch):
-    from examples.security_master.ticker_history import run_local
+    from examples.security_master.ticker_history import Locals, run_local
 
     monkeypatch.chdir(tmp_path)
-    run_local()
+    run_local(local=Locals.TICKER_HISTORY)
     text = capsys.readouterr().out
     assert '2020-01-08: ABC -> L2' in text
     assert 'after the January 13 withdrawal: nan' in text
