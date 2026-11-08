@@ -52,7 +52,7 @@ days / 365, including leap days. The study did not compare that day-count change
 | $j_t$ | Observed JPM cash-index return | Simple local-currency monthly return |
 | $r_t^L$ | Local asset return | Simple return over $[t-1,t]$ |
 | $S_t$, $r_t^{FX}$ | FX cross and its realised return | Reference currency per local unit; $S_t/S_{t-1}-1$ |
-| $h_{t-1}$, $f_{t-1}$ | Opening-principal hedge ratio and cash-growth premium | [FX hedging conventions](fx_hedging_and_market_data.md) |
+| $h_{t-1}$, $f_{t-1}$ | Opening-principal hedge ratio and CIP cash-growth premium | [FX hedging conventions](fx_hedging_and_market_data.md) |
 | $x_t$, $z_t$ | Scatter input and output | $x_t=j_t$, $z_t=c_t$ |
 | $e_t$, $n$ | Approximation error and paired sample size | $e_t=c_t-j_t$; $n$ is a count |
 
@@ -98,7 +98,7 @@ a different economic object from preceding-period cash accrual.
 |---|---|---|
 | Unhedged spot translation | Realised FX move over the same period as the asset return | None |
 | Opening hedge notional | Prior hedge ratio $h_{t-1}$ | None |
-| Short-forward carry | Prior premium $f_{t-1}$, using rates known when the hedge is fixed | None |
+| Short-forward carry | Prior CIP cash-growth premium $f_{t-1}$, using rates known when the hedge is fixed | None |
 | Reference-currency excess return | Subtract reference cash on the chosen return grid | Chooses the cash quote |
 | Local-currency excess return | Subtract native-currency cash; no spot conversion | Chooses the cash quote |
 | Reporting rate panel | Annual quotes, not periodic earned cash returns | Do not deduct this panel directly |
@@ -113,7 +113,7 @@ $$
 ratio is the product of the asset-price and spot ratios. $\square$
 
 Do not lag the realised FX move by one month. Inputs fixed before the holding period, such as
-hedge ratio and forward premium, are lagged. Under QIS's opening-principal hedge convention,
+hedge ratio and CIP cash-growth premium, are lagged. Under QIS's opening-principal hedge convention,
 
 $$
 R_t=r_t^L(1+r_t^{FX})+(1-h_{t-1})r_t^{FX}

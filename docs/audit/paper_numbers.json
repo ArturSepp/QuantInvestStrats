@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "86eb15e4e922968935979607e15b24e45a4eea8e",
+  "measured_at_commit": "44d35eee78500e6e8d1763b9ee1f1b9373b643b2",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -52,7 +52,7 @@
       "paper_phrase": null
     },
     "commits": {
-      "value": 1130,
+      "value": 1131,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null

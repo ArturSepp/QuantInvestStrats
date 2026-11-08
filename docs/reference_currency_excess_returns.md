@@ -68,7 +68,7 @@ the analytics.
 | $r^L_{i,t}$, $r^R_{i,t}(h)$ | Local total return and reference-currency total return under hedge policy $h$ |
 | $r^{f,R}_t$ | Periodic reference-currency cash accrual; not an annual yield |
 | $\tilde r^R_{i,t}$, $\tilde\ell^R_{i,t}$ | Arithmetic and log returns in excess of reference cash |
-| $f_{t-1,t}$ | QIS local/reference cash-growth premium for the forthcoming period; not the forward-price premium |
+| $f_{t-1,t}$ | CIP cash-growth premium for the forthcoming period; not the forward-price premium |
 
 Spots and rates must cover the local currencies and the reference currency, with enough
 history before the first return being measured. The foreign-asset path obtains both currencies'

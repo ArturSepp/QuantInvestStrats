@@ -243,14 +243,14 @@ is being discussed; the meaning and interval do not change.
 | $\tilde r_t$ | Arithmetic excess $r_t-r^f_t$; use superscripts $L$ or $R$ for its currency |
 | $q_t$ | Cash-relative simple $(1+r_t)/(1+r^f_t)-1$ |
 | $\tilde\ell_t$ (excess LOG) | $\log(1+r_t)-\log(1+r^f_t)$; its exponential minus one is $q_t$, not $\tilde r_t$ |
-| $f_{t-1,t}$, $\kappa_{t-1,t}$ | Inverse-forward premium $(1+r^{f,L}_t)/(1+r^{f,R}_t)-1$ and exact short-hedge cost $f_{t-1,t}/(1+f_{t-1,t})$ |
-| $p^{L\to R}_t$ | Translated local financed payoff $(r^L_t-r^{f,L}_t)(1+r^{FX}_{c,t})$ per opening reference notional |
-| $\varphi_{c,t}$ | Long-local forward payoff $r^{FX}_{c,t}+\kappa_{t-1,t}$ per opening reference notional |
-| $\tilde r^R_t(h)$ | Funded reference arithmetic excess $r^R_t(h)-r^{f,R}_t$ under opening principal hedge $h$ |
+| $f_{t-1,t}$, $\kappa_{t-1,t}$ | CIP cash-growth premium $(1+r^{f,L}_t)/(1+r^{f,R}_t)-1$ and short-forward cost $f_{t-1,t}/(1+f_{t-1,t})$ |
+| $p^{L\to R}_t$ | Translated self-financed payoff $(r^L_t-r^{f,L}_t)(1+r^{FX}_{c,t})$ per opening reference notional |
+| $\varphi_{c,t}$ | Forward FX return (long local) $r^{FX}_{c,t}+\kappa_{t-1,t}$ per opening reference notional |
+| $\tilde r^R_t(h)$ | Reference excess return in the arithmetic coordinate $r^R_t(h)-r^{f,R}_t$ under opening principal hedge $h$ |
 | $V_t$ | Actual account capital in reference currency, including marked unpaid claims |
 
 The short hedge costs $\kappa_{t-1,t}$; the long-local forward earns $\varphi_{c,t}$.
-The premium $f_{t-1,t}$ is neither a raw forward-price ratio nor the exact forward payoff.
+The CIP cash-growth premium $f_{t-1,t}$ is neither a raw forward-price ratio nor the exact forward payoff.
 Payoffs may be negative beyond initial notional and need no fabricated NAV or log coordinate.
 An optional normalized synthetic index is distinct from the held-unit cash/debt/contract
 ledger in [self-financed FX accounting](self_financed_fx_accounting.md). A balance not yet

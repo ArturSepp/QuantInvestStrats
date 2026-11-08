@@ -109,7 +109,11 @@ percent, without annualisation:
 Use `workflow["comparisons"]["B", "simple"]` for business-day returns, or replace `"simple"`
 with `"log"` for the four LOG views. The extra columns `translated_local_excess_pnl` and
 `fx_forward_pnl` remain **SIMPLE payoffs per opening reference notional** in every comparison.
-They are not LOG returns even when displayed beside LOG asset returns.
+They are not LOG returns even when displayed beside LOG asset returns. In the shared
+notation, the former is the **translated self-financed payoff** $p^{L\to R}$ and the latter
+is the **forward FX return** $\varphi$, long local currency through a forward.
+The API names remain `LOCAL_EXCESS_TRANSLATED` and `FX_FORWARD`; see the
+[notation and conventions](notation_and_conventions.md#fx-aliases-payoffs-and-account-capital).
 
 > **Pitfall.** The analytical frequency sets the cash and additional-hedge reset intervals.
 > Business-day cash includes intervening calendar days. A month-end request recomputes those

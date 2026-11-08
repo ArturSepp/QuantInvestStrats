@@ -44,7 +44,7 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | Sampling grid | The `freq` grid of the pair calculation, default `ME` |
 | Annualisation | ACT/365 Fixed cash; statistical $\mathrm{af}$ remains periods per year |
 | Mean adjustment | None for currency valuation; EWMA for hedge volatility and beta estimation |
-| Timing | Hedge ratio and forward premium set at $t-1$ apply to the return at $t$ |
+| Timing | Hedge ratio and CIP cash-growth premium set at $t-1$ apply to the return at $t$ |
 | Output units | Decimal returns in the reference currency |
 | qis default | Typed asset requests require kind and coordinate; `hedge_ratios=0.0`, `frequency='ME'`; the low-level pair kernel uses `is_log_returns=False` and an explicit `hedge_ratio` |
 
@@ -56,7 +56,7 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 | $r^{L}_t$, $r^{FX}_{c,t}$ | Local asset and cross-rate returns over $(t-1,t]$ | Simple periodic returns |
 | $y^L_{t-1}$, $y^R_{t-1}$ | Local and reference short rates | Annualised decimal rates |
 | $\mathrm{af}$, $\tau_t$ | Statistical periods per year and cash year fraction | $\tau_t=\mathrm{calendar\ days}(t-1,t)/365$ on the reset grid |
-| $f_{t-1,t}$ | qis local/reference cash-growth premium | Simple fraction; inverse quote to $F_{t-1,t}/S_{t-1}-1$ |
+| $f_{t-1,t}$ | CIP cash-growth premium | Simple fraction; inverse quote to $F_{t-1,t}/S_{t-1}-1$ |
 | $F_{t-1,t}$ | Forward fixed at $t-1$ and maturing at $t$ | Reference per local, same direction as $S_t$ |
 | $h_{t-1}$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
 
@@ -69,7 +69,7 @@ so off-grid rate updates remain available to later observations. Missing leading
 missing; future quotes are never carried backward.
 
 The pair calculation aligns and forward-fills asset prices and cross rates. Hedge ratios and
-forward premiums are as-of aligned to its return grid, then lagged one observation. Return $t$
+CIP cash-growth premiums are as-of aligned to its return grid, then lagged one observation. Return $t$
 uses the hedge and premium set at $t-1$. The standalone payoff kernel initializes its first
 output return to zero. `FxRatesData` masks that synthetic inception return as NaN before
 optional cash subtraction; it is not a realised hedge period or an estimation observation.
@@ -87,7 +87,7 @@ S_t=\frac{\operatorname{spot}_t(\mathrm{local})}
 1+r^{FX}_{c,t}=\frac{S_t}{S_{t-1}}.
 $$
 
-The getter's simple premium and the corresponding forward satisfy
+The getter's CIP cash-growth premium and the corresponding forward satisfy
 
 $$
 1+f_{t-1,t}=\frac{1+\tau_t y^L_{t-1}}{1+\tau_t y^R_{t-1}},
@@ -96,11 +96,14 @@ $$
               =\frac{1}{1+f_{t-1,t}}.
 $$
 
+The API retains the names `get_forward_rate_for_local_ccy` and `forward_premium` for $f$.
 Thus `get_forward_rate_for_local_ccy` does **not** return $F_{t-1,t}/S_{t-1}-1$ under the displayed spot
 direction. With `is_log_returns=True` it returns $\log(1+f_{t-1,t})$ instead. Supplied premiums must
 match the convention selected for the hedge function.
 
 The short-forward cost is $\kappa_{t-1,t}=f_{t-1,t}/(1+f_{t-1,t})$.
+The **forward FX return** $\varphi_{c,t}=r^{FX}_{c,t}+\kappa_{t-1,t}$ is the long-local
+forward payoff per opening reference notional; the short hedge contributes $-h_{t-1}\varphi_{c,t}$.
 A negative cost is a gain to this hedge under the model. Cash uses opening quotes and
 actual elapsed days through $r^{f,k}_t=y^k_{t-1}\tau_t$; it is never divided by the
 statistical annualisation factor. The supplied reset schedule remains unchanged.
@@ -126,10 +129,10 @@ opening asset value and sell $h_{t-1}V^L_{t-1}$ local currency forward:
 
 $$
 \begin{aligned}
-W^r^R_t
+W^R_t
 &=V^L_{t-1}\frac{P_t}{P_{t-1}}S_t
   +h_{t-1}V^L_{t-1}(F_{t-1,t}-S_t),\\
-r^R_t&=\frac{W^r^R_t}{V^L_{t-1}S_{t-1}}-1.
+r^R_t&=\frac{W^R_t}{V^L_{t-1}S_{t-1}}-1.
 \end{aligned}
 $$
 
@@ -192,9 +195,9 @@ $\lambda=4/3$ is a modelling choice, not an estimate.
 The panel helpers form excess returns using the reference currency's simple cash accrual $r^{f,R}_t$:
 
 $$
-\tilde r^r^R_t(h)=r^R_t-r^{f,R}_t,
+\tilde r^R_t(h)=r^R_t-r^{f,R}_t,
 \qquad
-\tilde\ell^r^R_t(h)=\log(1+r^R_t)-\log(1+r^{f,R}_t).
+\tilde\ell^R_t(h)=\log(1+r^R_t)-\log(1+r^{f,R}_t).
 $$
 
 These are distinct conventions; `expm1` of log excess is not generally simple excess.

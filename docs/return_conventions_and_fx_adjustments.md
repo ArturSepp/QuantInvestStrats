@@ -62,8 +62,9 @@ f_{t-1,t}=\frac{1+r^{f,L}_t}{1+r^{f,R}_t}-1,\qquad
 \kappa_{t-1,t}=\frac{f_{t-1,t}}{1+f_{t-1,t}}.
 $$
 
-The reference-per-local forward has $F_{t-1,t}/S_{t-1}=1/(1+f_{t-1,t})$. The existing principal-hedge
-kernel gives the funded reference asset return:
+Here $f_{t-1,t}$ is the **CIP cash-growth premium** and $\kappa_{t-1,t}$ is the
+**short-forward cost**. The reference-per-local forward has $F_{t-1,t}/S_{t-1}=1/(1+f_{t-1,t})$. The existing principal-hedge
+kernel gives the reference total return of the funded asset:
 
 $$
 r_t^R=r_t^L(1+r^{FX}_{c,t})+(1-h_{t-1})r^{FX}_{c,t}-h_{t-1}\kappa_{t-1,t}.
@@ -89,8 +90,10 @@ asset and cash gross factors. Valid arithmetic losses remain available without a
 
 ### Exact payoffs per opening reference notional
 
-**Definition.** `LOCAL_EXCESS_TRANSLATED` is the P&L of an asset financed with local cash, translated
-at terminal spot. `FX_FORWARD` is the long-local forward's terminal settlement:
+**Definition.** `LOCAL_EXCESS_TRANSLATED` gives the **translated self-financed payoff**:
+the P&L of an asset financed with local cash, translated at terminal spot per opening reference
+notional. `FX_FORWARD` gives the **forward FX return**, the long-local forward's terminal
+settlement per opening reference notional:
 
 $$
 p^{L\to R}_t=(r_t^L-r^{f,L}_t)(1+r^{FX}_{c,t}),\qquad
@@ -102,7 +105,7 @@ These are arithmetic payoffs, with no initial capital implied. They require open
 quotes and `SIMPLE`. A cash-relative local excess index would divide the financed gain by
 local cash growth and produce a different payoff; do not use it as a translation input.
 
-**Identity.** For the funded reference excess $\tilde r^R_t(h)=r_t^R(h)-r^{f,R}_t$:
+**Translation identity.** For the reference excess return $\tilde r^R_t(h)=r_t^R(h)-r^{f,R}_t$:
 
 $$
 \tilde r^R_t(h)=(r_t^L-r^{f,L}_t)+(1-h_{t-1})\varphi_{c,t}
@@ -224,14 +227,18 @@ reset and compounded daily reset are different strategies; this API does not ass
 
 | Consumer / economic object | API selection | Units and interpretation |
 |---|---|---|
-| Local equity signal/risk input | LOCAL_EXCESS / LOG | Log asset wealth relative to local cash; any model-specific selection is explicit |
+| Local equity signal input | LOCAL_EXCESS / LOG | Log asset wealth relative to local cash |
+| Research equity risk response | LOCAL_EXCESS_TRANSLATED / SIMPLE | Translated self-financed payoff; explicit FX factors enter through FX_FORWARD / SIMPLE |
 | Multi-fund signal/covariance in a reference book | REFERENCE_EXCESS / LOG | Same canonical cash-relative log panel for both consumers |
 | Funded investor P&L and performance | REFERENCE_TOTAL / SIMPLE | Funded return; explicit index normalization or unit/cash accounting |
-| Local financed asset payoff translated at terminal spot | LOCAL_EXCESS_TRANSLATED / SIMPLE | Signed reference P&L per opening reference notional |
-| Long-local FX contract payoff | FX_FORWARD / SIMPLE | Signed settlement per opening reference notional; not a log return |
+| Translated self-financed payoff | LOCAL_EXCESS_TRANSLATED / SIMPLE | Signed reference P&L per opening reference notional |
+| Forward FX return (long local) | FX_FORWARD / SIMPLE | Signed settlement per opening reference notional; not a log return |
 | FX spot diagnostic | FX_SPOT / SIMPLE or LOG | Spot movement only; no carry, principal or collateral cash |
 | Optional synthetic capital | `FxReturnsData.to_index(FxIndexNormalization(...))` | Explicit sizing/reinvestment; not a financing ledger |
 | Actual self-financed account | `backtest_fx_account(..., spec=FxAccountSpec(...))` | Reference monetary capital and P&L; cash, debt and unpaid contracts separated |
+
+The equity risk application is a research-only prototype in FactorModels and Rosaa; it is
+not a production risk-model selection in QIS.
 
 The equations in [exact payoffs](#exact-payoffs-per-opening-reference-notional) map to
 LOCAL_EXCESS_TRANSLATED and FX_FORWARD respectively. The three excess-coordinate identities
