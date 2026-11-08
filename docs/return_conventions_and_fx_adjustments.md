@@ -293,7 +293,7 @@ compatibility facade, old-shape adapter, or redirection that changes their econo
 | `compute_fx_adjusted_returns` | Asset request with scalar or per-asset frequency; consume typed cadence results |
 | `compute_returns_adjusted_by_local_rate` | Separate LOCAL_TOTAL and LOCAL_EXCESS requests; annual quotes stay on the data container |
 
-The currency methods `get_daily_carry_local_return`, `get_fr^{FX}_{c,t}otal_return_nav` and
+The currency methods `get_daily_carry_local_return`, `get_fx_total_return_nav` and
 `get_carry_fx_return_nav` emit `DeprecationWarning` from QIS 5.46.0, with removal in 6.0.0.
 Use an `FX_FORWARD` currency request and optional explicit normalization. Their old premium-based
 implementations are retained only for the bounded retirement period; no compatibility facade
@@ -329,7 +329,7 @@ These results contain quote currencies, not a claim about a security's full econ
 
 - [Notation and conventions](notation_and_conventions.md)
 - [Reference-currency excess returns](reference_currency_excess_returns.md)
-- [Cash rate timing and FX adjustments](cash_rat\tilde r_timing_and_fx_adjustments.md)
+- [Cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md)
 - [FX hedging and market data](fx_hedging_and_market_data.md)
 - [Self-financed FX accounting](self_financed_fx_accounting.md)
 
