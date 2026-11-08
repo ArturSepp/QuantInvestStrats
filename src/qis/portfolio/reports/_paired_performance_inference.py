@@ -38,7 +38,8 @@ def compute_paired_performance_inference(
     validate_alpha_inference(alpha_inference)
     issues = []
     portfolios = {"Strategy": strategy, "Comparison": comparison}
-    navs = pd.concat({key: value.get_portfolio_nav() for key, value in portfolios.items()}, axis=1)
+    navs = pd.concat(
+        {key: value.get_portfolio_nav() for key, value in portfolios.items()}, axis=1, sort=True)
     try:
         for portfolio in portfolios.values():
             validate_reporting_frequency(time_period.locate(portfolio.get_portfolio_nav()), freq)

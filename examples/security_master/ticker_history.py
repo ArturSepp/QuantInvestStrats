@@ -79,7 +79,7 @@ def populate_demo(master: SecurityMaster) -> pd.DatetimeIndex:
     return prices.index
 
 
-def run_local(local: Locals = Locals.TICKER_HISTORY) -> None:
+def run_local(local: Locals) -> None:
     """Print identities, an as-of panel and the later effect of a withdrawal.
 
     Args:
@@ -108,4 +108,4 @@ def run_local(local: Locals = Locals.TICKER_HISTORY) -> None:
 
 
 if __name__ == '__main__':
-    run_local()
+    run_local(local=Locals.TICKER_HISTORY)

@@ -198,7 +198,10 @@ def test_factsheet_output_directory(module, explicit, yahoo_panel, monkeypatch, 
         return fig
 
     def figures(**kwargs):
-        return [figure()]
+        # Examples export the default inference appendix by title or page position.
+        inference = figure()
+        inference.suptitle('Performance confidence and stability')
+        return [figure(), inference]
 
     generators = [
         ('multi_assets_factsheet', 'generate_multi_asset_factsheet', figure),

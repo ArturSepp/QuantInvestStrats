@@ -9,6 +9,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [5.47.2] - 2026-11-08
 
+### Fixed
+
+- Align example output-test placeholders with the default inference appendix, use the explicit
+  example dispatcher convention in the security-master demo, and state chronological sorting
+  when joining paired inference NAVs.
+
 ### Added
 
 - Configurable `alpha_inference` in single, paired and multi-strategy factsheets: Bartlett HAC
