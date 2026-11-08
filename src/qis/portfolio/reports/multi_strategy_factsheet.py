@@ -10,6 +10,8 @@ group navs and groups the exposures of an appended strategy factsheet; the expos
 panels have no group mode. ``add_group_exposures_and_pnl`` and ``add_strategy_factsheets`` each
 append further pages, both off by default. Frequencies arrive spread in from
 ``qis.fetch_default_report_kwargs``.
+Default-on paired inference follows the unchanged first page, comparing all non-base portfolios
+to portfolio zero. Optional pair-detail pages follow that overview before other appendices.
 
 Attributing the difference between a pair to their weights is ``strategy_benchmark_factsheet.py``;
 the same page rendered as HTML is ``multi_strategy_factsheet_pybloqs.py``.
@@ -24,6 +26,11 @@ from typing import List, Optional, Tuple
 import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports._multi_performance_inference import (
+    compute_multi_performance_inference, plot_multi_performance_inference, validate_inference_base,
+)
+from qis.portfolio.reports._performance_inference import plot_performance_inference
 from qis.portfolio._asset_display import factsheet_kwargs
 from qis.portfolio.reports.config import (
     DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
@@ -56,6 +63,10 @@ def generate_multi_portfolio_factsheet(
         DEFAULT_RECENT_RA_PERF_TABLE_START_DATE
     ),
     *,
+    base_portfolio_id: int = 0,
+    add_performance_inference_sheet: bool = True,
+    alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
+    add_pairwise_inference_sheets: bool = False,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
 ) -> List[plt.Figure]:
@@ -69,6 +80,21 @@ def generate_multi_portfolio_factsheet(
     hundred-line legend.
 
     Args:
+        alpha_inference: Primary alpha method for the unchanged 6K-test Holm family. Bartlett
+            HAC is default; PREWHITENED_AR1 is opt-in. Alternate same-sample raw p-values are
+            sensitivity only, outside Holm. Forwarded to all detail/embedded strategy pages;
+            does not change Sharpe or page one.
+        base_portfolio_id: Zero-based base position for inference, excluded from comparison rows.
+            All differences are portfolio minus base; the first market benchmark is separately
+            used for both holdings-alpha legs. Does not change any page-one calculation.
+        add_performance_inference_sheet: Add the default-on three-by-two inference overview
+            after page one, at most six comparisons per page. Full/recent paired Sharpe and
+            marginal holdings-alpha HAC intervals/p-values, plus whole-family Holm adjustments.
+            Incomplete families retain raw results but no adjusted p-values. Also forwarded to
+            appended standalone factsheets, preserving earlier kwargs behaviour.
+        add_pairwise_inference_sheets: Add one existing expanding/rolling paired diagnostics
+            page per non-base portfolio after the overview. Default False. Detail-page p-values
+            are raw, not Holm-adjusted; this option works independently of the overview flag.
         lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
             are finite, nonnegative and sum to one; omitted rows use group_data.
             None preserves categorical reporting. This is an accounting split.
@@ -95,6 +121,8 @@ def generate_multi_portfolio_factsheet(
     Returns:
         the pages, in order, ready for :func:`save_figs_to_pdf`
     """
+    if add_performance_inference_sheet or add_pairwise_inference_sheets:
+        validate_inference_base(multi_portfolio_data.portfolio_datas, base_portfolio_id)
     group_data, lookthrough_matrix = resolve_reporting_inputs(
         multi_portfolio_data.portfolio_datas, group_data, lookthrough_matrix)
     kwargs = factsheet_kwargs(kwargs)
@@ -115,7 +143,8 @@ def generate_multi_portfolio_factsheet(
 
     # guard: the requested reporting frequency must not be finer than the data it is computed on -
     # check every portfolio NAV and the benchmark prices (used for regime / beta / scatter panels)
-    nav_datas = [portfolio.get_portfolio_nav() for portfolio in multi_portfolio_data.portfolio_datas]
+    nav_datas = [portfolio.get_portfolio_nav()
+                 for portfolio in multi_portfolio_data.portfolio_datas]
     for data_series in nav_datas + [multi_portfolio_data.benchmark_prices]:
         if data_series is not None:
             validate_reporting_frequency(data_series, perf_params.freq)
@@ -130,7 +159,7 @@ def generate_multi_portfolio_factsheet(
                              panel_rows=1, gridspec_rows=7,
                              report_name='multi-portfolio factsheet')
 
-    # native grid of the NAV paths: drawdowns / under-water / cumulative are on this grid (not resampled)
+    # Drawdowns / under-water / cumulative use the native NAV grid (not resampled).
     nav_freq = infer_data_frequency_label(nav_datas[0])
     nav_freq_label = f" ({nav_freq}-freq)" if nav_freq else ""
 
@@ -177,7 +206,8 @@ def generate_multi_portfolio_factsheet(
                                                        regime_benchmark=regime_benchmark,
                                                        regime_classifier=regime_classifier,
                                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
-                                                       title=f'Rolling time under water{nav_freq_label}',
+                                                 title=(f'Rolling time under water'
+                                                        f'{nav_freq_label}'),
                                                        **kwargs)
 
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[3, :2]),
@@ -236,7 +266,8 @@ def generate_multi_portfolio_factsheet(
     multi_portfolio_data.plot_ra_perf_table(ax=fig.add_subplot(gs[3, 2:]),
                                             perf_params=perf_params,
                                             time_period=qis.get_time_period_shifted_by_years(time_period=time_period),
-                                            **qis.update_kwargs(kwargs, dict(fontsize=fontsize, freq_reg='W-WED')))
+                                            **qis.update_kwargs(
+                                                kwargs, dict(fontsize=fontsize, freq_reg='W-WED')))
     """
     multi_portfolio_data.plot_corr_table(ax=fig.add_subplot(gs[3, 2:]),
                                          time_period=time_period,
@@ -282,7 +313,8 @@ def generate_multi_portfolio_factsheet(
     if len(multi_portfolio_data.benchmark_prices.columns) > 1:
         # take first two benchmarks
         benchmark_prices = multi_portfolio_data.benchmark_prices.iloc[:, :2]
-        multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[5, 2:]), fig.add_subplot(gs[6, 2:])],
+        multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[5, 2:]),
+                                                   fig.add_subplot(gs[6, 2:])],
                                                benchmark_prices=benchmark_prices,
                                                time_period=time_period,
                                                regime_benchmark=regime_benchmark,
@@ -292,7 +324,8 @@ def generate_multi_portfolio_factsheet(
         multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[5, 2:]),
                                                   time_period=time_period,
                                                   benchmark=multi_portfolio_data.benchmark_prices.columns[0],
-                                                  **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
+                                                  **qis.update_kwargs(
+                                                      kwargs, dict(freq=perf_params.freq_reg)))
 
         multi_portfolio_data.plot_factor_betas(axs=[fig.add_subplot(gs[6, 2:])],
                                                time_period=time_period,
@@ -302,6 +335,21 @@ def generate_multi_portfolio_factsheet(
                                                **kwargs)
 
     figs = [fig]
+    if add_performance_inference_sheet or add_pairwise_inference_sheets:
+        inference = compute_multi_performance_inference(
+            multi_portfolio_data, base_portfolio_id=base_portfolio_id, time_period=time_period,
+            freq=perf_params.freq_vol, rates_data=perf_params.rates_data,
+            freq_beta=kwargs.get('freq_beta', 'B'),
+            factor_beta_span=kwargs.get('factor_beta_span', 260),
+            alpha_inference=alpha_inference,
+        )
+        if add_performance_inference_sheet:
+            figs.extend(plot_multi_performance_inference(inference, figsize=figsize))
+        if add_pairwise_inference_sheets:
+            for pair in inference.pairs.values():
+                figs.append(plot_performance_inference(
+                    pair, f"{pair.metadata['strategy']} vs {pair.metadata['comparison']}",
+                    figsize=figsize))
     if add_group_exposures_and_pnl:
         figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(
             time_period=time_period,
@@ -324,6 +372,8 @@ def generate_multi_portfolio_factsheet(
                     add_grouped_exposures=is_grouped,
                     time_period=time_period,
                     recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
+                    add_performance_inference_sheet=add_performance_inference_sheet,
+                    alpha_inference=alpha_inference,
                     **kwargs,
                     lookthrough_matrix=lookthrough_matrix,
                     group_data=group_data,

@@ -1,10 +1,10 @@
 """AR(1)-prewhitened Bartlett HAC inference for OLS intercepts, one response at a time.
 
 Mean and alpha tests need the long-run variance of the intercept score. With a fixed
-Bartlett lag count L the plain kernel estimator is biased towards zero when the score is
-persistent, and the bias does not vanish as T grows. Andrews and Monahan (1992, Econometrica
-60(4), 953-966) prewhiten with a low-order autoregression, apply the kernel to the innovations
-and recolour at frequency zero. Nothing here is new: this module is their estimator for the
+Bartlett lag count L the plain kernel can underestimate variance with positive serial
+covariances; that truncation bias need not vanish as T grows. Andrews and Monahan (1992,
+Econometrica 60(4), 953-966) prewhiten with a low-order autoregression, apply the kernel to
+the innovations and recolour at frequency zero. This module applies that approach to the
 linear combination of the score that defines each intercept, applied to one response at a
 time rather than as a VAR(1) of the joint score. The qis choices are a fixed Bartlett lag on
 the innovations instead of their automatic bandwidth, and an abort at |rho| >= 1 instead of
@@ -12,7 +12,8 @@ their truncation of rho at 0.97.
 
 For T observations, k design columns (intercept included) and the intercept row a of
 (X'X)^{-1}X', the influence is psi_t = T a_t u_t with OLS residuals u_t, so that
-alpha_hat - alpha = (1/T) sum_t psi_t and sum_t psi_t = 0 exactly. A zero-intercept AR(1)
+sum_t psi_t = 0 exactly. This fitted influence estimates covariance, not the unknown
+estimation error (whose representation involves true disturbances). A zero-intercept AR(1)
 fitted to psi, rho = sum_t psi_t psi_{t-1} / sum_t psi_{t-1}^2, leaves the T-1 innovations
 v_t = psi_t - rho psi_{t-1}. With Bartlett weights w_l = 1 - l/(L+1),
 

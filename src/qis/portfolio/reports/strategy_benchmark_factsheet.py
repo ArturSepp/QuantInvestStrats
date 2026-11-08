@@ -5,8 +5,9 @@ one strategy against one benchmark: a ``MultiPortfolioData`` in, a list of A4 pa
 against ``benchmark_idx``, and returns one ``plt.Figure`` per page. Page one always renders the
 joint performance, exposure and cost panels beside the risk-adjusted tables, regime Sharpes and
 rolling annualised alpha computed from the adjacent panel's lagged EWMA betas.
-``add_brinson_attribution`` is the one flag on by default,
-appending the allocation / selection page - the call assigns the interaction term to instrument
+``add_performance_inference_sheet`` and ``add_brinson_attribution`` are on by default:
+paired Sharpe / marginal holdings-alpha inference precedes the allocation / selection page.
+The Brinson call assigns the interaction term to instrument
 selection. The other page flags are off; ``add_benchmarks_to_navs`` adds benchmark
 lines to the page-one panels rather than a page, and ``add_grouped_exposures`` /
 ``add_grouped_cum_pnl``
@@ -31,6 +32,9 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 # portfolio
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
+from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports._paired_performance_inference import compute_paired_performance_inference
+from qis.portfolio.reports._performance_inference import plot_performance_inference
 from qis.portfolio._asset_display import (
     factsheet_kwargs, price_tails, reduce_rows, selection_title, tail_index,
 )
@@ -75,6 +79,8 @@ def generate_strategy_benchmark_factsheet_plt(
     brinson_time_period: Optional[TimePeriod] = None,
     brinson_group_data: Optional[pd.Series] = None,
     *,
+    add_performance_inference_sheet: bool = True,
+    alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
     group_data: Optional[pd.Series] = None,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
@@ -82,9 +88,9 @@ def generate_strategy_benchmark_factsheet_plt(
     """
     factsheet comparing one strategy against one benchmark, as a list of A4 figures.
 
-    The two-portfolio case, where the difference between them is the subject: the first page is the
-    strategy on its own and the second is the comparison, with Brinson attribution decomposing the
-    active return into allocation, selection and interaction. That decomposition is why this is a
+    The two-portfolio case, where the difference between them is the subject: the first page is
+    the joint summary, followed by paired inference and Brinson attribution decomposing the
+    active return into allocation and selection (including interaction). This is why this is a
     separate report from :func:`generate_multi_portfolio_factsheet`, which compares strategies that
     share no common weights.
 
@@ -93,6 +99,16 @@ def generate_strategy_benchmark_factsheet_plt(
     fees, funding or other cash flows absent from instrument P&L.
 
     Args:
+        alpha_inference: Primary marginal-alpha uncertainty method; defaults to Bartlett HAC.
+            PREWHITENED_AR1 is opt-in; the alternate is shown on the same sample as unadjusted
+            sensitivity only. Forwarded to embedded strategy pages; Sharpe stays unchanged.
+        add_performance_inference_sheet: Default-on paired arithmetic-Sharpe and marginal
+            holdings-alpha appendix before Brinson. Uses strategy_idx minus benchmark_idx;
+            alpha uses only the first market benchmark, with shared freq_beta/factor_beta_span
+            from kwargs (defaults B/260). Sharpe uses perf_params.freq_vol. Short/missing samples
+            warn and remain unavailable. False omits inference here and in any appended
+            standalone strategy factsheets, preserving the earlier kwargs forwarding behaviour.
+            Page one is unchanged.
         lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
             are finite, nonnegative and sum to one; omitted rows use group_data.
             None preserves categorical reporting. This is an accounting split.
@@ -148,7 +164,7 @@ def generate_strategy_benchmark_factsheet_plt(
     if 'heatmap_fontsize' in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
     if len(multi_portfolio_data.portfolio_datas) == 1:
-        raise ValueError(f"must be at least two strategies")
+        raise ValueError("must be at least two strategies")
 
     if is_grouped is None:
         if (
@@ -183,10 +199,11 @@ def generate_strategy_benchmark_factsheet_plt(
 
     # set reporting time period here
     if time_period is None:
-        time_period = qis.get_time_period(multi_portfolio_data.portfolio_datas[0].get_portfolio_nav())
+        time_period = qis.get_time_period(
+            multi_portfolio_data.portfolio_datas[0].get_portfolio_nav())
 
     # guard: the requested reporting frequency must not be finer than the data it is computed on -
-    # check both portfolio NAVs and the benchmark prices (used for regime / beta / scatter panels)
+    # check both portfolio NAVs and benchmark prices (used for regime / beta / scatter panels)
     strategy_nav = multi_portfolio_data.portfolio_datas[strategy_idx].get_portfolio_nav()
     for data_series in (strategy_nav,
                         multi_portfolio_data.portfolio_datas[benchmark_idx].get_portfolio_nav(),
@@ -234,8 +251,9 @@ def generate_strategy_benchmark_factsheet_plt(
                                   regime_benchmark=regime_benchmark,
                                   perf_params=perf_params,
                                   regime_classifier=regime_classifier,
-                                  title=f"Cumulative performance ({perf_params.freq}-freq stats) with "
-                                        f"bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+                                  title=(f"Cumulative performance ({perf_params.freq}-freq stats) "
+                                         f"with bear/normal/bull regimes of {regime_benchmark} "
+                                         f"{regime_classifier.freq}-returns"),
                                   **kwargs)
 
     multi_portfolio_data.plot_drawdowns(ax=fig.add_subplot(gs[2:4, :2]),
@@ -249,7 +267,8 @@ def generate_strategy_benchmark_factsheet_plt(
                                                        add_benchmarks_to_navs=add_benchmarks_to_navs,
                                                        regime_benchmark=regime_benchmark,
                                                        regime_classifier=regime_classifier,
-                                                       title=f'Rolling time under water{nav_freq_label}',
+                                                       title=(f'Rolling time under water'
+                                                              f'{nav_freq_label}'),
                                                        **kwargs)
 
     multi_portfolio_data.plot_rolling_perf(ax=fig.add_subplot(gs[6:8, :2]),
@@ -293,7 +312,8 @@ def generate_strategy_benchmark_factsheet_plt(
     )
     # change regression to weekly
     if _infer_freq(benchmark_price.index) in ['B', 'D']:
-        local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
+        local_kwargs = qis.update_kwargs(
+            kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
     else:
         local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
 
@@ -322,10 +342,12 @@ def generate_strategy_benchmark_factsheet_plt(
     if len(multi_portfolio_data.benchmark_prices.columns) == 1:
         benchmark_prices_ = {benchmark_price.name: fig.add_subplot(gs[6:8, 2:4])}
     else:
-        benchmark_prices_ = {multi_portfolio_data.benchmark_prices.columns[0]: fig.add_subplot(gs[6:8, 2]),
-                             multi_portfolio_data.benchmark_prices.columns[1]: fig.add_subplot(gs[6:8, 3])}
+        benchmark_prices_ = {
+            multi_portfolio_data.benchmark_prices.columns[0]: fig.add_subplot(gs[6:8, 2]),
+            multi_portfolio_data.benchmark_prices.columns[1]: fig.add_subplot(gs[6:8, 3])}
     for benchmark_, ax_ in benchmark_prices_.items():
-        post_title = f"Sharpe in {benchmark_} Bear/Normal/Bull {regime_classifier.freq}-freq regimes"
+        post_title = (f"Sharpe in {benchmark_} Bear/Normal/Bull "
+                      f"{regime_classifier.freq}-freq regimes")
         multi_portfolio_data.plot_regime_data(
             benchmark=benchmark_,
             add_benchmarks_to_navs=add_benchmarks_to_navs,
@@ -345,12 +367,12 @@ def generate_strategy_benchmark_factsheet_plt(
                                                              benchmark_price=benchmark_price,
                                                              perf_params=perf_params,
                                                              freq=regime_classifier.freq,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
+                        **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     multi_portfolio_data.portfolio_datas[1].plot_vol_regimes(ax=fig.add_subplot(gs[8:10, 3]),
                                                              benchmark_price=benchmark_price,
                                                              freq=perf_params.freq,
                                                              regime_classifier=regime_classifier,
-                                                             **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
+                        **qis.update_kwargs(kwargs, dict(fontsize=fontsize, x_rotation=90)))
     """
     multi_portfolio_data.plot_rolling_benchmark_alpha(
         ax=fig.add_subplot(gs[8:10, 2:]),
@@ -369,7 +391,21 @@ def generate_strategy_benchmark_factsheet_plt(
     with sns.axes_style('whitegrid'):
         multi_portfolio_data.plot_returns_scatter(ax=fig.add_subplot(gs[12:, 2:]),
                                                   benchmark=regime_benchmark,
-                                                  **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
+                    **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
+
+    if add_performance_inference_sheet:
+        inference = compute_paired_performance_inference(
+            strategy=multi_portfolio_data.portfolio_datas[strategy_idx],
+            comparison=multi_portfolio_data.portfolio_datas[benchmark_idx],
+            benchmark_prices=multi_portfolio_data.benchmark_prices,
+            time_period=time_period, freq=perf_params.freq_vol, rates_data=perf_params.rates_data,
+            freq_beta=kwargs.get('freq_beta', 'B'),
+            factor_beta_span=kwargs.get('factor_beta_span', 260),
+            alpha_inference=alpha_inference,
+        )
+        figs.append(plot_performance_inference(
+            inference, f"{inference.metadata['strategy']} vs {inference.metadata['comparison']}",
+            figsize=figsize))
 
     if add_brinson_attribution:
         brinson_period = time_period if brinson_time_period is None else brinson_time_period
@@ -596,7 +632,9 @@ def generate_strategy_benchmark_factsheet_plt(
                                      title=f"{key}",
                                      ax=ax,
                                      **local_kwargs)
-                multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index, regime_classifier=regime_classifier)
+                multi_portfolio_data.add_regime_shadows(
+                    ax=ax, regime_benchmark=regime_benchmark, index=df.index,
+                    regime_classifier=regime_classifier)
                 set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_joint_instrument_history_report:
@@ -611,9 +649,10 @@ def generate_strategy_benchmark_factsheet_plt(
         joint_prices, history_title = price_tails(
             time_period.locate(joint_prices), kwargs['asset_tail_count'],
             'Instruments in Joint Universe')
-        fig = qis.generate_price_history_report(prices=joint_prices,
-                                                **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
-                                                                                 perf_columns=perf_columns)))
+        fig = qis.generate_price_history_report(
+            prices=joint_prices,
+            **qis.update_kwargs(
+                kwargs, dict(fontsize=4, figsize=figsize, perf_columns=perf_columns)))
         fig.suptitle(history_title, fontweight="bold", fontsize=8, color='blue')
         figs.append(fig)
 
@@ -629,6 +668,8 @@ def generate_strategy_benchmark_factsheet_plt(
                     add_grouped_cum_pnl=add_grouped_cum_pnl,
                     is_grouped=is_grouped,
                     recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
+                    add_performance_inference_sheet=add_performance_inference_sheet,
+                    alpha_inference=alpha_inference,
                     **kwargs,  # time period will be in kwargs
                     lookthrough_matrix=lookthrough_matrix,
                     group_data=group_data,
@@ -673,7 +714,7 @@ def generate_strategy_benchmark_active_perf_plt(
     group_data, lookthrough_matrix = resolve_reporting_inputs(
         multi_portfolio_data.portfolio_datas, group_data, lookthrough_matrix)
     if len(multi_portfolio_data.portfolio_datas) == 1:
-        raise ValueError(f"must be at least two strategies")
+        raise ValueError("must be at least two strategies")
 
     # set report specific kqargs
     plot_kwargs = dict(fontsize=fontsize,
@@ -720,11 +761,16 @@ def generate_strategy_benchmark_active_perf_plt(
         group_data=group_data,
     )
 
-    datas = {'Active total return (Brinson attribution)': (active_total.cumsum(axis=0), fig.add_subplot(gs[0, 1])),
-             'Asset class allocation return': (grouped_allocation_return.cumsum(axis=0), fig.add_subplot(gs[1, 1])),
-             'Instrument selection return': (grouped_selection_return.cumsum(axis=0), fig.add_subplot(gs[2, 1]))}
+    datas = {
+        'Active total return (Brinson attribution)':
+            (active_total.cumsum(axis=0), fig.add_subplot(gs[0, 1])),
+        'Asset class allocation return':
+            (grouped_allocation_return.cumsum(axis=0), fig.add_subplot(gs[1, 1])),
+        'Instrument selection return':
+            (grouped_selection_return.cumsum(axis=0), fig.add_subplot(gs[2, 1]))}
     for key, (df, ax) in datas.items():
-        legend_labels = [column + ', sum=' + '{:.1%}'.format(df[column].iloc[-1]) for column in df.columns]
+        legend_labels = [column + ', sum=' + '{:.1%}'.format(df[column].iloc[-1])
+                         for column in df.columns]
         qis.plot_time_series(df=df,
                              title=key,
                              var_format='{:.1%}',
@@ -733,8 +779,9 @@ def generate_strategy_benchmark_active_perf_plt(
                              **kwargs)
 
         if regime_benchmark is not None:
-            multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark, index=df.index,
-                                                    regime_classifier=regime_classifier)
+            multi_portfolio_data.add_regime_shadows(
+                ax=ax, regime_benchmark=regime_benchmark, index=df.index,
+                regime_classifier=regime_classifier)
 
     # weights box plot
     # make horizontal is too many instruments
@@ -792,7 +839,7 @@ def generate_strategy_benchmark_active_perf_plt(
 
 def generate_performance_attribution_report(multi_portfolio_data: MultiPortfolioData,
                                             time_period: TimePeriod = None,
-                                            figsize: Tuple[float, float] = (8.3, 11.7),  # A4 for portrait
+                                            figsize: Tuple[float, float] = (8.3, 11.7),
                                             **kwargs
                                             ) -> List[plt.Figure]:
     figs = []

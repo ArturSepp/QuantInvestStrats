@@ -1,11 +1,11 @@
 """
 Strategy-vs-benchmark factsheet using ``generate_strategy_benchmark_factsheet_plt``.
 
-Builds a vol-parity strategy with a rolling-EWMA covariance estimator and
-compares it to a 60/40 benchmark. Shows attribution, tracking error,
-regime-conditional stats, and active risk decomposition.
+Builds a vol-parity strategy with EWMA volatility scaling and compares it to
+equal weight. PAIRED_INFERENCE shows paired Sharpe and marginal holdings alpha
+relative to SPY (the first market reference), followed by Brinson attribution.
 
-Implementation reference: ``qis.portfolio.reports.strategy_factsheet``.
+Implementation reference: ``qis.portfolio.reports.strategy_benchmark_factsheet``.
 """
 # packages
 import pandas as pd
@@ -96,6 +96,7 @@ class Locals(Enum):
     PERFORMANCE_ATTRIBUTION = 2
     ACTIVE_PERFORMANCE = 3
     TRACKING_ERROR = 4
+    PAIRED_INFERENCE = 5
 
 
 @qis.timer
@@ -121,7 +122,24 @@ def run_local(local: Locals, output_path: str = None):
         rebalancing_costs=0.0010,  # per traded volume
     )
 
-    if local == Locals.STRATEGY_BENCHMARK_PLT:
+    if local == Locals.PAIRED_INFERENCE:
+        # Monthly samples make the recent 3/5-year windows eligible for >=24 observations.
+        # Both NAVs retain the same stated trading-cost convention; zero cash is explicit.
+        figs = generate_strategy_benchmark_factsheet_plt(
+            multi_portfolio_data=multi_portfolio_data,
+            time_period=time_period,
+            backtest_name='VolParity vs EqualWeight',
+            is_grouped=False,
+            **fetch_default_report_kwargs(
+                time_period=time_period, reporting_frequency=qis.ReportingFrequency.MONTHLY,
+                add_rates_data=False),
+        )
+        # Default order: unchanged summary, paired inference, Brinson.
+        qis.save_figs_to_pdf(figs=figs, file_name='paired_performance_factsheet',
+                             local_path=output_path)
+        qis.save_fig(fig=figs[1], file_name='paired_performance_inference', local_path=output_path)
+
+    elif local == Locals.STRATEGY_BENCHMARK_PLT:
         pnl_attribution = False
         figs = generate_strategy_benchmark_factsheet_plt(
             multi_portfolio_data=multi_portfolio_data,
@@ -142,8 +160,8 @@ def run_local(local: Locals, output_path: str = None):
                              local_path=output_path)
         qis.save_fig(fig=figs[0], file_name="strategy_benchmark", local_path=output_path)
         if pnl_attribution:
-            qis.save_fig(fig=figs[1], file_name="brinson_attribution", local_path=output_path)
-            qis.save_fig(fig=figs[2], file_name="pnl_attribution", local_path=output_path)
+            qis.save_fig(fig=figs[2], file_name="brinson_attribution", local_path=output_path)
+            qis.save_fig(fig=figs[3], file_name="pnl_attribution", local_path=output_path)
 
     elif local == Locals.PERFORMANCE_ATTRIBUTION:
         figs = generate_performance_attribution_report(multi_portfolio_data=multi_portfolio_data,
@@ -185,6 +203,7 @@ def run_local(local: Locals, output_path: str = None):
                              file_name="strategy_benchmark_tracking_error",
                              local_path=output_path)
     plt.show()
+    return figs
 
 
 if __name__ == '__main__':

@@ -85,6 +85,7 @@ def test_monthly_returns_summary_defaults() -> None:
     heatmap_parameters = inspect.signature(plot_returns_heatmap).parameters
     assert strategy_parameters['monthly_returns_heatmap_max_years'].default == 10
     assert strategy_parameters['fontsize'].default == 5
+    assert strategy_parameters['add_performance_inference_sheet'].default is True
     assert benchmark_parameters['fontsize'].default == 5
     assert heatmap_parameters['fontsize'].default == 5
     assert 'heatmap_fontsize' not in strategy_parameters
@@ -140,8 +141,8 @@ def test_signal_instrument_batch_bounds_registered_pages(
 
 @pytest.mark.parametrize(
     ('exposures', 'brinson', 'facade', 'page_count'),
-    [(False, False, False, 1), (True, False, False, 3),
-     (True, True, False, 4), (True, False, True, 3)],
+    [(False, False, False, 2), (True, False, False, 4),
+     (True, True, False, 5), (True, False, True, 4)],
     ids=['base-page', 'exposure-pages', 'brinson-and-exposures', 'facade-exposure-pages'],
 )
 def test_generate_strategy_benchmark_factsheet_plt_preserves_figures(
@@ -348,7 +349,7 @@ def test_long_history_warns_limits_summary_and_appends_full_heatmap() -> None:
             fontsize=7,
         )
     try:
-        assert len(figs) == 2
+        assert len(figs) == 3
         summary_ax = next(ax for ax in figs[0].axes
                           if ax.get_title() == 'Monthly Returns - Last 3 Calendar Years')
         appendix_ax = next(ax for ax in figs[1].axes
@@ -759,7 +760,7 @@ def test_brinson_page_uses_requested_layout_titles_and_regime_backgrounds() -> N
         backtest_name='TAA vs Benchmark',
     )
     try:
-        brinson_page = figs[1]
+        brinson_page = figs[2]
         brinson_page.canvas.draw()
         axes_by_title = {ax.get_title(): ax for ax in brinson_page.axes if ax.get_title()}
         expected_titles = {
@@ -841,9 +842,9 @@ def test_generate_strategy_benchmark_factsheet_labels_brinson_trading_cost_basis
         regime_classifier=qis.BenchmarkReturnsQuantilesRegime(freq='ME'), **options,
     )
     try:
-        page = figs[1]
+        page = figs[2]
         page.canvas.draw()
-        assert len(figs) == 2
+        assert len(figs) == 3
         assert len(page.axes) == 6
         net = bool(is_net)
         assert calls == [(net, pytest.approx(expected[net], abs=1e-12))]

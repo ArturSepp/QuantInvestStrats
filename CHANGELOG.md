@@ -7,6 +7,39 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.47.2] - 2026-11-08
+
+### Added
+
+- Configurable `alpha_inference` in single, paired and multi-strategy factsheets: Bartlett HAC
+  by default, opt-in AR(1)-prewhitened HAC, with a same-sample/lag sensitivity comparison.
+  Sharpe is unchanged. Only the selected primary alpha method enters multi-strategy Holm;
+  alternate-method raw p-values are descriptive, not an additional qualified test family.
+- Default-on multi-strategy inference overview after unchanged page one, comparing each portfolio
+  with `base_portfolio_id=0`. Three-by-two paired Sharpe/marginal holdings-alpha panels include
+  pointwise HAC intervals, raw p-values and a single predeclared Holm family across both metrics,
+  three windows and all pages. Missing tests disable whole-family adjustment without hiding valid
+  raw results. Six comparisons per page; optional pair-detail pages, tests and VolParity example.
+- Default-on paired strategy-benchmark inference page before Brinson: paired arithmetic-Sharpe
+  differences and marginal holdings alpha relative to the first market reference, with full/recent
+  tables and expanding/rolling HAC bands. Reuses existing estimators, retains paired covariance
+  and complete holdings coverage. Includes safeguards, tests and a VolParity/EqualWeight example.
+- Single-strategy arithmetic Sharpe confidence intervals with IID-normal or Bartlett HAC
+  inference, explicit method/annualisation, independent reference tests and an offline chart example.
+- Default-on performance-confidence/stability appendix in `generate_strategy_factsheet`:
+  two columns for full/recent Sharpe intervals and holdings-weighted alpha against only the
+  first supplied benchmark, with expanding/rolling HAC bands and alpha p-values. Alpha uses
+  lagged actual exposures and warmed instrument betas, not a portfolio NAV regression.
+  It follows the full-history monthly-return appendix when present. Minimum-sample and missing-
+  data safeguards require complete held-instrument beta coverage, warn and display unavailable
+  estimates or a labelled shorter rolling window. Footnotes link to the methodology guides.
+
+### Changed
+
+- Strategy, strategy-benchmark and multi-strategy factsheets include inference by default. Set
+  `add_performance_inference_sheet=False` to retain the previous page set. The first page,
+  existing estimators/defaults and portfolio calculations are unchanged.
+
 ## [5.47.1] - 2026-11-08
 
 ### Fixed

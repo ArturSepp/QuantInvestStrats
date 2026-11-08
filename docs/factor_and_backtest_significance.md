@@ -155,8 +155,9 @@ This is not an exact finite-sample Student distribution. `hac_lags=None` selects
 
 ### AR(1) prewhitening of the intercept score
 
-With a fixed lag count $L$ the Bartlett estimator of a persistent score's long-run variance is
-biased towards zero, and the bias does not shrink as $T$ grows. `InterceptInference.PREWHITENED_AR1`
+With a fixed lag count $L$, Bartlett truncation and downweighting can underestimate long-run
+variance when score autocovariances are positive. That truncation bias need not vanish as
+$T$ grows. `InterceptInference.PREWHITENED_AR1`
 applies the prewhitening of [Andrews–Monahan (1992)](https://doi.org/10.2307/2951574) to the
 scalar influence of each intercept. For the intercept row $a$ of $(X^\top X)^{-1}X^\top$ and
 residuals $\hat\varepsilon_{j,t}$, the influence is
@@ -164,10 +165,12 @@ residuals $\hat\varepsilon_{j,t}$, the influence is
 $$
 \psi_{j,t}=T\,a_t\hat\varepsilon_{j,t},
 \qquad
-\hat\theta_j-\theta_j=\frac1T\sum_{t=1}^{T}\psi_{j,t},
-\qquad
 \sum_{t=1}^{T}\psi_{j,t}=0 .
 $$
+
+This is the **fitted, centred influence** used to estimate covariance, not an identity for
+the unknown estimation error. The error representation instead involves the unobserved true
+disturbances; replacing them with fitted residuals makes the displayed sum zero.
 
 A zero-intercept AR(1) fitted to $\psi_j$ gives
 $\hat\rho_j=\sum_{t\geq2}\psi_{j,t}\psi_{j,t-1}\big/\sum_{t\geq2}\psi_{j,t-1}^2$ and the $T-1$
@@ -188,10 +191,12 @@ $|\hat\rho_j|\geq1$ or a lag count above $T-2$ raises instead of truncating $\ha
 falling back to the plain kernel. The filter acts on the intercept's scalar influence, not on the
 joint parameter score, so no joint covariance is produced.
 
-Prewhitening is consistent at fixed $L$ for persistent scores, where the plain Bartlett estimator
-is not. It is not a validated default either: in the maintainer's replication study on
-independent rows with cross-correlated responses ($T=720$, $L=0$) its marginal size and pointwise
-non-coverage were 8.0–8.6% against a 7.9% acceptance bound. The other standard treatment of a
+Prewhitening can reduce persistence-related bias, but consistency at fixed $L$ requires the
+filter to leave no relevant residual serial dependence (for example, correctly specified
+AR(1) dependence with white innovations). It is not a general fixed-bandwidth consistency
+result for arbitrary persistent scores. Remaining dependence requires an appropriate
+bandwidth/asymptotic treatment. Estimating the filter can increase sampling variability;
+neither option guarantees finite-sample size or pointwise coverage. Another treatment of a
 persistent score, fixed-$b$ asymptotics with a nonstandard reference distribution
 ([Kiefer–Vogelsang (2005)](https://doi.org/10.1017/S0266466605050565);
 [Sun (2014)](https://doi.org/10.1016/j.jeconom.2013.10.001)), is not implemented; qis keeps the
@@ -510,9 +515,9 @@ matrix, and a two-panel figure of p-values and standard-error ratios.
   exogenous full-rank factor design. Paired Sharpe inference needs sufficient fourth moments.
 - The 24-observation check is an input-validity threshold, not a claim that 24 observations give
   reliable asymptotic inference. An automatic lag rule is not a finite-sample guarantee.
-- The maintainer's finite-sample validation study did not meet all its predeclared marginal-size
-  and pointwise-coverage gates, for the Bartlett default or for AR(1) prewhitening. The
-  implementation/reference checks and passing family-error checks do not override those results.
+- Finite-sample qualification remains incomplete for the Bartlett default and AR(1)
+  prewhitening. Implementation/reference checks do not establish marginal-size or
+  pointwise-coverage guarantees; no promotion or changed acceptance gate is implied.
 - Corrected p-values are not posterior probabilities, and nonrejection is not proof of zero
   return or zero alpha. Statistical evidence does not establish economic materiality or net
   investability. State funding, fees, leverage and the tested effect units.

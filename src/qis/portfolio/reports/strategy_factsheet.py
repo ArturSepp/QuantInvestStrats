@@ -6,11 +6,13 @@ follow. It takes a portfolio - simulated by ``qis.backtest_model_portfolio`` or 
 live track record, the report does not care which - plus one or more benchmark series, and
 returns one ``plt.Figure`` per page for ``qis.save_figs_to_pdf``.
 
-Page one always renders and is the whole report by default: cumulative performance with regime
+Page one always renders: cumulative performance with regime
 shading, the risk-adjusted performance tables, rolling volatility, Sharpe and beta, drawdowns
 and time under water, exposures, turnover and costs. Each ``add_*`` flag appends a further page
 - current positions and VaR, grouped weights, the current signal state, weight changes,
-performance and risk attribution, per-instrument history - and all of them default to False.
+performance and risk attribution, per-instrument history. The performance-inference appendix
+is on by default, after the full-history monthly-returns page when one is needed; other
+optional risk/holdings pages remain off by default.
 
 The panels do not share one sampling grid, which is why the signature carries a frequency and a
 window per panel rather than a single ``freq``. Drawdowns are read on the nav's native path
@@ -28,12 +30,14 @@ this module only lays them out on a gridspec. Comparing two portfolios is
 ``strategy_benchmark_factsheet.py``, several is ``multi_strategy_factsheet.py``, and the facade
 that picks between them by input shape is ``factsheet_facade.py``.
 """
+
 # packages
 import warnings
 import pandas as pd
 
 from qis.portfolio.attribution.group_exposures import (
-    resolve_group_partition, resolve_reporting_inputs,
+    resolve_group_partition,
+    resolve_reporting_inputs,
 )
 from qis.utils._pandas_compat import infer_freq as _infer_freq
 import matplotlib.pyplot as plt
@@ -44,8 +48,12 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import PortfolioData
 from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 from qis.portfolio._asset_display import (
-    compact_groups, factsheet_kwargs, plot_asset_bars, plot_asset_stack,
-    plot_asset_time_series, price_tails,
+    compact_groups,
+    factsheet_kwargs,
+    plot_asset_bars,
+    plot_asset_stack,
+    plot_asset_time_series,
+    price_tails,
 )
 from qis.portfolio.reports.config import (
     DEFAULT_RECENT_RA_PERF_TABLE_START_DATE,
@@ -53,6 +61,11 @@ from qis.portfolio.reports.config import (
     _get_recent_ra_perf_table_time_period,
     infer_data_frequency_label,
     validate_reporting_frequency,
+)
+from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports._performance_inference import (
+    compute_performance_inference,
+    plot_performance_inference,
 )
 from qis.plots.utils import TrendLine, align_y_limits_axs, set_spines
 
@@ -63,10 +76,9 @@ _MONTHLY_RETURNS_APPENDIX_MAX_HEIGHT = 0.72
 _MONTHLY_RETURNS_HEATMAP_CELL_ASPECT = 1.50
 
 
-def _get_monthly_returns_appendix_bounds(num_years: int,
-                                         num_columns: int,
-                                         figsize: Tuple[float, float]
-                                         ) -> Tuple[float, float, float, float]:
+def _get_monthly_returns_appendix_bounds(
+    num_years: int, num_columns: int, figsize: Tuple[float, float]
+) -> Tuple[float, float, float, float]:
     """Return centered axes bounds that preserve readable monthly-return cell proportions."""
     if num_years <= 0 or num_columns <= 0:
         raise ValueError("num_years and num_columns must be positive")
@@ -106,9 +118,15 @@ def _use_grouped_summary_tables(
     if not is_grouped or (group_data is None and lookthrough_matrix is None):
         return is_grouped
 
-    num_groups = (int(group_data.nunique(dropna=True)) if lookthrough_matrix is None
-                  else len(resolve_group_partition(
-                      group_data, portfolio_data.weights.columns, lookthrough_matrix).columns))
+    num_groups = (
+        int(group_data.nunique(dropna=True))
+        if lookthrough_matrix is None
+        else len(
+            resolve_group_partition(
+                group_data, portfolio_data.weights.columns, lookthrough_matrix
+            ).columns
+        )
+    )
     if num_groups <= MAX_GROUPS_FOR_SUMMARY_TABLES:
         return True
 
@@ -168,6 +186,8 @@ def generate_strategy_factsheet(
     turnover_computation_type: Optional[qis.TurnoverComputationType] = None,
     turnover_vols: Optional[pd.DataFrame] = None,
     *,
+    add_performance_inference_sheet: bool = True,
+    alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
     group_data: Optional[pd.Series] = None,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
@@ -178,7 +198,8 @@ def generate_strategy_factsheet(
     The strategy archetype behind :func:`qis.factsheet`. Page one always renders: cumulative
     performance with regime shading, risk-adjusted performance tables, rolling volatility,
     Sharpe and beta, drawdowns, exposures, turnover and costs. The ``add_*`` flags each append
-    a further page, all off by default, so the report stays one page unless more is asked for.
+    a further page. The inference appendix is on by default; set
+    add_performance_inference_sheet=False for the previous page set. Page one is unchanged.
 
     The parameters group as: data; reporting windows; statistics configuration; per-panel
     frequencies and rolling windows; optional extra sheets; layout; naming. The per-panel
@@ -187,6 +208,16 @@ def generate_strategy_factsheet(
     computed at.
 
     Args:
+        alpha_inference: Primary alpha uncertainty method. Bartlett HAC remains the default;
+            PREWHITENED_AR1 is opt-in. Both use the same eligible sample and lag count, with the
+            alternate shown as unadjusted sensitivity only. Does not change Sharpe or page one.
+        add_performance_inference_sheet: Append two-column arithmetic-Sharpe and holdings-alpha
+            diagnostics after the monthly full-history appendix, if present. Defaults to True.
+            Sharpe uses perf_params.freq_vol; alpha uses freq_beta/factor_beta_span and only
+            the first benchmark, lagged holdings betas and existing cash rates. Windows need
+            >=24 returns and two observation-equivalent years; HAC also needs N>=5(L+1).
+            Rolling five-year history falls back to three/two years with a warning; missing,
+            short or undefined samples display unavailable rather than manufacturing returns.
         lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
             are finite, nonnegative and sum to one; omitted rows use group_data.
             None preserves categorical reporting. This is an accounting split.
@@ -252,19 +283,25 @@ def generate_strategy_factsheet(
         one figure per page, in page order
     """
     group_data, lookthrough_matrix = resolve_reporting_inputs(
-        [portfolio_data], group_data, lookthrough_matrix)
+        [portfolio_data], group_data, lookthrough_matrix
+    )
     kwargs = factsheet_kwargs(kwargs)
-    if 'heatmap_fontsize' in kwargs:
+    if "heatmap_fontsize" in kwargs:
         raise TypeError("heatmap_fontsize was removed; use fontsize")
     if monthly_returns_heatmap_max_years is not None and monthly_returns_heatmap_max_years <= 0:
-        raise ValueError("monthly_returns_heatmap_max_years must be positive or None, "
-                         f"got {monthly_returns_heatmap_max_years}")
+        raise ValueError(
+            "monthly_returns_heatmap_max_years must be positive or None, "
+            f"got {monthly_returns_heatmap_max_years}"
+        )
 
     # align
     if isinstance(benchmark_prices, pd.Series):
         benchmark_prices = benchmark_prices.to_frame()
 
-    benchmark_prices = benchmark_prices.sort_index().reindex(index=portfolio_data.nav.index, method='ffill')
+    inference_benchmarks = benchmark_prices
+    benchmark_prices = benchmark_prices.sort_index().reindex(
+        index=portfolio_data.nav.index, method="ffill"
+    )
     if regime_benchmark is None:
         regime_benchmark = benchmark_prices.columns[0]
 
@@ -279,7 +316,8 @@ def generate_strategy_factsheet(
         ):  # otherwise tables look too bad
             warnings.warn(
                 "Using portfolio groups for a report with at least 10 assets; "
-                "oversized asset panels show bottom/top selections.")
+                "oversized asset panels show bottom/top selections."
+            )
             is_grouped = True
     is_grouped_for_summary_tables = _use_grouped_summary_tables(
         portfolio_data=portfolio_data,
@@ -291,16 +329,19 @@ def generate_strategy_factsheet(
     fig = plt.figure(figsize=figsize, constrained_layout=True)
     gs = fig.add_gridspec(nrows=14, ncols=4, wspace=0.0, hspace=0.0)
 
-    plot_kwargs = dict(fontsize=fontsize,
-                       linewidth=0.5,
-                       digits_to_show=1, sharpe_digits=2,
-                       weight='normal',
-                       markersize=1,
-                       framealpha=0.75)
+    plot_kwargs = dict(
+        fontsize=fontsize,
+        linewidth=0.5,
+        digits_to_show=1,
+        sharpe_digits=2,
+        weight="normal",
+        markersize=1,
+        framealpha=0.75,
+    )
     kwargs = qis.update_kwargs(kwargs, plot_kwargs)
     if factsheet_name is None:
         factsheet_name = f"{portfolio_data.nav.name} factsheet"
-    fig.suptitle(factsheet_name, fontweight="bold", fontsize=8, color='blue')
+    fig.suptitle(factsheet_name, fontweight="bold", fontsize=8, color="blue")
 
     # prices
     portfolio_nav = portfolio_data.get_portfolio_nav(time_period=time_period)
@@ -310,9 +351,9 @@ def generate_strategy_factsheet(
 
     monthly_returns_table = qis.compute_periodic_returns_table(
         prices=portfolio_nav,
-        heatmap_freq='YE',
-        column_period='ME',
-        row_date_format='%Y',
+        heatmap_freq="YE",
+        column_period="ME",
+        row_date_format="%Y",
         is_inverse_order=True,
         is_add_annual_column=True,
     )
@@ -354,43 +395,61 @@ def generate_strategy_factsheet(
     nav_freq_label = f" ({nav_freq}-freq)" if nav_freq else ""
 
     ax = fig.add_subplot(gs[0:2, :2])
-    qis.plot_prices(prices=joint_prices,
-                    perf_params=perf_params,
-                    title=f"Cumulative performance ({perf_params.freq}-freq stats) with "
-                          f"bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
-                    ax=ax,
-                    **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    qis.plot_prices(
+        prices=joint_prices,
+        perf_params=perf_params,
+        title=f"Cumulative performance ({perf_params.freq}-freq stats) with "
+        f"bear/normal/bull regimes of {regime_benchmark} {regime_classifier.freq}-returns",
+        ax=ax,
+        **kwargs,
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # dd
     ax = fig.add_subplot(gs[2:4, :2])
-    qis.plot_rolling_drawdowns(prices=joint_prices,
-                               title=f'Running Drawdowns{nav_freq_label}',
-                               dd_legend_type=dd_legend_type,
-                               ax=ax, **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    qis.plot_rolling_drawdowns(
+        prices=joint_prices,
+        title=f"Running Drawdowns{nav_freq_label}",
+        dd_legend_type=dd_legend_type,
+        ax=ax,
+        **kwargs,
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # under water
     ax = fig.add_subplot(gs[4:6, :2])
-    qis.plot_rolling_time_under_water(prices=joint_prices,
-                                      title=f'Running Time under Water{nav_freq_label}',
-                                      dd_legend_type=dd_legend_type,
-                                      ax=ax, **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    qis.plot_rolling_time_under_water(
+        prices=joint_prices,
+        title=f"Running Time under Water{nav_freq_label}",
+        dd_legend_type=dd_legend_type,
+        ax=ax,
+        **kwargs,
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # rolling performance
     ax = fig.add_subplot(gs[6:8, :2])
-    portfolio_data.plot_rolling_perf(rolling_perf_stat=qis.RollingPerfStat.TOTAL_RETURNS,
-                                     add_benchmarks=add_benchmarks_to_navs,
-                                     roll_freq=freq_sharpe,
-                                     rolling_window=sharpe_rolling_window,
-                                     time_period=time_period,
-                                     ax=ax,
-                                     **qis.update_kwargs(kwargs, dict(trend_line=TrendLine.ZERO_SHADOWS)))
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    portfolio_data.plot_rolling_perf(
+        rolling_perf_stat=qis.RollingPerfStat.TOTAL_RETURNS,
+        add_benchmarks=add_benchmarks_to_navs,
+        roll_freq=freq_sharpe,
+        rolling_window=sharpe_rolling_window,
+        time_period=time_period,
+        ax=ax,
+        **qis.update_kwargs(kwargs, dict(trend_line=TrendLine.ZERO_SHADOWS)),
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # exposures
@@ -404,13 +463,15 @@ def generate_strategy_factsheet(
     ax = fig.add_subplot(gs[8:10, :2])
     if weights_freq is not None:
         exposures = exposures.resample(weights_freq).last()
-    plot_asset_stack(df=exposures,
-                   use_bar_plot=True,
-                   title=f'Exposures ({weights_freq}-freq)' if weights_freq is not None else 'Exposures',
-                   legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                   var_format='{:.1%}',
-                   ax=ax,
-                   **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)))
+    plot_asset_stack(
+        df=exposures,
+        use_bar_plot=True,
+        title=f"Exposures ({weights_freq}-freq)" if weights_freq is not None else "Exposures",
+        legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+        var_format="{:.1%}",
+        ax=ax,
+        **qis.update_kwargs(kwargs, dict(bbox_to_anchor=(0.5, 1.05), ncols=2)),
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # turnover
@@ -428,8 +489,7 @@ def generate_strategy_factsheet(
     )
     freq = freq_turnover or _infer_freq(turnover.index)
     is_volatility_normalized = (
-        turnover_computation_type
-        == qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
+        turnover_computation_type == qis.TurnoverComputationType.VOLATILITY_NORMALIZED_WEIGHTS
         or (
             turnover_computation_type is None
             and is_unit_based_traded_volume is None
@@ -438,21 +498,25 @@ def generate_strategy_factsheet(
         )
     )
     turnover_label = (
-        'Volatility-Normalized Weight Turnover'
-        if is_volatility_normalized else 'Two-sided Turnover'
+        "Volatility-Normalized Weight Turnover"
+        if is_volatility_normalized
+        else "Two-sided Turnover"
     )
-    turnover_title = (
-        f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
+    turnover_title = f"{turnover_rolling_period}-period rolling {freq}-freq {turnover_label}"
+    plot_asset_time_series(
+        df=turnover,
+        asset_additive=True,
+        asset_totals=(portfolio_data.nav.name,),
+        var_format="{:,.2%}",
+        # y_limits=(0.0, None),
+        legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+        title=turnover_title,
+        ax=ax,
+        **kwargs,
     )
-    plot_asset_time_series(df=turnover, asset_additive=True,
-                         asset_totals=(portfolio_data.nav.name,),
-                         var_format='{:,.2%}',
-                         # y_limits=(0.0, None),
-                         legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                         title=turnover_title,
-                         ax=ax,
-                         **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # costs
@@ -471,15 +535,20 @@ def generate_strategy_factsheet(
     )
     freq = freq_cost or _infer_freq(costs.index)
     costs_title = f"{cost_rolling_period}-period rolling {freq}-freq Costs"
-    plot_asset_time_series(df=costs, asset_additive=True,
-                         asset_totals=(portfolio_data.nav.name,),
-                         var_format='{:,.2%}',
-                         # y_limits=(0.0, None),
-                         legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                         title=costs_title,
-                         ax=ax,
-                         **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    plot_asset_time_series(
+        df=costs,
+        asset_additive=True,
+        asset_totals=(portfolio_data.nav.name,),
+        var_format="{:,.2%}",
+        # y_limits=(0.0, None),
+        legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+        title=costs_title,
+        ax=ax,
+        **kwargs,
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     # ra perf table
@@ -517,10 +586,14 @@ def generate_strategy_factsheet(
             time_period=time_period,
             recent_ra_perf_table_start_date=recent_ra_perf_table_start_date,
         )
-        if _infer_freq(benchmark_prices.index) in ['B', 'D']:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, freq_reg='W-WED', fontsize=fontsize))
+        if _infer_freq(benchmark_prices.index) in ["B", "D"]:
+            local_kwargs = qis.update_kwargs(
+                kwargs, dict(time_period=time_period1, freq_reg="W-WED", fontsize=fontsize)
+            )
         else:
-            local_kwargs = qis.update_kwargs(kwargs, dict(time_period=time_period1, fontsize=fontsize))
+            local_kwargs = qis.update_kwargs(
+                kwargs, dict(time_period=time_period1, fontsize=fontsize)
+            )
         portfolio_data.plot_ra_perf_table(
             ax=ax,
             benchmark_price=benchmark_price1,
@@ -534,24 +607,32 @@ def generate_strategy_factsheet(
     # heatmap
     ax = fig.add_subplot(gs[2:4, 2:])
     if is_add_monthly_returns_appendix:
-        monthly_returns_title = (f"Monthly Returns - Last "
-                                 f"{monthly_returns_heatmap_max_years} Calendar Years")
+        monthly_returns_title = (
+            f"Monthly Returns - Last {monthly_returns_heatmap_max_years} Calendar Years"
+        )
     else:
-        monthly_returns_title = 'Monthly Returns'
-    portfolio_data.plot_monthly_returns_heatmap(ax=ax,
-                                                time_period=time_period,
-                                                title=monthly_returns_title,
-                                                **qis.update_kwargs(
-                                                    kwargs,
-                                                    dict(fontsize=fontsize,
-                                                         date_format='%Y',
-                                                         max_years=monthly_returns_heatmap_max_years,
-                                                         is_ytd_color_scale_independent=True)))
+        monthly_returns_title = "Monthly Returns"
+    portfolio_data.plot_monthly_returns_heatmap(
+        ax=ax,
+        time_period=time_period,
+        title=monthly_returns_title,
+        **qis.update_kwargs(
+            kwargs,
+            dict(
+                fontsize=fontsize,
+                date_format="%Y",
+                max_years=monthly_returns_heatmap_max_years,
+                is_ytd_color_scale_independent=True,
+            ),
+        ),
+    )
 
     # periodic returns
     ax = fig.add_subplot(gs[4:6, 2:])
-    local_kwargs = qis.update_kwargs(kwargs=kwargs,
-                                     new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True))
+    local_kwargs = qis.update_kwargs(
+        kwargs=kwargs,
+        new_kwargs=dict(fontsize=fontsize, square=False, x_rotation=90, transpose=True),
+    )
     portfolio_data.plot_periodic_returns(
         benchmark_prices=benchmark_price1,
         is_grouped=is_grouped_for_summary_tables,
@@ -578,25 +659,35 @@ def generate_strategy_factsheet(
     # perf attribution
     local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
     with sns.axes_style("whitegrid"):
-        portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                    attribution_metric=qis.AttributionMetric.PNL,
-                                                    ax=fig.add_subplot(gs[8:10, 2:]),
-                                                    **local_kwargs)
-        portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                    attribution_metric=qis.AttributionMetric.PNL_RISK,
-                                                    ax=fig.add_subplot(gs[10:12, 2:]),
-                                                    **local_kwargs)
+        portfolio_data.plot_performance_attribution(
+            time_period=time_period,
+            attribution_metric=qis.AttributionMetric.PNL,
+            ax=fig.add_subplot(gs[8:10, 2:]),
+            **local_kwargs,
+        )
+        portfolio_data.plot_performance_attribution(
+            time_period=time_period,
+            attribution_metric=qis.AttributionMetric.PNL_RISK,
+            ax=fig.add_subplot(gs[10:12, 2:]),
+            **local_kwargs,
+        )
 
     # constituents
     ax = fig.add_subplot(gs[12:, 2:])
-    num_investable_instruments = portfolio_data.get_num_investable_instruments(time_period=time_period)
-    qis.plot_time_series(df=num_investable_instruments,
-                         var_format='{:,.0f}',
-                         legend_stats=qis.LegendStats.FIRST_AVG_LAST,
-                         title='Number of investable and invested instruments',
-                         ax=ax,
-                         **kwargs)
-    qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+    num_investable_instruments = portfolio_data.get_num_investable_instruments(
+        time_period=time_period
+    )
+    qis.plot_time_series(
+        df=num_investable_instruments,
+        var_format="{:,.0f}",
+        legend_stats=qis.LegendStats.FIRST_AVG_LAST,
+        title="Number of investable and invested instruments",
+        ax=ax,
+        **kwargs,
+    )
+    qis.add_bnb_regime_shadows(
+        ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+    )
     set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     figs = [fig]
@@ -613,24 +704,54 @@ def generate_strategy_factsheet(
         portfolio_data.plot_monthly_returns_heatmap(
             ax=appendix_ax,
             time_period=time_period,
-            title='Monthly Returns - Full History',
-            **qis.update_kwargs(kwargs, dict(fontsize=fontsize,
-                                             date_format='%Y',
-                                             max_years=None,
-                                             is_ytd_color_scale_independent=True)),
+            title="Monthly Returns - Full History",
+            **qis.update_kwargs(
+                kwargs,
+                dict(
+                    fontsize=fontsize,
+                    date_format="%Y",
+                    max_years=None,
+                    is_ytd_color_scale_independent=True,
+                ),
+            ),
         )
         figs.append(appendix_fig)
+
+    if add_performance_inference_sheet:
+        inference = compute_performance_inference(
+            portfolio_data.get_portfolio_nav(),
+            inference_benchmarks,
+            time_period,
+            freq=perf_params.freq_vol,
+            rates_data=perf_params.rates_data,
+            instrument_prices=portfolio_data.prices,
+            weights=portfolio_data.get_weights(freq=None),
+            freq_beta=freq_beta,
+            factor_beta_span=factor_beta_span,
+            alpha_inference=alpha_inference,
+        )
+        figs.append(plot_performance_inference(inference, portfolio_data.nav.name, figsize=figsize))
 
     if add_current_position_var_risk_sheet:
         # qqq
         fig = plt.figure(figsize=figsize, constrained_layout=True)
-        fig.suptitle(f"{portfolio_data.nav.name} 99%-Var and risk profile", fontweight="bold", fontsize=8, color='blue')
+        fig.suptitle(
+            f"{portfolio_data.nav.name} 99%-Var and risk profile",
+            fontweight="bold",
+            fontsize=8,
+            color="blue",
+        )
         figs.append(fig)
         gs = fig.add_gridspec(nrows=7, ncols=4, wspace=0.0, hspace=0.0)
 
         # current var grouped
         with sns.axes_style("whitegrid"):
-            axs = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]), fig.add_subplot(gs[0, 3])]
+            axs = [
+                fig.add_subplot(gs[0, 0]),
+                fig.add_subplot(gs[0, 1]),
+                fig.add_subplot(gs[0, 2]),
+                fig.add_subplot(gs[0, 3]),
+            ]
             portfolio_data.plot_current_var(
                 snapshot_period=qis.SnapshotPeriod.LAST,
                 is_grouped=True,
@@ -713,29 +834,32 @@ def generate_strategy_factsheet(
 
         # best worst returns
         with sns.axes_style("whitegrid"):
-            portfolio_data.plot_best_worst_returns(ax=fig.add_subplot(gs[2, 0:2]),
-                                                   num_returns=kwargs['asset_tail_count'],
-                                                   time_period=time_period,
-                                                   title=(f"Portfolio Worst/Best returns for "
-                                                          f"{time_period.to_str()}"),
-                                                   **qis.update_kwargs(kwargs, dict(date_format='%d%b%Y')))
-            num_assets = kwargs['asset_tail_count']
+            portfolio_data.plot_best_worst_returns(
+                ax=fig.add_subplot(gs[2, 0:2]),
+                num_returns=kwargs["asset_tail_count"],
+                time_period=time_period,
+                title=(f"Portfolio Worst/Best returns for {time_period.to_str()}"),
+                **qis.update_kwargs(kwargs, dict(date_format="%d%b%Y")),
+            )
+            num_assets = kwargs["asset_tail_count"]
             num_investable_assets = len(portfolio_data.prices.columns)
             if num_investable_assets > 2 * num_assets:
                 pre_title = f"-{num_assets}"
             else:
-                pre_title = ''
-            portfolio_data.plot_contributors(ax=fig.add_subplot(gs[2, 2]),
-                                             time_period=time_period,
-                                             title=(f"Bottom/Top{pre_title} contributors\n"
-                                                    f"{time_period.to_str()}"),
-                                             **kwargs)
+                pre_title = ""
+            portfolio_data.plot_contributors(
+                ax=fig.add_subplot(gs[2, 2]),
+                time_period=time_period,
+                title=(f"Bottom/Top{pre_title} contributors\n{time_period.to_str()}"),
+                **kwargs,
+            )
             time_period_1y = qis.get_time_period_shifted_by_years(time_period=time_period)
-            portfolio_data.plot_contributors(ax=fig.add_subplot(gs[2, 3]),
-                                             time_period=time_period_1y,
-                                             title=(f"Bottom/Top-{num_assets} contributors\n"
-                                                    f"{time_period_1y.to_str()}"),
-                                             **kwargs)
+            portfolio_data.plot_contributors(
+                ax=fig.add_subplot(gs[2, 3]),
+                time_period=time_period_1y,
+                title=(f"Bottom/Top-{num_assets} contributors\n{time_period_1y.to_str()}"),
+                **kwargs,
+            )
 
         # var attribution
         with sns.axes_style("whitegrid"):
@@ -768,7 +892,9 @@ def generate_strategy_factsheet(
             lookthrough_matrix=lookthrough_matrix,
             group_data=group_data,
         )
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+        qis.add_bnb_regime_shadows(
+            ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+        )
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # var time series - correlted
@@ -781,17 +907,23 @@ def generate_strategy_factsheet(
             lookthrough_matrix=lookthrough_matrix,
             group_data=group_data,
         )
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+        qis.add_bnb_regime_shadows(
+            ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+        )
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # vol time series
         ax = fig.add_subplot(gs[5, 2:])
-        portfolio_data.plot_portfolio_vols(freq=perf_params.freq_vol,
-                                           span=vol_rolling_window,
-                                           time_period=time_period,
-                                           ax=ax,
-                                           **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+        portfolio_data.plot_portfolio_vols(
+            freq=perf_params.freq_vol,
+            span=vol_rolling_window,
+            time_period=time_period,
+            ax=ax,
+            **kwargs,
+        )
+        qis.add_bnb_regime_shadows(
+            ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+        )
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # benchmark betas
@@ -809,36 +941,55 @@ def generate_strategy_factsheet(
         )
         factor_exposures = time_period.locate(factor_exposures)
         factor_beta_title = (
-            f'Rolling {factor_beta_span}-span holdings-weighted beta ({freq_beta}-freq),\n'
-            f'instrument beta estimation starting from {estimation_start:%d%b%Y}'
+            f"Rolling {factor_beta_span}-span holdings-weighted beta ({freq_beta}-freq),\n"
+            f"instrument beta estimation starting from {estimation_start:%d%b%Y}"
         )
-        qis.plot_time_series(df=factor_exposures,
-                             var_format='{:,.2f}',
-                             legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
-                             title=factor_beta_title,
-                             ax=ax,
-                             **kwargs)
+        qis.plot_time_series(
+            df=factor_exposures,
+            var_format="{:,.2f}",
+            legend_stats=qis.LegendStats.AVG_NONNAN_LAST,
+            title=factor_beta_title,
+            ax=ax,
+            **kwargs,
+        )
         if factor_exposures.isna().all().all():
-            ax.text(0.5, 0.5, f'Insufficient history: {factor_beta_span}-return warm-up',
-                    transform=ax.transAxes, ha='center', va='center', fontsize=fontsize)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+            ax.text(
+                0.5,
+                0.5,
+                f"Insufficient history: {factor_beta_span}-return warm-up",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=fontsize,
+            )
+        qis.add_bnb_regime_shadows(
+            ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+        )
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
         # beta attribution
         ax = fig.add_subplot(gs[6, :2])
-        factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(benchmark_prices=benchmark_prices,
-                                                                                    freq_beta=freq_beta,
-                                                                                    factor_beta_span=factor_beta_span,
-                                                                                    time_period=time_period)
-        factor_attribution_title = (f"Cumulative return attribution using rolling "
-                                    f"{factor_beta_span}-span beta of {freq_beta}-freq returns")
-        qis.plot_time_series(df=factor_attribution.cumsum(axis=0),
-                             var_format='{:,.0%}',
-                             legend_stats=qis.LegendStats.LAST_NONNAN,
-                             title=factor_attribution_title,
-                             ax=ax,
-                             **kwargs)
-        qis.add_bnb_regime_shadows(ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier)
+        factor_attribution = portfolio_data.compute_portfolio_benchmark_attribution(
+            benchmark_prices=benchmark_prices,
+            freq_beta=freq_beta,
+            factor_beta_span=factor_beta_span,
+            time_period=time_period,
+        )
+        factor_attribution_title = (
+            f"Cumulative return attribution using rolling "
+            f"{factor_beta_span}-span beta of {freq_beta}-freq returns"
+        )
+        qis.plot_time_series(
+            df=factor_attribution.cumsum(axis=0),
+            var_format="{:,.0%}",
+            legend_stats=qis.LegendStats.LAST_NONNAN,
+            title=factor_attribution_title,
+            ax=ax,
+            **kwargs,
+        )
+        qis.add_bnb_regime_shadows(
+            ax=ax, pivot_prices=pivot_prices, regime_classifier=regime_classifier
+        )
         set_spines(ax=ax, bottom_spine=False, left_spine=False)
         """
         # returns scatter
@@ -878,9 +1029,9 @@ def generate_strategy_factsheet(
 
     if add_grouped_weights_sheet:
         if portfolio_data.group_data is None:
-            raise ValueError(f"need group data")
+            raise ValueError("need group data")
 
-        total_column = 'Total'
+        total_column = "Total"
         grouped_weights_agg, grouped_weights_by_inst = (
             portfolio_data.get_grouped_long_short_weights(
                 time_period=time_period,
@@ -892,74 +1043,113 @@ def generate_strategy_factsheet(
         )
 
         grouped_weights_agg, grouped_weights_by_inst = compact_groups(
-            grouped_weights_agg, grouped_weights_by_inst)
+            grouped_weights_agg, grouped_weights_by_inst
+        )
         lead_index = next(iter(grouped_weights_agg.values())).index
         current_date = lead_index[-1]
-        past_date = qis.find_upto_date_from_datetime_index(index=lead_index,
-                                                           date=current_date - pd.Timedelta(days=weights_change_lag))
+        past_date = qis.find_upto_date_from_datetime_index(
+            index=lead_index, date=current_date - pd.Timedelta(days=weights_change_lag)
+        )
 
         grouped_weights_agg_current = {}
         grouped_weights_agg_last = {}
         for key, weights in grouped_weights_agg.items():
             grouped_weights_agg_current[key] = weights.loc[current_date, :]
             grouped_weights_agg_last[key] = weights.loc[past_date, :]
-        grouped_weights_agg_current = pd.DataFrame.from_dict(grouped_weights_agg_current, orient="columns")
-        grouped_weights_agg_last = pd.DataFrame.from_dict(grouped_weights_agg_last, orient="columns")
+        grouped_weights_agg_current = pd.DataFrame.from_dict(
+            grouped_weights_agg_current, orient="columns"
+        )
+        grouped_weights_agg_last = pd.DataFrame.from_dict(
+            grouped_weights_agg_last, orient="columns"
+        )
 
-        with sns.axes_style('darkgrid'):
+        with sns.axes_style("darkgrid"):
             fig1 = plt.figure(figsize=figsize, constrained_layout=True)
             figs.append(fig1)
-            fig1.suptitle(f"{portfolio_data.nav.name} Weights by groups for past date {past_date.strftime('%d%b%Y')} "
-                          f" and current date {current_date.strftime('%d%b%Y')}",
-                         fontweight="bold", fontsize=8, color='blue')
-            instrument_groups = {key: value for key, value in grouped_weights_by_inst.items()
-                                 if key != total_column}
+            fig1.suptitle(
+                f"{portfolio_data.nav.name} Weights by groups for past date "
+                f"{past_date.strftime('%d%b%Y')} "
+                f" and current date {current_date.strftime('%d%b%Y')}",
+                fontweight="bold",
+                fontsize=8,
+                color="blue",
+            )
+            instrument_groups = {
+                key: value for key, value in grouped_weights_by_inst.items() if key != total_column
+            }
             nrows = 1 + (len(instrument_groups) + 1) // 2
             gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
             local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
 
-            local_kwargs_ = qis.update_kwargs(local_kwargs, new_kwargs=dict(yvar_format='{:,.1%}', stacked=False, ncols=3,
-                                                                            add_bar_values=True, total_rotation=90, alpha=0.75))
+            local_kwargs_ = qis.update_kwargs(
+                local_kwargs,
+                new_kwargs=dict(
+                    yvar_format="{:,.1%}",
+                    stacked=False,
+                    ncols=3,
+                    add_bar_values=True,
+                    total_rotation=90,
+                    alpha=0.75,
+                ),
+            )
             ax = fig1.add_subplot(gs[0, 0])
-            plot_asset_bars(df=grouped_weights_agg_last.T,
-                          title=f"Aggregated by groups on past date {past_date.strftime('%d%b%Y')}",
-                          ax=ax,
-                          **local_kwargs_)
+            plot_asset_bars(
+                df=grouped_weights_agg_last.T,
+                title=f"Aggregated by groups on past date {past_date.strftime('%d%b%Y')}",
+                ax=ax,
+                **local_kwargs_,
+            )
 
             ax = fig1.add_subplot(gs[0, 1])
-            plot_asset_bars(df=grouped_weights_agg_current.T,
-                          title=f"Weights by groups on current date {current_date.strftime('%d%b%Y')}",
-                          ax=ax,
-                          **local_kwargs_)
+            plot_asset_bars(
+                df=grouped_weights_agg_current.T,
+                title=f"Weights by groups on current date {current_date.strftime('%d%b%Y')}",
+                ax=ax,
+                **local_kwargs_,
+            )
 
             for idx, (key, weights) in enumerate(instrument_groups.items()):
-                df = pd.concat([weights.loc[past_date, :].rename(past_date.strftime('%d%b%Y')),
-                                                                 weights.loc[current_date, :].rename(current_date.strftime('%d%b%Y')),
-                                ], axis=1, sort=True)
-                ax = fig1.add_subplot(gs[1+idx//2, idx%2])  # shift row by one
-                plot_asset_bars(df=df, asset_additive=True,
-                              title=f"{key} by instrument",
-                              ax=ax,
-                              **local_kwargs_)
+                df = pd.concat(
+                    [
+                        weights.loc[past_date, :].rename(past_date.strftime("%d%b%Y")),
+                        weights.loc[current_date, :].rename(current_date.strftime("%d%b%Y")),
+                    ],
+                    axis=1,
+                    sort=True,
+                )
+                ax = fig1.add_subplot(gs[1 + idx // 2, idx % 2])  # shift row by one
+                plot_asset_bars(
+                    df=df, asset_additive=True, title=f"{key} by instrument", ax=ax, **local_kwargs_
+                )
 
     if add_current_signal_report and portfolio_data.strategy_signal_data is not None:
-        fig = qis.generate_current_signal_report(portfolio_data=portfolio_data,
-                                                 **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize,
-                                                                                  y_limits=y_limits_signal)))
+        fig = qis.generate_current_signal_report(
+            portfolio_data=portfolio_data,
+            **qis.update_kwargs(
+                kwargs, dict(fontsize=5, figsize=figsize, y_limits=y_limits_signal)
+            ),
+        )
         figs.append(fig)
 
     if add_weight_change_report and portfolio_data.strategy_signal_data is not None:
-        fig = qis.generate_weight_change_report(portfolio_data=portfolio_data,
-                                                time_period=weight_report_time_period or time_period,
-                                                sample_size=weights_change_lag,
-                                                is_grouped=True,
-                                                **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize)))
+        fig = qis.generate_weight_change_report(
+            portfolio_data=portfolio_data,
+            time_period=weight_report_time_period or time_period,
+            sample_size=weights_change_lag,
+            is_grouped=True,
+            **qis.update_kwargs(kwargs, dict(fontsize=5, figsize=figsize)),
+        )
         figs.append(fig)
 
     if add_performance_risk_attribution_sheet:
         # qqq
         fig = plt.figure(figsize=figsize, constrained_layout=True)
-        fig.suptitle(f"{portfolio_data.nav.name} P&L and risk attribution by instrument", fontweight="bold", fontsize=8, color='blue')
+        fig.suptitle(
+            f"{portfolio_data.nav.name} P&L and risk attribution by instrument",
+            fontweight="bold",
+            fontsize=8,
+            color="blue",
+        )
         figs.append(fig)
         gs = fig.add_gridspec(nrows=5, ncols=4, wspace=0.0, hspace=0.0)
 
@@ -992,26 +1182,34 @@ def generate_strategy_factsheet(
         # total and ytd performance attribution
         with sns.axes_style("whitegrid"):
             local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL,
-                                                        ax=fig.add_subplot(gs[0, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL,
-                                                        ax=fig.add_subplot(gs[0, 2:]),
-                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(
+                time_period=time_period,
+                attribution_metric=qis.AttributionMetric.PNL,
+                ax=fig.add_subplot(gs[0, :2]),
+                **local_kwargs,
+            )
+            portfolio_data.plot_performance_attribution(
+                time_period=ytd_attribution_time_period,
+                attribution_metric=qis.AttributionMetric.PNL,
+                ax=fig.add_subplot(gs[0, 2:]),
+                **local_kwargs,
+            )
 
         # total and ytd risk attribution
         with sns.axes_style("whitegrid"):
             local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(legend_loc=None))
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL_RISK,
-                                                        ax=fig.add_subplot(gs[1, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.PNL_RISK,
-                                                        ax=fig.add_subplot(gs[1, 2:]),
-                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(
+                time_period=time_period,
+                attribution_metric=qis.AttributionMetric.PNL_RISK,
+                ax=fig.add_subplot(gs[1, :2]),
+                **local_kwargs,
+            )
+            portfolio_data.plot_performance_attribution(
+                time_period=ytd_attribution_time_period,
+                attribution_metric=qis.AttributionMetric.PNL_RISK,
+                ax=fig.add_subplot(gs[1, 2:]),
+                **local_kwargs,
+            )
 
         # turnover
         with sns.axes_style("whitegrid"):
@@ -1024,14 +1222,18 @@ def generate_strategy_factsheet(
                     vols=turnover_vols,
                 ),
             )
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
-                                                        ax=fig.add_subplot(gs[2, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.TURNOVER,
-                                                        ax=fig.add_subplot(gs[2, 2:]),
-                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(
+                time_period=time_period,
+                attribution_metric=qis.AttributionMetric.TURNOVER,
+                ax=fig.add_subplot(gs[2, :2]),
+                **local_kwargs,
+            )
+            portfolio_data.plot_performance_attribution(
+                time_period=ytd_attribution_time_period,
+                attribution_metric=qis.AttributionMetric.TURNOVER,
+                ax=fig.add_subplot(gs[2, 2:]),
+                **local_kwargs,
+            )
 
         # vol adjusted turnover
         with sns.axes_style("whitegrid"):
@@ -1044,14 +1246,18 @@ def generate_strategy_factsheet(
                     vols=turnover_vols,
                 ),
             )
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
-                                                        ax=fig.add_subplot(gs[3, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
-                                                        ax=fig.add_subplot(gs[3, 2:]),
-                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(
+                time_period=time_period,
+                attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
+                ax=fig.add_subplot(gs[3, :2]),
+                **local_kwargs,
+            )
+            portfolio_data.plot_performance_attribution(
+                time_period=ytd_attribution_time_period,
+                attribution_metric=qis.AttributionMetric.VOL_ADJUSTED_TURNOVER,
+                ax=fig.add_subplot(gs[3, 2:]),
+                **local_kwargs,
+            )
 
         # costs
         with sns.axes_style("whitegrid"):
@@ -1062,19 +1268,23 @@ def generate_strategy_factsheet(
                     is_unit_based_traded_volume=is_unit_based_costs,
                 ),
             )
-            portfolio_data.plot_performance_attribution(time_period=time_period,
-                                                        attribution_metric=qis.AttributionMetric.COSTS,
-                                                        ax=fig.add_subplot(gs[4, :2]),
-                                                        **local_kwargs)
-            portfolio_data.plot_performance_attribution(time_period=ytd_attribution_time_period,
-                                                        attribution_metric=qis.AttributionMetric.COSTS,
-                                                        ax=fig.add_subplot(gs[4, 2:]),
-                                                        **local_kwargs)
+            portfolio_data.plot_performance_attribution(
+                time_period=time_period,
+                attribution_metric=qis.AttributionMetric.COSTS,
+                ax=fig.add_subplot(gs[4, :2]),
+                **local_kwargs,
+            )
+            portfolio_data.plot_performance_attribution(
+                time_period=ytd_attribution_time_period,
+                attribution_metric=qis.AttributionMetric.COSTS,
+                ax=fig.add_subplot(gs[4, 2:]),
+                **local_kwargs,
+            )
 
     # set 1y time period for exposures
     if is_1y_exposures:
         time_period1 = qis.get_time_period_shifted_by_years(time_period=time_period)
-        regime_classifier1 = BenchmarkReturnsQuantilesRegime(freq='ME')
+        regime_classifier1 = BenchmarkReturnsQuantilesRegime(freq="ME")
     else:
         time_period1 = weight_report_time_period or time_period
         regime_classifier1 = regime_classifier
@@ -1088,79 +1298,115 @@ def generate_strategy_factsheet(
             )
         )
         grouped_weights_agg, grouped_weights_by_inst = compact_groups(
-            grouped_weights_agg, grouped_weights_by_inst)
+            grouped_weights_agg, grouped_weights_by_inst
+        )
         nrows = len(grouped_weights_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)
         figs.append(fig1)
-        fig1.suptitle(f"{portfolio_data.nav.name} Exposures by groups for period {time_period1.to_str()}",
-                     fontweight="bold", fontsize=8, color='blue')
+        fig1.suptitle(
+            f"{portfolio_data.nav.name} Exposures by groups for period {time_period1.to_str()}",
+            fontweight="bold",
+            fontsize=8,
+            color="blue",
+        )
         gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
         for idx, (group, exposures_agg) in enumerate(grouped_weights_agg.items()):
-            datas = {f"{group} aggregated": grouped_weights_agg[group],
-                     f"{group} by instrument": grouped_weights_by_inst[group]}
+            datas = {
+                f"{group} aggregated": grouped_weights_agg[group],
+                f"{group} by instrument": grouped_weights_by_inst[group],
+            }
             for idx_, (key, df) in enumerate(datas.items()):
                 ax = fig1.add_subplot(gs[idx, idx_])
-                plot_asset_time_series(df=df,
-                                     var_format='{:,.0%}',
-                                     legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
-                                     title=f"{key}",
-                                     ax=ax,
-                                     **local_kwargs)
-                qis.add_bnb_regime_shadows(ax=ax, pivot_prices=time_period1.locate(pivot_prices),
-                                           regime_classifier=regime_classifier1)
+                plot_asset_time_series(
+                    df=df,
+                    var_format="{:,.0%}",
+                    legend_stats=qis.LegendStats.AVG_MIN_MAX_LAST,
+                    title=f"{key}",
+                    ax=ax,
+                    **local_kwargs,
+                )
+                qis.add_bnb_regime_shadows(
+                    ax=ax,
+                    pivot_prices=time_period1.locate(pivot_prices),
+                    regime_classifier=regime_classifier1,
+                )
                 set_spines(ax=ax, bottom_spine=False, left_spine=False)
-                ax.axhline(0, color='black', linewidth=0.5)
+                ax.axhline(0, color="black", linewidth=0.5)
 
     if add_grouped_cum_pnl:
         grouped_pnls_agg, grouped_pnls_by_inst = portfolio_data.get_grouped_cum_pnls(
             time_period=time_period1, lookthrough_matrix=lookthrough_matrix, group_data=group_data
         )
         grouped_pnls_agg, grouped_pnls_by_inst = compact_groups(
-            grouped_pnls_agg, grouped_pnls_by_inst)
+            grouped_pnls_agg, grouped_pnls_by_inst
+        )
         nrows = len(grouped_pnls_agg.keys())
         fig1 = plt.figure(figsize=figsize, constrained_layout=True)
         figs.append(fig1)
-        fig1.suptitle(f"{portfolio_data.nav.name} P&L by groups for period {time_period1.to_str()}",
-                     fontweight="bold", fontsize=8, color='blue')
+        fig1.suptitle(
+            f"{portfolio_data.nav.name} P&L by groups for period {time_period1.to_str()}",
+            fontweight="bold",
+            fontsize=8,
+            color="blue",
+        )
         gs = fig1.add_gridspec(nrows=nrows, ncols=2, wspace=0.0, hspace=0.0)
         local_kwargs = qis.update_kwargs(kwargs=kwargs, new_kwargs=dict(framealpha=0.9))
         for idx, (group, pnls_agg) in enumerate(grouped_pnls_agg.items()):
-            datas = {f"{group} aggregated": grouped_pnls_agg[group],
-                     f"{group} by instrument": grouped_pnls_by_inst[group]}
+            datas = {
+                f"{group} aggregated": grouped_pnls_agg[group],
+                f"{group} by instrument": grouped_pnls_by_inst[group],
+            }
             for idx_, (key, df) in enumerate(datas.items()):
                 ax = fig1.add_subplot(gs[idx, idx_])
-                plot_asset_time_series(df=df,
-                                     var_format='{:,.0%}',
-                                     legend_stats=qis.LegendStats.LAST_NONNAN,
-                                     title=f"{key}",
-                                     ax=ax,
-                                     **local_kwargs)
-                qis.add_bnb_regime_shadows(ax=ax,
-                                           pivot_prices=time_period1.locate(pivot_prices),
-                                           regime_classifier=regime_classifier1)
+                plot_asset_time_series(
+                    df=df,
+                    var_format="{:,.0%}",
+                    legend_stats=qis.LegendStats.LAST_NONNAN,
+                    title=f"{key}",
+                    ax=ax,
+                    **local_kwargs,
+                )
+                qis.add_bnb_regime_shadows(
+                    ax=ax,
+                    pivot_prices=time_period1.locate(pivot_prices),
+                    regime_classifier=regime_classifier1,
+                )
                 set_spines(ax=ax, bottom_spine=False, left_spine=False)
 
     if add_instrument_history_report:
         if df_to_add is None:
-            ac_data = portfolio_data.group_data.to_frame(name='AC')
+            ac_data = portfolio_data.group_data.to_frame(name="AC")
             if portfolio_data.instrument_names is not None:
-                df_to_add = pd.concat([portfolio_data.instrument_names.rename('Name'),
-                                       ac_data], axis=1, sort=True)
+                df_to_add = pd.concat(
+                    [portfolio_data.instrument_names.rename("Name"), ac_data], axis=1, sort=True
+                )
             else:
                 df_to_add = ac_data
 
-        perf_columns = (qis.PerfStat.START_DATE, qis.PerfStat.END_DATE, qis.PerfStat.PA_RETURN,
-                        qis.PerfStat.VOL, qis.PerfStat.SHARPE_RF0,
-                        qis.PerfStat.MAX_DD, qis.PerfStat.MAX_DD_VOL, qis.PerfStat.SKEWNESS)
+        perf_columns = (
+            qis.PerfStat.START_DATE,
+            qis.PerfStat.END_DATE,
+            qis.PerfStat.PA_RETURN,
+            qis.PerfStat.VOL,
+            qis.PerfStat.SHARPE_RF0,
+            qis.PerfStat.MAX_DD,
+            qis.PerfStat.MAX_DD_VOL,
+            qis.PerfStat.SKEWNESS,
+        )
 
         history_prices, history_title = price_tails(
-            time_period.locate(portfolio_data.prices), kwargs['asset_tail_count'],
-            'Program Instrument Universe')
-        fig = qis.generate_price_history_report(prices=history_prices,
-                                                **qis.update_kwargs(kwargs, dict(fontsize=4, figsize=figsize,
-                                                                                 perf_columns=perf_columns)))
-        fig.suptitle(history_title, fontweight="bold", fontsize=8, color='blue')
+            time_period.locate(portfolio_data.prices),
+            kwargs["asset_tail_count"],
+            "Program Instrument Universe",
+        )
+        fig = qis.generate_price_history_report(
+            prices=history_prices,
+            **qis.update_kwargs(
+                kwargs, dict(fontsize=4, figsize=figsize, perf_columns=perf_columns)
+            ),
+        )
+        fig.suptitle(history_title, fontweight="bold", fontsize=8, color="blue")
         figs.append(fig)
 
     return figs

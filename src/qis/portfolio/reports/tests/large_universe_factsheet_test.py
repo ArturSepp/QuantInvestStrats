@@ -225,7 +225,7 @@ def test_large_universe_summary(large_portfolios, kind, grouped, tmp_path, monke
     if not grouped:
         _guard_dense_panels(monkeypatch)
     figures = _make_report(large_portfolios, kind, grouped=grouped)
-    assert len(figures) == (2 if kind == 'strategy_benchmark' else 1)
+    assert len(figures) == {'multi_strategy': 2, 'strategy': 2, 'strategy_benchmark': 3}[kind]
     _assert_readable_pages(figures)
     qis.save_figs_to_pdf(figures, kind, local_path=str(tmp_path), add_current_date=False)
     assert (tmp_path / f'{kind}.pdf').read_bytes().startswith(b'%PDF-')
@@ -302,6 +302,14 @@ def test_large_universe_appendices(large_portfolios, kind, options, page_count, 
             page_count = 6  # Summary plus five pages of four selected groups.
     elif not grouped and kind == 'multi_strategy':
         page_count = 21 if options.get('add_group_exposures_and_pnl') else 4
+    if kind == 'strategy':
+        page_count += 1  # Default confidence/stability appendix, before the selected detail page.
+    elif options.get('add_strategy_factsheet'):
+        page_count += 2  # One inference appendix per embedded strategy factsheet.
+    elif options.get('add_strategy_factsheets'):
+        page_count += 3
+    if kind in ('strategy_benchmark', 'multi_strategy'):
+        page_count += 1  # Paired inference precedes Brinson/group and other appendices.
     figures = _make_report(large_portfolios, kind, grouped=grouped, **options)
     assert len(figures) == page_count
     _assert_readable_pages(figures)
@@ -318,7 +326,7 @@ def test_large_universe_benchmark_without_brinson(large_portfolios):
     """The aggregate comparison page can work without instrument group metadata."""
     figures = _make_report(large_portfolios, 'strategy_benchmark', grouped=False,
                            add_brinson_attribution=False)
-    assert len(figures) == 1
+    assert len(figures) == 2
     _assert_readable_pages(figures)
 
 

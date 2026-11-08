@@ -23,6 +23,7 @@ examples/
 ├── _helpers/                     shared helpers, imported by examples
 ├── getting_started/              core-only, offline first results
 ├── data_fetching/                optional vendor universe definitions
+├── security_master/              stable identities, ticker history and as-of price panels
 ├── perfstats/                    qis.perfstats — performance metrics on price series
 ├── models/                       qis.models — EWM, regression, vol estimation, bootstrap
 ├── regimes/                      qis.perfstats.regime_classifier — regime-conditional analytics
@@ -42,6 +43,22 @@ examples/
 | [first_chart.py](getting_started/first_chart.py) | A quarterly 60/40 synthetic backtest and first chart. |
 | [offline_quickstart.py](getting_started/offline_quickstart.py) | A live-universe-aware weight schedule, backtest, performance table and accounting checks. Included in the [quickstart guide](../docs/quickstart.md). |
 
+## security_master — identifiers and point-in-time data
+
+The [security-master guide](security_master/README.md) documents a reusable SQLite data layer
+for a checkout-based QIS workflow. It requires only the core installation and keeps provider
+reconciliation upstream of QIS analytics. These modules are not shipped in the wheel.
+
+| File | What it shows |
+|---|---|
+| [store.py](security_master/store.py) | Transactional ingestion, immutable IDs, effective/knowledge intervals and explicit as-of daily price loading. |
+| [ticker_history.py](security_master/ticker_history.py) | Offline synthetic ticker rename/reuse, stable-ID QIS returns and a later price withdrawal. |
+| [security_master_test.py](security_master/tests/security_master_test.py) | Focused identity, point-in-time, rollback and persistence tests; invoke this file explicitly. |
+
+Run `python -m examples.security_master.ticker_history`; it uses an in-memory database and
+prints the results without writing files. See the guide for the mandatory Windows environment
+setup and the targeted test command (the default suite excludes the `examples/` directory).
+
 ## perfstats — performance metrics
 
 | File | What it shows |
@@ -49,6 +66,7 @@ examples/
 | `quickstart.py` | Yahoo-data plotting walkthrough: prices, drawdowns and risk-adjusted tables. Uses YAML `OUTPUT_PATH`; the package README starts with offline data. |
 | `full_performance_report.py` | Five-figure summary on a yfinance universe (ETFs, crypto, vol ETFs…). Uses `_helpers.reporting_helpers`. |
 | `sharpe_vs_sortino.py` | Sharpe vs Sortino across return frequencies. |
+| [sharpe_confidence_intervals.py](perfstats/sharpe_confidence_intervals.py) | Offline single-strategy arithmetic Sharpe CIs: IID-normal track-length chart holding observed Sharpe at 2, and a same-sample HAC comparison. New source-module interface; existing paired defaults unchanged. |
 | `factor_and_backtest_significance.py` | Offline mean, alpha and paired-Sharpe families on the nine full-history instruments of the frozen synthetic panel: Bartlett and AR(1)-prewhitened intercept inference side by side, Holm/BHY through the family functions and directly through `adjust_pvalues`, four stationary-bootstrap families on one shared index matrix, and a two-panel figure. Source-only interfaces, not in `qis.__all__`; finite-sample size and coverage are not established. |
 | `risk_return_frontier.py` | Bond-ETF risk/return scatter using `compute_ra_perf_table`. |
 | `rolling_performance.py` | Rolling per-annum returns via `compute_rolling_perf_stat`. **Bloomberg.** |
@@ -67,6 +85,12 @@ files. `Locals.BOOTSTRAP` adds the four bootstrap families (B=199, one index mat
 `Locals.EXPORT` also writes every table as CSV and the figure as PNG using YAML `OUTPUT_PATH`.
 An explicit `run_local(..., output_path=...)` overrides that configuration. See the
 [significance guide](../docs/factor_and_backtest_significance.md) for assumptions and limitations.
+
+Run `python -m examples.perfstats.sharpe_confidence_intervals` to print the single-Sharpe
+tables and display the track-length chart without writing files. `Locals.EXPORT` also saves
+the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output_path` and
+`settings_path` arguments override the portable YAML configuration. See the
+[single-strategy CI methodology](../docs/performance_analytics_and_sharpe.md#single-strategy-confidence-intervals).
 
 ## models — EWM, regression, vol estimation
 
@@ -130,9 +154,9 @@ An explicit `run_local(..., output_path=...)` overrides that configuration. See 
 | File | What it shows |
 |---|---|
 | `strategy.py` | `generate_strategy_factsheet` on a volparity portfolio. |
-| `strategy_benchmark.py` | `generate_strategy_benchmark_factsheet_plt` — strategy vs benchmark. |
+| `strategy_benchmark.py` | Strategy vs benchmark; `Locals.PAIRED_INFERENCE` produces the default-on paired Sharpe / marginal holdings-alpha page before Brinson (5.47.2 development source). VolParity minus EqualWeight, common market reference SPY, monthly sampling and explicit zero cash. |
 | `multi_assets.py` | `generate_multi_asset_factsheet` on an asset-class universe. |
-| `multi_strategy.py` | `generate_multi_portfolio_factsheet` over a span sweep. |
+| `multi_strategy.py` | VolParity span sweep; `Locals.PERFORMANCE_INFERENCE` shows the default-on three-by-two overview against `base_portfolio_id=0` (span 5): paired Sharpe differences, marginal holdings alpha vs SPY, pointwise HAC CIs and a single complete Holm family across all comparisons/windows. Monthly, zero cash; 5.47.2 development source. |
 | [sharpe_difference_table.py](factsheets/sharpe_difference_table.py) | Offline paired HAC Sharpe comparisons from `MultiPortfolioData`, with a selected base and NAV window. Uses month-end returns with inferred annualisation, synthetic backtests with transaction costs or existing portfolio NAVs, and display or PNG/CSV export via `Locals.EXPORT`. |
 | `strategy_reporting_frequencies.py` | `generate_strategy_factsheet` reproduced across the DAILY/WEEKLY/MONTHLY/QUARTERLY × {long, short} reporting-frequency grid via `fetch_default_report_kwargs`, on one volparity portfolio. |
 | `strategy_benchmark_reporting_frequencies.py` | `generate_strategy_benchmark_factsheet_plt` across the same reporting-frequency grid — volparity vs equal-weight. |

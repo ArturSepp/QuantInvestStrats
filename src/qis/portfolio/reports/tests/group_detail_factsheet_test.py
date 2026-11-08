@@ -81,9 +81,9 @@ def test_seven_group_strategy_appendices(grouped_portfolio, tmp_path):
         add_current_signal_report=True, add_weight_change_report=True,
         add_grouped_exposures=True, add_grouped_cum_pnl=True, fontsize=4,
     )
-    assert len(figures) == 6
-    weights, signals, changes, exposures, pnl = figures[1:]
-    for page in figures[1:]:
+    assert len(figures) == 7
+    weights, signals, changes, exposures, pnl = figures[2:]
+    for page in figures[2:]:
         assert not any('All instruments' in axis.get_title() for axis in page.axes)
         _draw_and_check(page)
     assert [axis.get_title().splitlines()[0] for axis in weights.axes[2:]] == [
@@ -104,7 +104,7 @@ def test_seven_group_strategy_appendices(grouped_portfolio, tmp_path):
     pd.testing.assert_series_equal(portfolio.nav, nav_before)
     pd.testing.assert_series_equal(portfolio.group_data, groups_before)
     page_names = ('weights', 'signals', 'weight-changes', 'exposures', 'pnl')
-    for name, page in zip(page_names, figures[1:]):
+    for name, page in zip(page_names, figures[2:]):
         page.savefig(tmp_path / f'{name}.png', dpi=140)
 
 

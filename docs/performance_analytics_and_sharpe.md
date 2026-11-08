@@ -39,8 +39,8 @@ The main results of the chapter are:
    an asset whose arithmetic Sharpe ratio is below half its volatility loses money when held.
 3. The standard error of an annualised Sharpe ratio is about $1/\sqrt{Y}$ for $Y$ years of
    data, whatever the sampling frequency. A Sharpe ratio of 0.5 needs about 16 years of data to
-   be twice its standard error. qis does not compute Sharpe standard errors; the worked example
-   computes them with numpy.
+   be twice its standard error. The single-strategy source interface below computes IID-normal
+   and HAC standard errors; the worked example also checks the formulas independently.
 4. `PerfParams.sharpe_convention` changes only the regime-conditional Sharpe ratios. Every
    table column is computed on every call and is unaffected by it.
 
@@ -65,7 +65,7 @@ finite-sample qualification remains incomplete. The existing paired test below i
 | Return basis | P.a. and log columns: compound growth over the sampled boundaries, volatility on `PerfParams.return_type` returns (log by default); arithmetic columns: simple returns in numerator and denominator; total, or in excess of `rates_data` |
 | Sampling grid | `PerfParams.freq_vol` (default `ME`) for every table Sharpe column, on each asset's complete boundaries; the regime classifier's grid (default `QE`); `roll_freq` for rolling ratios; the caller's grid for EWM ratios and the information ratio |
 | Annualisation | $\sqrt{\mathrm{af}}$ of the sampled grid for volatilities and arithmetic ratios; compound numerators use $Y$ years of 365.25 days; $\mathrm{af}$ is inferred from the sampled index |
-| Mean adjustment | Standard deviations are demeaned, `ddof=1`, except paired Sharpe inference uses population moments, `ddof=0`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
+| Mean adjustment | Standard deviations are demeaned, `ddof=1`, except single and paired Sharpe inference use population moments, `ddof=0`; numerators are raw means or compound returns; the EWM ratio with `norm_type=1` uses a second moment about zero |
 | Timing | Table and regime ratios are full-sample and descriptive; rolling and EWM ratios at $t$ use data up to $t$; cash accrued over $(t-1,t]$ uses the rate known at $t-1$ on the return grid |
 | Output units | Dimensionless annualised ratios; the EWM ratio with `norm_type=0` is an annualised return; standard errors are in Sharpe-ratio units |
 | qis default | `compute_ra_perf_table(prices, perf_params=None)` builds `PerfParams(freq=pd.infer_freq(prices.index))`; `PerfParams()` has `freq_vol='ME'`, `return_type=ReturnTypes.LOG`, `sharpe_convention=SharpeConvention.PA`, `rates_data=None` |
@@ -520,14 +520,78 @@ record length. The deflated Sharpe ratio of
 to the expected maximum Sharpe ratio among the independent trials of a strategy search, which
 corrects for selection among many backtests.
 
-**What qis computes.** `qis.sharpe_difference_test` returns a paired Sharpe-difference standard
-error and test, described below. It does not estimate a probabilistic or deflated Sharpe ratio.
+**What qis computes.** The source-module `sharpe_ratio_test` computes single-strategy intervals
+with IID-normal or HAC standard errors. `qis.sharpe_difference_test` returns a paired
+Sharpe-difference standard error and test, described below. Neither estimates a probabilistic
+or deflated Sharpe ratio.
 The separate `qis.compute_desc_table(...,
 is_add_tstat=True)` reports $\sqrt{T}\,\bar x/s(x)$ for each column; on periodic returns
 this is $\sqrt{T}\,\hat\theta$, the Sharpe ratio divided by its standard error under the null
 $\theta=0$. The worked example computes the standard errors above with numpy, and the bootstrap
 of [reproducibility](reproducibility.md) can resample returns for a distribution-free
 alternative.
+
+### Single-strategy confidence intervals
+
+The new source-level interface is
+`qis.perfstats.sharpe_inference.sharpe_ratio_test`, with `SharpeInference.IID_NORMAL`
+and `SharpeInference.HAC`. Import these explicitly from the module: they are not in
+`qis.__all__` and no released-version support floor is claimed for this addition.
+The existing paired API, table conventions and defaults are unchanged.
+
+Supply one finite simple-return Series with an ordered, unique, nonmissing DatetimeIndex.
+There must be at least 24 observations; the function rejects rather than drops NaN/inf rows.
+It performs no resampling, cash subtraction, cost deduction or calendar-gap repair. Both
+`method` and `af` are explicit. Use already adjusted excess returns to estimate excess Sharpe.
+Both methods use population moments (ddof=0), matching paired inference, rather than the
+ddof=1 arithmetic risk-table column. With $T$ observations, write
+$\hat\theta=\bar r/\hat\sigma$ and $\hat S=\sqrt{\mathrm{af}}\,\hat\theta$.
+
+**Definition.** `IID_NORMAL` uses the independent-normal plug-in variance
+$\operatorname{Var}(\hat\theta)=(1+\hat\theta^2/2)/T$ derived above. This is not
+valid for arbitrary nonnormal IID returns. `HAC` estimates the long-run variance
+of the estimated influence observations
+
+$$
+\hat\psi_t=\frac{r_t-\bar r}{\hat\sigma}
+-\frac{\hat\theta}{2}\left(\frac{(r_t-\bar r)^2}{\hat\sigma^2}-1\right).
+$$
+
+**Proposition.** Let $\hat\gamma_{\psi,k}$ be the lag-$k$ sample autocovariance of
+the demeaned influence observations, with divisor $T$, and $L$ the Bartlett truncation.
+The implemented scaled-periodic Sharpe variance is
+
+$$
+\widehat{\operatorname{Var}}(\hat S)=\frac{\mathrm{af}}{T}
+\left(\hat\gamma_{\psi,0}
++2\sum_{k=1}^{L}\left(1-\frac{k}{L+1}\right)\hat\gamma_{\psi,k}\right).
+$$
+
+**Proof.** Apply the delta method to the sample first and second raw moments of returns.
+The resulting linearised score is $\hat\psi_t$. Bartlett HAC estimates its long-run
+variance; divide by $T$ for the variance of the sample average and multiply by
+$\mathrm{af}$ for the displayed scaling. This is the single-series version of the
+[Ledoit–Wolf paired delta method](https://doi.org/10.1016/j.jempfin.2008.03.002). $\square$
+
+HAC reuses `qis.utils.regression.estimate_hac_mean`, removing its $T/(T-1)$ correction
+to retain the paired Sharpe test's uncorrected convention. There is no prewhitening.
+`n_lags=None` selects the existing Newey–West lag rule; an explicit integer must be in
+$[0,T-1]$. `IID_NORMAL` permits only `None` or zero. HAC(0) incorporates empirical
+skewness and kurtosis and therefore need not equal the independent-normal calculation.
+HAC assumes stationarity, weak dependence and sufficient finite moments; it can yield
+a narrower or wider interval and does not guarantee finite-sample coverage.
+
+For either method, a two-sided pointwise interval is
+$\hat S\pm z_{(1+c)/2}\,\widehat{\operatorname{se}}(\hat S)$ at confidence level $c$.
+The result contains `sr_an`, `se_an`, `ci_lower`, `ci_upper`, a normal-reference `t_stat`,
+two-sided `p_value`, observation/lag counts and method/settings metadata. `null_sharpe`
+is in the same annualised display units (zero by default); it changes the test, not the
+estimate or interval. Neither interval is simultaneous, selection-adjusted or bootstrap-based.
+
+> **Pitfall.** These intervals describe the arithmetic mean/standard-deviation statistic,
+> not CAGR/volatility. With dependent returns, multiplying periodic Sharpe by
+> $\sqrt{\mathrm{af}}$ is a display convention, not a correction to the Sharpe of aggregated
+> annual returns. Nor does a 95% frequentist interval mean a 95% probability of skill.
 
 ### Paired HAC test of a Sharpe difference
 
@@ -931,6 +995,51 @@ assert np.isclose(eta_12 / np.sqrt(12.0), 0.916, atol=5e-4)
 assert np.isclose(eta_12 * theta, 0.522, atol=5e-4)
 ```
 
+### Reproducing the six-month Sharpe-2 illustration
+
+The canonical offline example is
+[sharpe_confidence_intervals.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/sharpe_confidence_intervals.py).
+It constructs hypothetical records from prefixes of the frozen synthetic `SEQ_US` daily
+simple returns (2005–2009, no quirks), standardising and shifting each prefix separately
+to hold its observed ddof=0 Sharpe at 2. This is an analytical track-length illustration,
+not one evolving backtest, a normality claim about the fixture, or a simulation of 200,000
+strategies. No new seeds or calibration are used. Here `af=252` is explicit to match the
+illustration; it does not change the package's existing annualisation conventions.
+
+```python
+from qis.perfstats.sharpe_inference import SharpeInference, sharpe_ratio_test
+
+daily = qis.to_returns(generate_synthetic_prices(end='2009-12-31', apply_quirks=False)
+                       ['SEQ_US'], is_log_returns=False, drop_first=True)
+prefix = daily.iloc[:126]
+hypothetical = 0.01 * ((prefix - prefix.mean()) / prefix.std(ddof=0) + 2 / np.sqrt(252))
+interval = sharpe_ratio_test(hypothetical, method=SharpeInference.IID_NORMAL, af=252)
+np.testing.assert_allclose([interval.sr_an, interval.se_an, interval.ci_lower, interval.ci_upper],
+                           [2.0, 1.41981443, -0.78278515, 4.78278515], atol=1e-8)
+# HAC uses the same observations, but estimates the score covariance from the data.
+hac_interval = sharpe_ratio_test(hypothetical, method=SharpeInference.HAC, af=252, n_lags=3)
+assert hac_interval.n_obs == 126 and hac_interval.sr_an == interval.sr_an
+```
+
+| Observed annualised Sharpe | Record length | IID-normal SE | Approximate 95% interval |
+|---|---|---|---|
+| 2 | 126 daily observations (0.5 years at af=252) | 1.420 | −0.783 to 4.783 |
+| 2 | 252 daily observations (1 year at af=252) | 1.004 | 0.032 to 3.968 |
+
+The runnable chart holds the estimate fixed while record length varies. The familiar
+$1/\sqrt{Y}$ rule gives thresholds of about 1, 4 and 15 years for observed Sharpes
+2, 1 and 0.5. These are not track lengths guaranteeing detection of a true edge:
+near the threshold the probability of significance is only about one half under the
+normal approximation. They refer to a two-sided 95% interval, not a one-sided 5% test.
+The roughly 8% zero-edge exceedance probability for Sharpe 2 over six months is
+one-sided; the corresponding two-sided null tail probability is roughly 16%.
+
+Run `python -m examples.perfstats.sharpe_confidence_intervals` from the checkout.
+`run_local(local=Locals.CHART)` shows the chart and the same-sample IID/HAC comparison,
+without writing. `Locals.EXPORT` saves PNG/CSV/metadata through `qis.local_path`, with
+explicit `output_path` or private `settings_path` YAML overrides. Nothing is downloaded.
+The image is an example output, not an embedded or published handbook preview.
+
 ### The other estimators
 
 A rolling window of all 143 months gives 0.495, the rolling formula applied to the full sample;
@@ -992,7 +1101,8 @@ assert np.isclose(information_ratio.iloc[0], 0.301, atol=5e-4)
 | Tracking error and information ratio | $\sqrt{\mathrm{af}}\,s(r_p-r_b)$; $\sqrt{\mathrm{af}}\,\overline{(r_p-r_b)}/s(r_p-r_b)$ | `qis.compute_te_ir_errors`, `qis.compute_info_ratio_table` |
 | t-statistic of the mean | $\sqrt{T}\,\bar x/s(x)$ | `qis.compute_desc_table(..., is_add_tstat=True)` |
 | Arithmetic helper | $\sqrt{\mathrm{af}}\,\bar x/s(x)$ | Internal `qis.perfstats.perf_stats.compute_sharpe_arithmetic` |
-| Single-series Sharpe SE, PSR, DSR | See Sampling uncertainty | Not implemented; reader calculation |
+| Single-strategy Sharpe SE and CI | IID-normal or Bartlett HAC delta method | Source-module `qis.perfstats.sharpe_inference.sharpe_ratio_test`; explicit method and af |
+| Probabilistic/deflated Sharpe ratio (PSR/DSR) | See Sampling uncertainty | Not implemented; reader calculation |
 
 The block below shows the contract of `PerfParams.sharpe_convention` on two synthetic assets:
 the performance table is identical under the three conventions, while the regime-conditional

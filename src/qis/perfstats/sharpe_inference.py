@@ -1,10 +1,11 @@
-"""Paired Sharpe-ratio inference using the Ledoit--Wolf (2008) delta method.
+"""Single and paired arithmetic Sharpe-ratio inference.
 
 Uses unprewhitened Bartlett HAC, not the paper's studentized bootstrap or its
 prewhitened quadratic-spectral estimator. DOI: 10.1016/j.jempfin.2008.03.002.
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from numbers import Integral, Real
 from typing import Optional
 
@@ -13,6 +14,166 @@ import pandas as pd
 from scipy.stats import norm
 
 from qis.utils import regression
+
+
+class SharpeInference(Enum):
+    """Single-Sharpe variance assumptions; neither choice changes paired inference.
+
+    Attributes:
+        IID_NORMAL: Independent normal returns; plug-in variance (1 + theta**2/2)/T.
+        HAC: Unprewhitened Bartlett HAC of the Sharpe influence series; finite fourth
+            moments, stationarity and weak dependence are required.
+    """
+
+    IID_NORMAL = 'iid_normal'
+    HAC = 'hac'
+
+
+@dataclass(frozen=True)
+class SharpeRatioTest:
+    """One strategy's scaled periodic arithmetic Sharpe and pointwise normal interval.
+
+    Attributes:
+        sr_an: sqrt(af) times mean/population standard deviation (ddof=0).
+        se_an: Standard error in the same annualised display units.
+        ci_lower: Lower bound of the two-sided, pointwise normal confidence interval.
+        ci_upper: Upper bound of that interval; no multiple-testing adjustment.
+        t_stat: (sr_an - null_sharpe) / se_an; uses a normal, not Student-t, reference.
+        p_value: Two-sided normal p-value for the specified null Sharpe.
+        n_obs: Number of supplied observations; no rows are removed.
+        n_lags: Bartlett lag count, or zero for IID_NORMAL.
+        method: Selected variance estimator.
+        confidence_level: Coverage requested for the asymptotic pointwise interval.
+        af: Positive periods per year; display scaling, not a time-aggregation correction.
+        null_sharpe: Hypothesised Sharpe in the same annualised display units.
+    """
+
+    sr_an: float
+    se_an: float
+    ci_lower: float
+    ci_upper: float
+    t_stat: float
+    p_value: float
+    n_obs: int
+    n_lags: int
+    method: SharpeInference
+    confidence_level: float
+    af: float
+    null_sharpe: float
+
+
+def sharpe_ratio_test(
+        returns: pd.Series,
+        *,
+        method: SharpeInference,
+        af: float,
+        n_lags: Optional[int] = None,
+        confidence_level: float = 0.95,
+        null_sharpe: float = 0.0,
+) -> SharpeRatioTest:
+    """Estimate a single arithmetic Sharpe's standard error, interval and null test.
+
+    This source-level interface is imported explicitly from this module, not qis.__all__.
+    IID_NORMAL uses Lo's independent-normal plug-in variance. HAC applies the same
+    uncorrected Bartlett delta-method convention as sharpe_difference_test, to one
+    strategy's influence series rather than a paired difference. Existing APIs are unchanged.
+
+    Args:
+        returns: Finite simple periodic returns on an ordered, unique DatetimeIndex.
+            Supply excess returns after funding/cost adjustments if desired; none are
+            performed here. At least 24 observations are required. Missing observations
+            are rejected, not dropped or filled; resolve calendar gaps before inference.
+        method: Explicit SharpeInference.IID_NORMAL or SharpeInference.HAC.
+        af: Explicit positive, finite observations per year. Sharpe, SE and bounds scale
+            by sqrt(af). With serial dependence this is a scaled periodic statistic, not
+            necessarily the Sharpe of compounded or aggregated annual returns.
+        n_lags: HAC truncation in observations, from zero through T-1. None uses the
+            existing Newey-West rule. IID_NORMAL permits only None or zero.
+        confidence_level: Two-sided pointwise normal interval level, strictly in (0, 1).
+        null_sharpe: Finite hypothesised Sharpe in annualised display units; default zero.
+
+    Returns:
+        A frozen SharpeRatioTest with estimate, uncertainty, two-sided test and settings.
+        All estimates use population moments, matching the paired Sharpe test.
+
+    Raises:
+        ValueError: If data/settings are invalid, variance is numerically degenerate,
+            or the resulting standard error is not positive and finite.
+
+    Notes:
+        Neither method gives exact finite-sample coverage, a Bayesian probability of
+        skill, a bootstrap interval, or protection against selection/repeated peeking.
+        HAC(0) allows empirical skewness/kurtosis and need not equal IID_NORMAL.
+    """
+    if not isinstance(method, SharpeInference):
+        raise ValueError('method must be a SharpeInference member')
+    for name, value in (('af', af), ('confidence_level', confidence_level),
+                        ('null_sharpe', null_sharpe)):
+        if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+                or not np.isfinite(value)):
+            raise ValueError(f'{name} must be a finite real number')
+    if af <= 0:
+        raise ValueError('af must be positive')
+    if not 0 < confidence_level < 1:
+        raise ValueError('confidence_level must be between zero and one')
+    if (not isinstance(returns, pd.Series)
+            or not pd.api.types.is_numeric_dtype(returns.dtype)
+            or pd.api.types.is_complex_dtype(returns.dtype)
+            or pd.api.types.is_bool_dtype(returns.dtype)):
+        raise ValueError('returns must be a real numeric pandas Series')
+    if (not isinstance(returns.index, pd.DatetimeIndex) or returns.index.hasnans
+            or not returns.index.is_unique or not returns.index.is_monotonic_increasing):
+        raise ValueError('returns require an ordered, unique, nonmissing DatetimeIndex')
+    values = returns.to_numpy(dtype=float, na_value=np.nan)
+    if not np.isfinite(values).all():
+        raise ValueError('returns must be finite; missing observations cannot be dropped')
+    n_obs = len(values)
+    if n_obs < 24:
+        raise ValueError(f'require at least 24 observations, got {n_obs}')
+    if n_lags is not None and (
+            isinstance(n_lags, (bool, np.bool_)) or not isinstance(n_lags, Integral)
+            or not 0 <= n_lags < n_obs):
+        raise ValueError('n_lags must be an integer between zero and T-1')
+    if method is SharpeInference.IID_NORMAL:
+        if n_lags not in (None, 0):
+            raise ValueError('IID_NORMAL permits only n_lags=None or zero')
+        lags = 0
+    else:
+        lags = regression.newey_west_lag_rule(n_obs) if n_lags is None else int(n_lags)
+
+    scale = np.max(np.abs(values))
+    if scale == 0:
+        raise ValueError('degenerate return variance')
+    values = values / scale
+    centered = values - values.mean()
+    sigma = np.sqrt(np.mean(centered ** 2))
+    if sigma <= 10 * np.finfo(float).eps:
+        raise ValueError('degenerate return variance relative to scale')
+    theta = float(values.mean() / sigma)
+    if method is SharpeInference.IID_NORMAL:
+        se = np.sqrt((1.0 + 0.5 * theta ** 2) / n_obs)
+    else:
+        z = centered / sigma
+        influence = z - 0.5 * theta * (z ** 2 - 1.0)
+        influence -= influence.mean()
+        hac = regression.estimate_hac_mean(influence, hac_lags=lags)
+        # Match the paired test: remove the mean estimator's T/(T-1) correction.
+        se = hac.hac_se * np.sqrt((n_obs - 1) / n_obs)
+    if not np.isfinite(se) or se <= 0:
+        raise ValueError('Sharpe has no positive finite standard error')
+    with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+        sr_an = float(np.sqrt(af) * theta)
+        se_an = float(np.sqrt(af) * se)
+        statistic = (sr_an - null_sharpe) / se_an
+        critical = norm.isf(0.5 * (1.0 - confidence_level))
+        lower, upper = sr_an - critical * se_an, sr_an + critical * se_an
+        pvalue = float(2 * norm.sf(abs(statistic)))
+    if not np.isfinite([sr_an, se_an, statistic, lower, upper, pvalue]).all() or se_an <= 0:
+        raise ValueError('Sharpe display or inference is not finite')
+    return SharpeRatioTest(
+        sr_an, se_an, float(lower), float(upper), float(statistic), pvalue,
+        n_obs, int(lags), method, float(confidence_level), float(af), float(null_sharpe),
+    )
 
 
 @dataclass(frozen=True)

@@ -120,8 +120,8 @@ def test_brinson_report_period_is_independent_of_performance_window(monkeypatch)
         assert captured[0]['time_period'].start == recent.start
         assert captured[0]['time_period'].end == recent.end
         pd.testing.assert_frame_equal(captured[0]['lookthrough_matrix'], matrix)
-        assert '31Mar2021' in figures[1]._suptitle.get_text()
-        assert '30Jun2021' in figures[1]._suptitle.get_text()
+        assert '31Mar2021' in figures[2]._suptitle.get_text()
+        assert '30Jun2021' in figures[2]._suptitle.get_text()
     finally:
         for fig in figures:
             plt.close(fig)
@@ -140,7 +140,7 @@ def test_large_partition_keeps_complete_table_and_readable_names():
     figures = qis.generate_strategy_benchmark_factsheet_plt(
         multi, time_period=period, lookthrough_matrix=matrix, **options)
     try:
-        page = figures[1]
+        page = figures[2]
         page.canvas.draw()
         assert len(page.axes) == 5
         table = next(iter(page.axes[0].tables))

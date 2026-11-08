@@ -170,8 +170,12 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 
 ### Part VI: Currency returns, hedging and accounting
 
+- [Multi-currency portfolio P&L in Python](multi_currency_portfolio_pnl.md):
+  an offline workflow from four return views to a funded account with hedge resets and settlement.
 - [Return conventions and FX adjustments](return_conventions_and_fx_adjustments.md):
   typed return coordinates, dated cash/hedge metadata and optional index normalization.
+- [Self-financed FX accounting](self_financed_fx_accounting.md):
+  signed holdings, financing balances, contract fixing and cash settlement.
 - [FX hedging and market data](fx_hedging_and_market_data.md):
   currency conversion, hedging assumptions and data contracts.
 - [Reference-currency conversion and excess returns](reference_currency_excess_returns.md):
@@ -313,7 +317,9 @@ Stress testing with options <stress_testing_with_options>
 :maxdepth: 1
 :caption: Part VI - Currency returns, hedging and accounting
 
+Multi-currency portfolio P&L in Python <multi_currency_portfolio_pnl>
 Return conventions and FX adjustments <return_conventions_and_fx_adjustments>
+Self-financed FX accounting <self_financed_fx_accounting>
 FX hedging and market data <fx_hedging_and_market_data>
 Reference-currency conversion and excess returns <reference_currency_excess_returns>
 Cash rate timing and FX adjustments <cash_rate_timing_and_fx_adjustments>

@@ -5,6 +5,9 @@ Backtests the same vol-parity strategy across several spans, wraps the
 results into a ``MultiPortfolioData``, and renders
 ``qis.generate_multi_portfolio_factsheet`` to compare strategies
 side by side. Useful for illustrating sensitivity to a single parameter.
+``Locals.PERFORMANCE_INFERENCE`` adds the default-on six-panel paired Sharpe / marginal
+holdings-alpha overview against span 5, with SPY as the common market reference. Requires
+5.47.2 development source; optional Yahoo data, no calibration or parameter selection.
 """
 # packages
 import pandas as pd
@@ -13,6 +16,7 @@ from enum import Enum
 from qis import local_path
 import yfinance as yf
 import qis
+from qis.perfstats.significance import InterceptInference
 from qis import (
     TimePeriod,
     MultiPortfolioData,
@@ -75,15 +79,38 @@ def generate_volparity_multi_strategy(prices: pd.DataFrame,
 
 class Locals(Enum):
     VOLPARITY_SPAN = 1
+    PERFORMANCE_INFERENCE = 2
 
 
-def run_local(local: Locals, output_path: str = None):
+def run_local(local: Locals, output_path: str = None,
+              alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC):
     """Run local tests for development and debugging purposes.
 
     These are integration tests that download real data and generate reports.
     Use for quick verification during development.
+
+    Pass alpha_inference=InterceptInference.PREWHITENED_AR1 to make prewhitening primary.
+    The alternate alpha method is compared on the same sample; Sharpe stays unchanged.
     """
     output_path = local_path.get_output_path(output_path)
+
+    if local == Locals.PERFORMANCE_INFERENCE:
+        time_period = TimePeriod('31Dec2006', '31Dec2025')
+        prices, benchmark_prices, group_data = fetch_universe_data()
+        multi = generate_volparity_multi_strategy(
+            prices, benchmark_prices, group_data, time_period,
+            spans=(5, 10, 20, 40, 60, 120), rebalancing_costs=0.0010)
+        figs = generate_multi_portfolio_factsheet(
+            multi, time_period=time_period, base_portfolio_id=0,
+            backtest_name='VolParity span comparison',
+            alpha_inference=alpha_inference,
+            **fetch_default_report_kwargs(
+                time_period=time_period, reporting_frequency=qis.ReportingFrequency.MONTHLY,
+                add_rates_data=False),  # Explicit zero cash; same basis and costs for all legs.
+        )
+        qis.save_figs_to_pdf(figs, 'volparity_multi_inference', local_path=output_path)
+        qis.save_fig(figs[1], 'volparity_multi_inference', local_path=output_path)
+        return figs
 
     if local == Locals.VOLPARITY_SPAN:
         # time period for portfolio reporting
@@ -104,7 +131,9 @@ def run_local(local: Locals, output_path: str = None):
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period,
                                                   add_group_exposures_and_pnl=True,
-                                                  **fetch_default_report_kwargs(time_period=time_period))
+                                                  alpha_inference=alpha_inference,
+                                                  **fetch_default_report_kwargs(
+                                                      time_period=time_period))
 
         qis.save_fig(fig=figs[0], file_name="multi_strategy", local_path=output_path)
 
@@ -115,8 +144,10 @@ def run_local(local: Locals, output_path: str = None):
         time_period_short = TimePeriod('31Dec2019', time_period.end)
         figs = generate_multi_portfolio_factsheet(multi_portfolio_data=multi_portfolio_data,
                                                   time_period=time_period_short,
+                                                  alpha_inference=alpha_inference,
                                                   add_group_exposures_and_pnl=True,
-                                                  **fetch_default_report_kwargs(time_period=time_period_short))
+                                                  **fetch_default_report_kwargs(
+                                                      time_period=time_period_short))
         qis.save_figs_to_pdf(figs=figs,
                              file_name="volparity_span_factsheet_short",
                              local_path=output_path)

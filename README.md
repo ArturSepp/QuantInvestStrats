@@ -68,6 +68,12 @@ whole-sample TE/IR, and EWMA beta/alpha. The same conventions serve the wider pa
 the [worked tracking-error example](docs/tracking_error_and_risk.md#worked-example) and
 [offline ex-ante and ex-post workflows](docs/tracking_error_and_risk.md#implementation-in-qis).
 
+**Multi-currency portfolio P&L.** `compute_fx_returns()` supplies local and reference-currency
+total/excess returns, translated local-excess payoffs and FX-forward payoffs.
+`backtest_fx_account()` tracks funded positions, financing, hedge resets and settlement.
+Start with the [offline multi-currency workflow](docs/multi_currency_portfolio_pnl.md),
+using provider-neutral `FxRatesData` inputs.
+
 **Instrument-aware stress reports.** `qis.portfolio.stress` combines funded holdings, signed
 intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`. It preserves
 source marks and shared underlying risk, splits factor-family scenarios, ranks historical
@@ -224,7 +230,7 @@ data contract and conventions.
 | Risk contributions | `compute_portfolio_risk_contributions` (volatility units), `compute_portfolio_risk_contribution_ratios` (shares), `compute_group_portfolio_risk_contribution_ratios` (clusters, sectors, asset classes or any complete partition) |
 | Stress testing | `qis.portfolio.stress`: funded holdings, signed intrinsic calls/puts, futures and custom payoffs under an assigned `RiskModel`; factor-family scenarios; historical-month ranking; financed accounts with borrowing and equity after stress |
 | Regimes | Bear/Normal/Bull conditional tables; `qis.regimes` for regime Sharpe nulls, the convexity premium, overlay frontiers, regime betas and regime-mixture covariances |
-| Market data and FX | `FxRatesData`: cross rates, covered-interest-parity forward premia, carry decomposition, reference-currency and FX-hedged translation of multi-asset panels, single- and multi-asset hedging reports; `FactorsData` for tradable-factor prices |
+| Market data and FX | Multi-currency portfolio P&L: `FxRatesData` supplies currency spots/rates; `compute_fx_returns` computes local/reference total and excess returns, translated local-excess and FX-forward payoffs; `backtest_fx_account` tracks financing, hedge resets and settlement. See the [offline workflow](docs/multi_currency_portfolio_pnl.md). `FactorsData` holds tradable-factor prices |
 | Models | Numba EWM kernels, multivariate EWM linear factor models, multivariate OLS, EWM correlation tables, block bootstrap of price paths, return unsmoothing and de-levering, infrequent-return interpolation |
 | Reporting | Multi-asset, strategy, strategy-versus-benchmark and multi-strategy factsheets; Brinsonâ€“Hoodâ€“Beebower attribution with Frongello linking; optional PyBloqs HTML/PDF rendering |
 
@@ -459,7 +465,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.47.1},
+  version={5.47.2},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

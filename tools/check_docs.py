@@ -63,6 +63,7 @@ METHODOLOGY_PAGES = frozenset({
     'tracking_error_and_risk.md', 'turnover_conventions.md',
 })
 UTILITY_PAGES = frozenset({
+    'multi_currency_portfolio_pnl.md',
     'risk_monitoring.md',
     'documentation_standard.md', 'factsheets.md', 'gallery.md', 'index.md', 'install.md',
     'package_comparison.md', 'quickstart.md', 'REMOVED_5_0.md', 'software_design.md',
@@ -70,6 +71,7 @@ UTILITY_PAGES = frozenset({
 })
 # Adoption is explicit. Do not infer it from a byline or let new pages evade the inventory.
 ADOPTED_PAGES = frozenset({
+    'multi_currency_portfolio_pnl.md',
     'self_financed_fx_accounting.md',
     'return_conventions_and_fx_adjustments.md',
     'factor_and_backtest_significance.md',
