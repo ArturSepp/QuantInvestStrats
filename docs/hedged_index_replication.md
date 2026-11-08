@@ -213,7 +213,7 @@ spots = pd.DataFrame({'USD': 1.0, 'CHF': [1.0, 1.0/1.01, 1.0/1.01]}, index=dates
 rates = pd.DataFrame({'USD': 0.04, 'CHF': 0.01}, index=dates)
 prices = pd.Series([100.0, 102.0, 102.0], index=dates, name='USD asset')
 fx = qis.FxRatesData(fx_spots=spots, domestic_rates=rates)
-converted_1 = qis.compute_fx_returns(
+hedged_result = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(prices).to_frame(), local_ccys='USD',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -221,7 +221,7 @@ converted_1 = qis.compute_fx_returns(
         reference_ccy='CHF', hedge_ratios=1.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-hedged = converted_1.values.iloc[:, 0]
+hedged = hedged_result.values.iloc[:, 0]
 dt = (dates[1] - dates[0]).days / 365
 carry = (1.0 + 0.01 * dt)/(1.0 + 0.04 * dt) - 1.0
 expected = 0.02*1.01 + carry

@@ -229,31 +229,35 @@ cash account and a monthly-reset deposit need not earn identical monthly returns
 
 ### FX aliases, payoffs and account capital
 
-The currency chapters use the following aliases for these conventions. Return labels alone
-do not determine whether a value is a funded return, a cash-relative coordinate or a payoff.
+The currency chapters share this vocabulary. A return dated $t$ covers $(t-1,t]$.
+The currency index $c$ or asset index $i$ can be suppressed when a single pair or asset
+is being discussed; the meaning and interval do not change.
 
 | Symbol / quantity | Meaning and units |
 |---|---|
-| $S_t$ | Reference currency per local currency unit; crosses divide USD-per-local by USD-per-reference |
-| $x_t$ (also $r^{FX}_t$) | Simple spot change $S_t/S_{t-1}-1$; log spot is labelled separately |
-| $c_t^L$, $c_t^R$ | Local/reference cash growth over the actual interval, aliases of currency-specific $r_t^f$ |
-| $e_t$ | Arithmetic excess $r_t-c_t$ |
-| $q_t$ | Cash-relative simple $(1+r_t)/(1+c_t)-1$ |
-| Excess LOG | $log(1+r_t)-log(1+c_t)$; its exponential minus one is $q_t$, not $e_t$ |
-| $f_t$, $kappa_t$ | Cash-growth premium $(1+c_t^L)/(1+c_t^R)-1$ and exact hedge cost $f_t/(1+f_t)$ |
-| $p_t^R$ | Translated local financed payoff $(r_t^L-c_t^L)(1+x_t)$ per opening reference notional |
-| $arphi_t$ | Long-local forward payoff $x_t+kappa_t$ per opening reference notional |
+| $S_{c,t}$ | Reference currency per local currency unit; crosses divide USD-per-local by USD-per-reference |
+| $r^{FX}_{c,t}$ | Simple spot change $S_{c,t}/S_{c,t-1}-1$; log spot is labelled separately |
+| $y^k_{t-1}$ | Annual decimal quote for currency $k$, known at the opening |
+| $\tau_t$ | ACT/365 Fixed year fraction $\mathrm{calendar\ days}(t-1,t)/365$ |
+| $r^{f,k}_t=y^k_{t-1}\tau_t$ | Currency-specific cash return over the actual interval |
+| $\tilde r_t$ | Arithmetic excess $r_t-r^f_t$; use superscripts $L$ or $R$ for its currency |
+| $q_t$ | Cash-relative simple $(1+r_t)/(1+r^f_t)-1$ |
+| $\tilde\ell_t$ (excess LOG) | $\log(1+r_t)-\log(1+r^f_t)$; its exponential minus one is $q_t$, not $\tilde r_t$ |
+| $f_{t-1,t}$, $\kappa_{t-1,t}$ | Inverse-forward premium $(1+r^{f,L}_t)/(1+r^{f,R}_t)-1$ and exact short-hedge cost $f_{t-1,t}/(1+f_{t-1,t})$ |
+| $p^{L\to R}_t$ | Translated local financed payoff $(r^L_t-r^{f,L}_t)(1+r^{FX}_{c,t})$ per opening reference notional |
+| $\varphi_{c,t}$ | Long-local forward payoff $r^{FX}_{c,t}+\kappa_{t-1,t}$ per opening reference notional |
+| $\tilde r^R_t(h)$ | Funded reference arithmetic excess $r^R_t(h)-r^{f,R}_t$ under opening principal hedge $h$ |
 | $V_t$ | Actual account capital in reference currency, including marked unpaid claims |
 
-The short hedge costs $kappa_t$; the long-local forward earns $x_t+kappa_t$.
-The premium $f_t$ is neither a raw forward-price ratio nor the exact earned forward payoff.
+The short hedge costs $\kappa_{t-1,t}$; the long-local forward earns $\varphi_{c,t}$.
+The premium $f_{t-1,t}$ is neither a raw forward-price ratio nor the exact forward payoff.
 Payoffs may be negative beyond initial notional and need no fabricated NAV or log coordinate.
 An optional normalized synthetic index is distinct from the held-unit cash/debt/contract
 ledger in [self-financed FX accounting](self_financed_fx_accounting.md). A balance not yet
 paid contributes to marked capital but does not earn spendable-cash interest.
 
 See [return conventions and FX adjustments](return_conventions_and_fx_adjustments.md) for
-exact identities and the mapping to typed APIs. Statistical annualisation uses $mathrm{af}$;
+exact identities and the mapping to typed APIs. Statistical annualisation uses $\mathrm{af}$;
 it does not replace actual elapsed days in ACT/365F cash accrual.
 
 ### Timing and information

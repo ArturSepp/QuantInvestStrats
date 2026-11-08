@@ -218,3 +218,24 @@ def test_generated_api_page_states_a_meta_description():
                   and any(getattr(target, 'id', None) == 'API_HEADER' for target in node.targets))
     assert '\n.. meta::\n   :description: ' in header
     assert header.index('\n.. meta::') < header.index('\nAPI reference\n')
+
+
+@pytest.mark.parametrize('bad', ['\x00', '\x0b', '\x0c', '\x1b', '\x7f'])
+def test_control_characters_are_rejected_even_inside_code(bad):
+    """Hidden control bytes are invalid source, including excluded code fences."""
+    issues = CHECK(HEADER + SECTIONS + '\n```python\n# ' + bad + '\n```\n', methodology=True)
+    assert any('control character' in issue.message for issue in issues)
+
+
+@pytest.mark.parametrize('bad', ['$log(1+r)$', '$kappa_t$', '$mathrm{af}$',
+                                  '$x+varphi_t$', '$$\nkappa_t=1\n$$'])
+def test_missing_math_macro_backslash_is_rejected(bad):
+    """Reject known bare macros in inline and display maths."""
+    issues = CHECK(HEADER + SECTIONS + '\n' + bad + '\n', methodology=True)
+    assert any('backslash' in issue.message for issue in issues)
+
+
+def test_math_macro_checker_preserves_code_words_and_valid_macros():
+    """Literal source examples and ordinary prose must not cause false positives."""
+    source = HEADER + SECTIONS + '\nLog software uses `$log(x)$`; $\\log(x)+\\kappa_t$ is maths.\n'
+    assert not CHECK(source, methodology=True)

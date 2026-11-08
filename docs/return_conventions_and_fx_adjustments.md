@@ -8,7 +8,7 @@ myst:
 
 # Return conventions and FX adjustments
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-11-08](https://github.com/ArturSepp/QuantInvestStrats/commit/fae104880a01c21f3882fe8af3a6796cd669b96d)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
@@ -37,7 +37,7 @@ Fetching, ticker choice and provider yield normalization belong to the data laye
 | qis default | Kind and coordinate required for assets; no automatic NAV or zero filtering |
 
 Write $S_t$ for reference currency per unit of local currency, $r_t^L$ for the funded local asset
-return, $x_t=S_t/S_{t-1}-1$ for spot return, and $h_{t-1}$ for the additional opening principal hedge.
+return, $r^{FX}_{c,t}=S_t/S_{t-1}-1$ for spot return, and $h_{t-1}$ for the additional opening principal hedge.
 Prices include any embedded instrument hedges; additional hedge ratios must not repeat them.
 
 `FxCashPolicy` records ACT/365 Fixed, quote lag and annual-rate provenance. The default quote lag
@@ -51,33 +51,35 @@ are aligned as-of and shifted to the opening. Currency/hedge labels must cover e
 
 ## Methodology
 
-Opening annual decimal quotes $i^L_{t-1}$ and $i^R_{t-1}$ accrue over the actual interval:
+Let $\tau_t=\mathrm{calendar\ days}(t-1,t)/365$ denote the ACT/365 Fixed year fraction.
+
+Opening annual decimal quotes $y^L_{t-1}$ and $y^R_{t-1}$ accrue over the actual interval:
 
 $$
-c_t^L=i^L_{t-1}\frac{d_t}{365},\qquad
-c_t^R=i^R_{t-1}\frac{d_t}{365},\qquad
-f_t=\frac{1+c_t^L}{1+c_t^R}-1,\qquad
-\kappa_t=\frac{f_t}{1+f_t}.
+r^{f,L}_t=y^L_{t-1}\tau_t,\qquad
+r^{f,R}_t=y^R_{t-1}\tau_t,\qquad
+f_{t-1,t}=\frac{1+r^{f,L}_t}{1+r^{f,R}_t}-1,\qquad
+\kappa_{t-1,t}=\frac{f_{t-1,t}}{1+f_{t-1,t}}.
 $$
 
-The reference-per-local forward has $F_{t-1,t}/S_{t-1}=1/(1+f_t)$. The existing principal-hedge
+The reference-per-local forward has $F_{t-1,t}/S_{t-1}=1/(1+f_{t-1,t})$. The existing principal-hedge
 kernel gives the funded reference asset return:
 
 $$
-r_t^R=r_t^L(1+x_t)+(1-h_{t-1})x_t-h_{t-1}\kappa_t.
+r_t^R=r_t^L(1+r^{FX}_{c,t})+(1-h_{t-1})r^{FX}_{c,t}-h_{t-1}\kappa_{t-1,t}.
 $$
 
 The local gain remains exposed to terminal spot. A hedge of one does not remove that cross term.
-For either local or reference cash $c_t$, the three excess coordinates are distinct:
+For either local or reference cash $r^f_t$, the three excess coordinates are distinct:
 
 $$
-e_t=r_t-c_t,\qquad
-q_t=\frac{1+r_t}{1+c_t}-1,\qquad
-\ell_t=\log(1+r_t)-\log(1+c_t).
+\tilde r_t=r_t-r^f_t,\qquad
+q_t=\frac{1+r_t}{1+r^f_t}-1,\qquad
+\tilde\ell_t=\log(1+r_t)-\log(1+r^f_t).
 $$
 
-`SIMPLE` excess is $e_t$, `CASH_RELATIVE_SIMPLE` is $q_t$, and `LOG` excess is $\ell_t$.
-The identity $q_t=\exp(\ell_t)-1$ holds; $e_t=\exp(\ell_t)-1$ generally does not.
+`SIMPLE` excess is $\tilde r_t$, `CASH_RELATIVE_SIMPLE` is $q_t$, and `LOG` excess is $\tilde\ell_t$.
+The identity $q_t=\exp(\tilde\ell_t)-1$ holds; $\tilde r_t=\exp(\tilde\ell_t)-1$ generally does not.
 Cash-relative simple is rejected for non-excess kinds. Log output requires positive completed
 asset and cash gross factors. Valid arithmetic losses remain available without a log or index.
 
@@ -91,30 +93,30 @@ asset and cash gross factors. Valid arithmetic losses remain available without a
 at terminal spot. `FX_FORWARD` is the long-local forward's terminal settlement:
 
 $$
-p_t^R=(r_t^L-c_t^L)(1+x_t),\qquad
-\varphi_t=\frac{S_t-F_{t-1,t}}{S_{t-1}}
-=x_t+\kappa_t,\qquad \kappa_t=1-\frac{1+c_t^R}{1+c_t^L}.
+p^{L\to R}_t=(r_t^L-r^{f,L}_t)(1+r^{FX}_{c,t}),\qquad
+\varphi_{c,t}=\frac{S_t-F_{t-1,t}}{S_{t-1}}
+=r^{FX}_{c,t}+\kappa_{t-1,t},\qquad \kappa_{t-1,t}=1-\frac{1+r^{f,R}_t}{1+r^{f,L}_t}.
 $$
 
 These are arithmetic payoffs, with no initial capital implied. They require opening cash
 quotes and `SIMPLE`. A cash-relative local excess index would divide the financed gain by
 local cash growth and produce a different payoff; do not use it as a translation input.
-**Identity.** For the funded reference excess $e_t^R(h)=r_t^R(h)-c_t^R$:
 
+**Identity.** For the funded reference excess $\tilde r^R_t(h)=r_t^R(h)-r^{f,R}_t$:
 
 $$
-e_t^R(h)=(r_t^L-c_t^L)+(1-h_{t-1})\varphi_t
-+r_t^L x_t+\kappa_t c_t^L
-=p_t^R+(1+c_t^L-h_{t-1})\varphi_t.
+\tilde r^R_t(h)=(r_t^L-r^{f,L}_t)+(1-h_{t-1})\varphi_{c,t}
++r_t^L r^{FX}_{c,t}+\kappa_{t-1,t} r^{f,L}_t
+=p^{L\to R}_t+(1+r^{f,L}_t-h_{t-1})\varphi_{c,t}.
 $$
 
 **Proof.** Expand the funded payoff, subtract reference cash and substitute
-$\varphi_t=x_t+\kappa_t$. The cash identity
-$\kappa_t(1+c_t^L)=c_t^L-c_t^R$ gives the first decomposition.
-Substituting $p_t^R=(r_t^L-c_t^L)(1+x_t)$ gives the second. $\square$
+$\varphi_{c,t}=r^{FX}_{c,t}+\kappa_{t-1,t}$. The cash identity
+$\kappa_{t-1,t}(1+r^{f,L}_t)=r^{f,L}_t-r^{f,R}_t$ gives the first decomposition.
+Substituting $p^{L\to R}_t=(r_t^L-r^{f,L}_t)(1+r^{FX}_{c,t})$ gives the second. $\square$
 
-The old currency-index approximation adds $f_t$ to spot. Its exact replacement adds
-$\kappa_t$: the incremental payoff is $-f_t^2/(1+f_t)$ when cash growth is positive.
+The old currency-index approximation adds $f_{t-1,t}$ to spot. Its exact replacement adds
+$\kappa_{t-1,t}$: the incremental payoff is $-f_{t-1,t}^2/(1+f_{t-1,t})$ when the forward gross factor is positive.
 This comparison holds cash accrual, quotes and reset dates fixed. It is separate from
 switching the cash day count, changing settlement cadence or revising portfolio funding.
 
@@ -148,7 +150,8 @@ for kind in (qis.FxReturnType.LOCAL_TOTAL, qis.FxReturnType.LOCAL_EXCESS,
     reference = 'USD' if kind in (qis.FxReturnType.REFERENCE_TOTAL,
                                   qis.FxReturnType.REFERENCE_EXCESS) else None
     results[kind] = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
-        prices, currencies, kind, qis.FxReturnCoordinate.SIMPLE,
+        prices=prices, local_ccys=currencies, return_type=kind,
+        coordinate=qis.FxReturnCoordinate.SIMPLE,
         reference_ccy=reference, frequency='ME'))['ME']
 reference = results[qis.FxReturnType.REFERENCE_TOTAL]
 assert np.isclose(reference.values.EU_equity.iloc[1], 1.02*(1.12/1.10)-1)
@@ -157,8 +160,8 @@ assert np.isclose(excess.values.EU_equity.iloc[1],
                   reference.values.EU_equity.iloc[1] - .05*29/365)
 assert excess.synthetic_index is None
 log_excess = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
-    prices, currencies, qis.FxReturnType.REFERENCE_EXCESS,
-    qis.FxReturnCoordinate.LOG, reference_ccy='USD'))['ME']
+    prices=prices, local_ccys=currencies, return_type=qis.FxReturnType.REFERENCE_EXCESS,
+    coordinate=qis.FxReturnCoordinate.LOG, reference_ccy='USD'))['ME']
 assert np.isclose(log_excess.values.EU_equity.iloc[1],
                   np.log1p(reference.values.EU_equity.iloc[1])-np.log1p(.05*29/365))
 spot = qis.compute_fx_returns(fx, qis.FxCurrencyReturnsRequest(
@@ -179,8 +182,8 @@ The two notional payoffs use the same input data without creating indices:
 
 ```python
 translated = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
-    prices, currencies, qis.FxReturnType.LOCAL_EXCESS_TRANSLATED,
-    qis.FxReturnCoordinate.SIMPLE, reference_ccy='USD', frequency='ME'))['ME']
+    prices=prices, local_ccys=currencies, return_type=qis.FxReturnType.LOCAL_EXCESS_TRANSLATED,
+    coordinate=qis.FxReturnCoordinate.SIMPLE, reference_ccy='USD', frequency='ME'))['ME']
 forward = qis.compute_fx_returns(fx, qis.FxCurrencyReturnsRequest(
     ('EUR', 'CHF'), 'USD', return_type=qis.FxReturnType.FX_FORWARD,
     frequency='ME', diagnostics=True))['ME']
@@ -214,6 +217,8 @@ Change the frequency to `B` on a daily input panel for business-daily resets. Mo
 reset and compounded daily reset are different strategies; this API does not assert their equality.
 
 ## Implementation in qis
+
+[FX return API](api/generated/qis.compute_fx_returns.rst), [asset request](api/generated/qis.FxAssetReturnsRequest.rst) and [currency request](api/generated/qis.FxCurrencyReturnsRequest.rst).
 
 ### Select the economic object before its coordinate
 
@@ -288,7 +293,7 @@ compatibility facade, old-shape adapter, or redirection that changes their econo
 | `compute_fx_adjusted_returns` | Asset request with scalar or per-asset frequency; consume typed cadence results |
 | `compute_returns_adjusted_by_local_rate` | Separate LOCAL_TOTAL and LOCAL_EXCESS requests; annual quotes stay on the data container |
 
-The currency methods `get_daily_carry_local_return`, `get_fx_total_return_nav` and
+The currency methods `get_daily_carry_local_return`, `get_fr^{FX}_{c,t}otal_return_nav` and
 `get_carry_fx_return_nav` emit `DeprecationWarning` from QIS 5.46.0, with removal in 6.0.0.
 Use an `FX_FORWARD` currency request and optional explicit normalization. Their old premium-based
 implementations are retained only for the bounded retirement period; no compatibility facade
@@ -324,7 +329,7 @@ These results contain quote currencies, not a claim about a security's full econ
 
 - [Notation and conventions](notation_and_conventions.md)
 - [Reference-currency excess returns](reference_currency_excess_returns.md)
-- [Cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md)
+- [Cash rate timing and FX adjustments](cash_rat\tilde r_timing_and_fx_adjustments.md)
 - [FX hedging and market data](fx_hedging_and_market_data.md)
 - [Self-financed FX accounting](self_financed_fx_accounting.md)
 

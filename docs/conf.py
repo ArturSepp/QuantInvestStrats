@@ -294,6 +294,7 @@ def _write_api_index() -> None:
     import qis
     from qis.api import CORE_API, core_api_names
 
+    core = set(core_api_names())
     documentable = []
     for name in sorted(qis.__all__):
         if name.startswith('_'):
@@ -301,11 +302,11 @@ def _write_api_index() -> None:
         obj = getattr(qis, name)
         if inspect.ismodule(obj):
             continue
-        if not (inspect.isclass(obj) or inspect.isfunction(obj) or inspect.isbuiltin(obj)):
+        if name not in core and not (
+                inspect.isclass(obj) or inspect.isfunction(obj) or inspect.isbuiltin(obj)):
             continue
         documentable.append((name, obj))
 
-    core = set(core_api_names())
     lines = [API_HEADER, CORE_HEADING]
     for capability, names in CORE_API.items():
         listed = [name for name in names if any(name == n for n, _ in documentable)]

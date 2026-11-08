@@ -40,25 +40,25 @@ cross-currency basis and trading costs, so the model premium is not an executabl
 
 | Convention | This article |
 |---|---|
-| Return basis | Simple returns; log output is $\log(1+R_t)$ of the complete payoff |
+| Return basis | Simple returns; log output is $\log(1+r^R_t)$ of the complete payoff |
 | Sampling grid | The `freq` grid of the pair calculation, default `ME` |
 | Annualisation | ACT/365 Fixed cash; statistical $\mathrm{af}$ remains periods per year |
 | Mean adjustment | None for currency valuation; EWMA for hedge volatility and beta estimation |
 | Timing | Hedge ratio and forward premium set at $t-1$ apply to the return at $t$ |
 | Output units | Decimal returns in the reference currency |
-| qis default | Pair and panel conversion use `is_log_returns=False`; `hedge_ratio` has no default: 0 is unhedged, 1 hedges the opening principal; `freq='ME'` |
+| qis default | Typed asset requests require kind and coordinate; `hedge_ratios=0.0`, `frequency='ME'`; the low-level pair kernel uses `is_log_returns=False` and an explicit `hedge_ratio` |
 
 | Symbol or input | Meaning | Units or convention |
 |---|---|---|
 | `fx_spots` | Spot panel by currency | USD per one unit of each currency; USD column is 1 |
 | $S_t$ | Local-to-reference cross | Reference currency per one unit of local currency |
 | $P_t$ | Asset price in local currency | Positive level on a dated index |
-| $r^{L}_t$, $r^{FX}_t$ | Local asset and cross-rate returns over $[t-1,t]$ | Simple periodic returns |
-| $y^L_t$, $y^R_t$ | Local and reference short rates | Annualised decimal rates |
-| $\mathrm{af}$, $\Delta_t$ | Statistical periods per year and cash year fraction | $\Delta_t=\mathrm{calendar\ days}(t,t+1)/365$ on the reset grid |
-| $f_t$ | qis local/reference cash-growth premium | Simple fraction; inverse quote to $F_t/S_t-1$ |
-| $F_t$ | Forward fixed at $t$ for the next period | Reference per local, same direction as $S_t$ |
-| $h_t$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
+| $r^{L}_t$, $r^{FX}_{c,t}$ | Local asset and cross-rate returns over $(t-1,t]$ | Simple periodic returns |
+| $y^L_{t-1}$, $y^R_{t-1}$ | Local and reference short rates | Annualised decimal rates |
+| $\mathrm{af}$, $\tau_t$ | Statistical periods per year and cash year fraction | $\tau_t=\mathrm{calendar\ days}(t-1,t)/365$ on the reset grid |
+| $f_{t-1,t}$ | qis local/reference cash-growth premium | Simple fraction; inverse quote to $F_{t-1,t}/S_{t-1}-1$ |
+| $F_{t-1,t}$ | Forward fixed at $t-1$ and maturing at $t$ | Reference per local, same direction as $S_t$ |
+| $h_{t-1}$ | Local opening principal sold forward | Fraction; 0 unhedged, 1 principal hedge |
 
 The cross is `fx_spots[local] / fx_spots[reference]`. For EUR assets viewed in CHF, it is CHF per
 EUR. Asset and currency labels must agree, and the panels must contain the necessary currencies.
@@ -84,40 +84,41 @@ $$
 S_t=\frac{\operatorname{spot}_t(\mathrm{local})}
           {\operatorname{spot}_t(\mathrm{reference})},
 \qquad
-1+r^{FX}_t=\frac{S_t}{S_{t-1}}.
+1+r^{FX}_{c,t}=\frac{S_t}{S_{t-1}}.
 $$
 
 The getter's simple premium and the corresponding forward satisfy
 
 $$
-1+f_t=\frac{1+\Delta_t y^L_t}{1+\Delta_t y^R_t},
+1+f_{t-1,t}=\frac{1+\tau_t y^L_{t-1}}{1+\tau_t y^R_{t-1}},
 \qquad
-\frac{F_t}{S_t}=\frac{1+\Delta_t y^R_t}{1+\Delta_t y^L_t}
-              =\frac{1}{1+f_t}.
+\frac{F_{t-1,t}}{S_{t-1}}=\frac{1+\tau_t y^R_{t-1}}{1+\tau_t y^L_{t-1}}
+              =\frac{1}{1+f_{t-1,t}}.
 $$
 
-Thus `get_forward_rate_for_local_ccy` does **not** return $F_t/S_t-1$ under the displayed spot
-direction. With `is_log_returns=True` it returns $\log(1+f_t)$ instead. Supplied premiums must
+Thus `get_forward_rate_for_local_ccy` does **not** return $F_{t-1,t}/S_{t-1}-1$ under the displayed spot
+direction. With `is_log_returns=True` it returns $\log(1+f_{t-1,t})$ instead. Supplied premiums must
 match the convention selected for the hedge function.
 
-The short-forward simple cost is $f_t/(1+f_t)$. A negative value is a gain to this hedge under
-the model. The period uses the frequency factor, not the actual number of days between two
-observations; state that convention when comparing with dated market forwards.
+The short-forward cost is $\kappa_{t-1,t}=f_{t-1,t}/(1+f_{t-1,t})$.
+A negative cost is a gain to this hedge under the model. Cash uses opening quotes and
+actual elapsed days through $r^{f,k}_t=y^k_{t-1}\tau_t$; it is never divided by the
+statistical annualisation factor. The supplied reset schedule remains unchanged.
 
 ### Hedged, unhedged, cash, and futures exposures
 
 For a cash asset, the reference-currency simple return is
 
 $$
-R_t
-=r^L_t(1+r^{FX}_t)
- +(1-h_{t-1})r^{FX}_t
- -h_{t-1}\frac{f_{t-1}}{1+f_{t-1}}.
+r^R_t
+=r^L_t(1+r^{FX}_{c,t})
+ +(1-h_{t-1})r^{FX}_{c,t}
+ -h_{t-1}\kappa_{t-1,t}.
 $$
 
-Setting $h=0$ gives $(1+r^L_t)(1+r^{FX}_t)-1$. Setting $h=1$ removes the direct spot-return term,
-but retains $r^L_t r^{FX}_t$: local investment gains remain exposed to terminal FX.
-Log output is $\log(1+R_t)$ after computing the complete payoff. For an unhedged position only,
+Setting $h=0$ gives $(1+r^L_t)(1+r^{FX}_{c,t})-1$. Setting $h=1$ removes the direct spot-return term,
+but retains $r^L_t r^{FX}_{c,t}$: local investment gains remain exposed to terminal FX.
+Log output is $\log(1+r^R_t)$ after computing the complete payoff. For an unhedged position only,
 this decomposes into local log return plus FX log return.
 
 An independent cash-flow derivation makes the hedge notional explicit. Let $V^L_{t-1}$ be local
@@ -125,15 +126,15 @@ opening asset value and sell $h_{t-1}V^L_{t-1}$ local currency forward:
 
 $$
 \begin{aligned}
-W^R_t
+W^r^R_t
 &=V^L_{t-1}\frac{P_t}{P_{t-1}}S_t
-  +h_{t-1}V^L_{t-1}(F_{t-1}-S_t),\\
-R_t&=\frac{W^R_t}{V^L_{t-1}S_{t-1}}-1.
+  +h_{t-1}V^L_{t-1}(F_{t-1,t}-S_t),\\
+r^R_t&=\frac{W^r^R_t}{V^L_{t-1}S_{t-1}}-1.
 \end{aligned}
 $$
 
-For a *known local cash payoff* with periodic interest $c^L$, hedge the terminal amount by
-setting $h=1+c^L$. Under the same CIP rates this locks terminal gross wealth at $1+c^R$,
+For a *known local cash payoff* with periodic interest $r^{f,L}_t$, hedge the terminal amount by
+setting $h=1+r^{f,L}_t$. Under the same CIP rates this locks terminal gross wealth at $1+r^{f,R}_t$,
 independent of terminal FX. Hedging only opening principal leaves the interest exposed.
 A risky asset's future gain is not known in advance, so this cash identity is not a general
 equal-excess-return identity for hedged investments.
@@ -151,7 +152,7 @@ $\ell^{FX}_t$. Selling $h$ units of local currency forward earns $-h\,\ell^{FX}_
 annualised forward carry $c$, so to first order the hedged reference-currency return is
 
 $$
-R_t(h)\approx(1+\beta-h)\,\ell^{FX}_t+\varepsilon_t-h\,c .
+r^R_t(h)\approx(1+\beta-h)\,\ell^{FX}_t+\varepsilon_t-h\,c .
 $$
 
 **Proposition (optimal hedge ratio).** Maximising
@@ -188,12 +189,12 @@ $\lambda=4/3$ is a modelling choice, not an estimate.
 
 ### Total and excess returns
 
-The panel helpers form excess returns using the reference currency's simple cash accrual $c_t$:
+The panel helpers form excess returns using the reference currency's simple cash accrual $r^{f,R}_t$:
 
 $$
-R^{\mathrm{excess}}_t=R_t-c_t,
+\tilde r^r^R_t(h)=r^R_t-r^{f,R}_t,
 \qquad
-\ell^{\mathrm{excess}}_t=\log(1+R_t)-\log(1+c_t).
+\tilde\ell^r^R_t(h)=\log(1+r^R_t)-\log(1+r^{f,R}_t).
 $$
 
 These are distinct conventions; `expm1` of log excess is not generally simple excess.
@@ -203,9 +204,9 @@ For reference/local asset requests passed to `compute_fx_returns`, raw annual
 rate quotes are as-of aligned to the asset grid, shifted by `cash_rate_lag` observations
 (default 1), then multiplied by actual interval days / 365. Statistical annualisation and
 the existing reset schedules are unchanged. The setting affects cash subtraction only, not spot
-translation or the one-period hedge carry. The latter helper's third output is the annual rate
-quote panel for reporting.
-Do not substitute that panel directly for periodic lagged cash accruals.
+translation or the one-period hedge carry. For reporting,
+`get_local_rate(annualise=True)` supplies annual quotes;
+do not substitute them directly for periodic lagged cash accruals.
 See [cash rate timing and FX adjustments](cash_rate_timing_and_fx_adjustments.md) for lag 0,
 lag 1 and midpoint comparisons against observed cash-index returns.
 
@@ -237,7 +238,7 @@ rates = pd.DataFrame({'USD': 0.048, 'EUR': 0.024}, index=dates)
 fx = qis.FxRatesData(fx_spots=spots, domestic_rates=rates)
 asset = pd.Series([100.0, 102.0], index=dates, name='EUR asset')
 
-converted_1 = qis.compute_fx_returns(
+unhedged_result = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(asset).to_frame(), local_ccys='EUR',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -245,8 +246,8 @@ converted_1 = qis.compute_fx_returns(
         reference_ccy='USD', hedge_ratios=0.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-unhedged = converted_1.values.iloc[:, 0]
-converted_2 = qis.compute_fx_returns(
+unhedged = unhedged_result.values.iloc[:, 0]
+hedged_result = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(asset).to_frame(), local_ccys='EUR',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -254,7 +255,7 @@ converted_2 = qis.compute_fx_returns(
         reference_ccy='USD', hedge_ratios=1.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-hedged = converted_2.values.iloc[:, 0]
+hedged = hedged_result.values.iloc[:, 0]
 dt = (dates[1] - dates[0]).days / 365
 local_growth, usd_cash = 1 + 0.024 * dt, 0.048 * dt
 forward = 1.10 * (1 + usd_cash) / local_growth
@@ -264,7 +265,7 @@ assert isclose(unhedged.iloc[-1], 0.122, abs_tol=1e-12)
 assert isclose(hedged.iloc[-1], cash_flow_return, abs_tol=1e-12)
 
 local_cash = pd.Series([100.0, 100.0 * local_growth], index=dates, name='EUR cash')
-converted_3 = qis.compute_fx_returns(
+covered_cash_result = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(local_cash).to_frame(), local_ccys='EUR',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -272,7 +273,7 @@ converted_3 = qis.compute_fx_returns(
         reference_ccy='USD', hedge_ratios=local_growth,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-covered_cash = converted_3.values.iloc[:, 0]
+covered_cash = covered_cash_result.values.iloc[:, 0]
 assert isclose(covered_cash.iloc[-1], usd_cash, abs_tol=1e-12)
 ```
 
@@ -367,10 +368,10 @@ The two figures can be opened at full resolution from their image links.
 
 | Quantity | Formula | qis entry point |
 |---|---|---|
-| FX and domestic-rate panel | $S_t$, $y^L_t$, $y^R_t$ | `qis.FxRatesData`, `qis.load_fx_rates_data` |
+| FX and domestic-rate panel | $S_t$, $y^L_{t-1}$, $y^R_{t-1}$ | `qis.FxRatesData`, `qis.load_fx_rates_data` |
 | Cross rates aligned to assets | $S_t$ per asset currency | `qis.get_aligned_fx_spots` |
-| Local and FX legs | $r^{L}_t$, $r^{FX}_t$ or their logs | `qis.compute_local_and_fx_return` |
-| Hedged reference return and optional index | $R_t$ at hedge ratio $h$ | `compute_fx_returns` with REFERENCE_TOTAL; explicit `.to_index(...)` |
+| Local and FX legs | $r^{L}_t$, $r^{FX}_{c,t}$ or their logs | `qis.compute_local_and_fx_return` |
+| Hedged reference return and optional index | $r^R_t$ at hedge ratio $h$ | `compute_fx_returns` with REFERENCE_TOTAL; explicit `.to_index(...)` |
 | Cash and futures translation | funded vs P&L-only exposure | `qis.compute_cash_fx_adjusted_returns`, `qis.compute_futures_fx_adjusted_returns` |
 | FX volatility and beta | $\sigma_{FX}$, $\beta$ | `qis.compute_fx_vol_beta` |
 | Optimal, beta and carry hedges | $h^{*}$, $1+\beta$, $1-c/(2\lambda\sigma^2_{FX})$ | `qis.compute_fx_optimal_hedge` |
@@ -399,7 +400,7 @@ eur_in_usd = fx.get_local_to_reference_fx_rate('EUR', 'USD')
 monthly_forward = fx.get_forward_rate_for_local_ccy(
     local_ccy='EUR', reference_ccy='USD', freq='ME', is_log_returns=False,
 )
-converted_4 = qis.compute_fx_returns(
+unhedged_history = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(eur_asset).to_frame(), local_ccys='EUR',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -407,11 +408,11 @@ converted_4 = qis.compute_fx_returns(
         reference_ccy='USD', hedge_ratios=0.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-unhedged_returns = converted_4.values.iloc[:, 0]
-unhedged_nav = converted_4.to_index(qis.FxIndexNormalization(
+unhedged_returns = unhedged_history.values.iloc[:, 0]
+unhedged_nav = unhedged_history.to_index(qis.FxIndexNormalization(
     1., 1., "capital_proportional", 'ME', "each_interval",
     "as_returned", "skip")).iloc[:, 0]
-converted_5 = qis.compute_fx_returns(
+hedged_history = qis.compute_fx_returns(
     fx, qis.FxAssetReturnsRequest(
         prices=(eur_asset).to_frame(), local_ccys='EUR',
         return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -419,8 +420,8 @@ converted_5 = qis.compute_fx_returns(
         reference_ccy='USD', hedge_ratios=1.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-hedged_returns = converted_5.values.iloc[:, 0]
-hedged_nav = converted_5.to_index(qis.FxIndexNormalization(
+hedged_returns = hedged_history.values.iloc[:, 0]
+hedged_nav = hedged_history.to_index(qis.FxIndexNormalization(
     1., 1., "capital_proportional", 'ME', "each_interval",
     "as_returned", "skip")).iloc[:, 0]
 ```

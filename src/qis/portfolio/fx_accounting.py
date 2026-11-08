@@ -67,6 +67,10 @@ class FxAccountSpec:
 class FxAccountData:
     """Owned account histories and event receipts, in explicit monetary units.
 
+    Each public field read makes a deep copy to preserve mutation isolation. For
+    reporting loops, read once (for example, ``nav = account.nav``) and reuse that
+    snapshot; the cost of each read is proportional to the field's size.
+
     Attributes:
         spec: Accounting policy, including initial reference capital.
         nav: Marked reference-currency capital, including unsettled receivables.
@@ -107,9 +111,10 @@ class FxAccountData:
         """
         from qis.portfolio.portfolio_data import PortfolioData
 
-        if (self.nav <= 0).any():
+        nav = self.nav
+        if (nav <= 0).any():
             raise ValueError("Nonpositive capital cannot be reported as a funded return index")
-        return PortfolioData(nav=self.nav)
+        return PortfolioData(nav=nav)
 
 
 def _dates(index: pd.Index, name: str) -> None:
@@ -320,9 +325,13 @@ def backtest_fx_account(
     account_rows, pnl_rows, flow_rows, diagnostic_rows = [], [], [], []
     units_rows, loans_rows, contract_rows = [], [], []
     active, receipts = {}, []
+    trades_by_date = {date: list(group.iterrows())
+                      for date, group in contracts.groupby("trade_date", sort=False)}
+    spot_values = spots.to_numpy(dtype=float)
+    currency_positions = {ccy: position for position, ccy in enumerate(spots.columns)}
     for step, date in enumerate(dates):
         p = prices.iloc[step].to_numpy(dtype=float)
-        s = spots.iloc[step].to_numpy(dtype=float)
+        s = spot_values[step]
         asset_spot = s[mapped]
         r = rates.iloc[step]
         period = accruals.iloc[step]
@@ -338,7 +347,7 @@ def backtest_fx_account(
         )
         if step:
             old_p = prices.iloc[step - 1].to_numpy(dtype=float)
-            old_s = spots.iloc[step - 1].to_numpy(dtype=float)[mapped]
+            old_s = spot_values[step - 1, mapped]
             pnl["asset_price_fx"] = float(np.sum(units * (p * asset_spot - old_p * old_s)))
             pnl["financing_fx"] = float(np.sum(loans * (asset_spot - old_s)))
             interest = loans * period.iloc[mapped].to_numpy()
@@ -356,7 +365,7 @@ def backtest_fx_account(
                 if spot_missing.loc[date, [ccy, reference]].any():
                     raise ValueError(f"Missing FX fixing quote for {identity}")
                 contract["fixed_payoff"] = contract["quantity"] * (
-                    spots.loc[date, ccy] - contract["strike"]
+                    s[currency_positions[ccy]] - contract["strike"]
                 )
             if date >= row.settlement_date:
                 if not contract["paid"]:
@@ -370,7 +379,7 @@ def backtest_fx_account(
                 )
             else:
                 fair_forward = (
-                    spots.loc[date, ccy]
+                    s[currency_positions[ccy]]
                     * _discount(r[ccy], date, row.fixing_date)
                     / _discount(r[reference], date, row.fixing_date)
                 )
@@ -415,7 +424,7 @@ def backtest_fx_account(
                 flows["equity_trades"] = -float(np.sum(changes * p * asset_spot))
                 cash += flows["equity_trades"]
             units = desired
-        for identity, row in contracts.loc[contracts.trade_date.eq(date)].iterrows():
+        for identity, row in trades_by_date.get(date, ()):
             ccy = row.currency
             if spot_missing.loc[date, [ccy, reference]].any():
                 raise ValueError("Cannot open a forward using stale FX marks")
@@ -428,9 +437,9 @@ def backtest_fx_account(
                 if price_missing.iloc[step].to_numpy()[selected & (units != 0.0)].any():
                     raise ValueError("Cannot size a principal hedge on stale equity marks")
                 base = float(np.sum(units[selected] * p[selected] * asset_spot[selected]))
-            quantity = row.notional_weight * base / spots.loc[date, ccy]
+            quantity = row.notional_weight * base / s[currency_positions[ccy]]
             strike = (
-                spots.loc[date, ccy]
+                s[currency_positions[ccy]]
                 * _discount(r[ccy], date, row.fixing_date)
                 / (_discount(r[reference], date, row.fixing_date))
             )
@@ -444,7 +453,7 @@ def backtest_fx_account(
                     fixing_date=row.fixing_date,
                     settlement_date=row.settlement_date,
                     currency=ccy,
-                    reference_notional=quantity * spots.loc[date, ccy],
+                    reference_notional=quantity * s[currency_positions[ccy]],
                     local_quantity=quantity,
                     strike=strike,
                 )

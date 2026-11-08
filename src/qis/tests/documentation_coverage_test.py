@@ -73,3 +73,22 @@ def test_perf_stat_member_is_in_the_catalogue(member: str) -> None:
     text = CATALOGUE.read_text(encoding='utf-8')
     assert re.search(rf'`(?:PerfStat\.)?{member}`', text), (
         f'PerfStat.{member} has no entry in performance_statistics.md')
+
+
+
+def test_generated_api_index_lists_every_core_symbol(tmp_path, monkeypatch):
+    """The Sphinx-generated reference covers the current core, including new FX exports."""
+    import sys
+    monkeypatch.setattr(sys, 'path', list(sys.path))
+    config = runpy.run_path(str(REPO_ROOT / 'docs' / 'conf.py'))
+    writer = config['_write_api_index']
+    monkeypatch.setitem(writer.__globals__, 'DOCS_DIR', tmp_path)
+    writer()
+    text = (tmp_path / 'api' / 'index.rst').read_text(encoding='utf-8')
+    listed = set(re.findall(r'^   qis\.(\w+)$', text, re.MULTILINE))
+    expected = {name for names in CORE_API.values() for name in names}
+    assert expected <= listed, sorted(expected - listed)
+    # Prove a missing symbol in the generated artifact is detected, even with prose coverage.
+    mutated = text.replace('   qis.FxAccountSpec\n', '')
+    assert mutated != text
+    assert 'FxAccountSpec' not in set(re.findall(r'^   qis\.(\w+)$', mutated, re.MULTILINE))

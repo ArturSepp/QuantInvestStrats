@@ -51,10 +51,10 @@ def run_example(verbose: bool = True) -> dict:
                 results[kind.value] = qis.compute_fx_returns(
                     fx,
                     qis.FxAssetReturnsRequest(
-                        prices,
-                        ccys,
-                        kind,
-                        coordinate,
+                        prices=prices,
+                        local_ccys=ccys,
+                        return_type=kind,
+                        coordinate=coordinate,
                         reference_ccy=reference,
                         frequency=freq,
                         cash_policy=qis.FxCashPolicy(quote_lag=1),
@@ -63,10 +63,10 @@ def run_example(verbose: bool = True) -> dict:
             translated = qis.compute_fx_returns(
                 fx,
                 qis.FxAssetReturnsRequest(
-                    prices,
-                    ccys,
-                    qis.FxReturnType.LOCAL_EXCESS_TRANSLATED,
-                    qis.FxReturnCoordinate.SIMPLE,
+                    prices=prices,
+                    local_ccys=ccys,
+                    return_type=qis.FxReturnType.LOCAL_EXCESS_TRANSLATED,
+                    coordinate=qis.FxReturnCoordinate.SIMPLE,
                     reference_ccy="USD",
                     frequency=freq,
                 ),
@@ -128,10 +128,10 @@ def run_example(verbose: bool = True) -> dict:
     cash_relative = qis.compute_fx_returns(
         fx,
         qis.FxAssetReturnsRequest(
-            prices,
-            ccys,
-            qis.FxReturnType.REFERENCE_EXCESS,
-            qis.FxReturnCoordinate.CASH_RELATIVE_SIMPLE,
+            prices=prices,
+            local_ccys=ccys,
+            return_type=qis.FxReturnType.REFERENCE_EXCESS,
+            coordinate=qis.FxReturnCoordinate.CASH_RELATIVE_SIMPLE,
             reference_ccy="USD",
             frequency="ME",
         ),

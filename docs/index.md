@@ -166,7 +166,9 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
   funded assets, options and futures in one stress interface.
 - [Stress testing with options](stress_testing_with_options.md):
   five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
-### Currency: returns, hedging and accounting
+<a id="currency-returns-hedging-and-accounting"></a>
+
+### Part VI: Currency returns, hedging and accounting
 
 - [Return conventions and FX adjustments](return_conventions_and_fx_adjustments.md):
   typed return coordinates, dated cash/hedge metadata and optional index normalization.
@@ -181,7 +183,9 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 - [Unhedged index replication](unhedged_index_replication.md): paired scatterplots using
   supplied spot FX and different-family index-implied FX, with explicit diagnostic limitations.
 
-### Part VI: Attribution
+<a id="part-vi-attribution"></a>
+
+### Part VII: Attribution
 
 - [Brinson attribution](brinson_attribution.md):
   allocation, selection and interaction effects against a benchmark.
@@ -307,7 +311,7 @@ Stress testing with options <stress_testing_with_options>
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Currency - Returns, hedging and accounting
+:caption: Part VI - Currency returns, hedging and accounting
 
 Return conventions and FX adjustments <return_conventions_and_fx_adjustments>
 FX hedging and market data <fx_hedging_and_market_data>
@@ -320,7 +324,7 @@ Unhedged index replication <unhedged_index_replication>
 ```{toctree}
 :hidden:
 :maxdepth: 1
-:caption: Part VI - Attribution
+:caption: Part VII - Attribution
 
 Brinson attribution <brinson_attribution>
 Model-layer attribution <model_layer_attribution>

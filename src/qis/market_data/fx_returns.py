@@ -134,7 +134,10 @@ class FxAssetReturnsRequest:
         coordinate: SIMPLE, LOG, or excess-only CASH_RELATIVE_SIMPLE; P&L requires SIMPLE.
         reference_ccy: Required for reference returns and translated P&L; absent for local.
         hedge_ratios: Additional principal hedge; scalar, asset Series or dated DataFrame.
-            Must be zero for LOCAL_EXCESS_TRANSLATED, which has local debt and no extra hedge.
+            Must be zero or missing for local returns and LOCAL_EXCESS_TRANSLATED; missing
+            means no additional hedge on these kinds. Reference-currency assets have no FX
+            exposure: their effective opening hedge is zero, also in opening_hedge_ratios.
+            Missing foreign-asset hedges still mask reference-return observations.
         frequency: Reset/return cadence, scalar or per-asset Series.
         cash_policy: Cash quote timing, day count and provenance.
         zero_return_to_nan: Explicit observation filter, applied after all calculations.
@@ -153,7 +156,9 @@ class FxAssetReturnsRequest:
     frequency: str | pd.Series = "ME"
     cash_policy: FxCashPolicy = field(default_factory=FxCashPolicy)
     zero_return_to_nan: bool = False
-    embedded_hedge_policy: str = "prices_include_existing_hedges; ratios_are_additional"
+    embedded_hedge_policy: Literal[
+        "prices_include_existing_hedges; ratios_are_additional"
+    ] = "prices_include_existing_hedges; ratios_are_additional"
     currency_changes: Literal["reject", "mask_boundary"] = "reject"
     diagnostics: bool = False
     normalization: FxIndexNormalization | None = None
@@ -545,18 +550,19 @@ def _asset_result(
                 }
             )
     return FxReturnsData(
-        request.return_type,
-        request.coordinate,
-        frequency,
-        request.reference_ccy,
-        request.cash_policy,
-        request.embedded_hedge_policy,
-        request.normalization,
-        values,
-        pd.DataFrame(currencies),
-        pd.DataFrame(hedges),
-        diagnostics,
-        request.local_ccys.loc[:, assets] if isinstance(request.local_ccys, pd.DataFrame) else None,
+        return_type=request.return_type,
+        coordinate=request.coordinate,
+        frequency=frequency,
+        reference_ccy=request.reference_ccy,
+        cash_policy=request.cash_policy,
+        embedded_hedge_policy=request.embedded_hedge_policy,
+        normalization=request.normalization,
+        _values=values,
+        _local_ccys=pd.DataFrame(currencies),
+        _opening_hedge_ratios=pd.DataFrame(hedges),
+        _diagnostics=diagnostics,
+        _currency_spells=(request.local_ccys.loc[:, assets]
+                          if isinstance(request.local_ccys, pd.DataFrame) else None),
     )
 
 
@@ -599,19 +605,18 @@ def _currency_result(data: FxRatesData, request: FxCurrencyReturnsRequest) -> Fx
                 forward_to_spot=1.0 / (1.0 + premium),
             )
     return FxReturnsData(
-        request.return_type,
-        request.coordinate,
-        request.frequency,
-        request.reference_ccy,
-        request.cash_policy,
-        "not applicable: long-local currency forward"
-        if is_forward
-        else "not applicable: spot only",
-        request.normalization,
-        values,
-        pd.DataFrame({ccy: ccy for ccy in values}, index=values.index),
-        pd.DataFrame(0.0, index=values.index, columns=values.columns),
-        diagnostics,
+        return_type=request.return_type,
+        coordinate=request.coordinate,
+        frequency=request.frequency,
+        reference_ccy=request.reference_ccy,
+        cash_policy=request.cash_policy,
+        embedded_hedge_policy=("not applicable: long-local currency forward"
+                               if is_forward else "not applicable: spot only"),
+        normalization=request.normalization,
+        _values=values,
+        _local_ccys=pd.DataFrame({ccy: ccy for ccy in values}, index=values.index),
+        _opening_hedge_ratios=pd.DataFrame(0.0, index=values.index, columns=values.columns),
+        _diagnostics=diagnostics,
     )
 
 
@@ -686,8 +691,10 @@ def compute_fx_returns(
         raise ValueError("prices requires nonempty unique asset columns")
     if request.return_type not in _REFERENCE:
         h = np.asarray(request.hedge_ratios)
-        if np.any(h != 0.0):
-            raise ValueError("Local returns and translated local excess cannot request an FX hedge")
+        if np.any(h[pd.notna(h)] != 0.0):
+            raise ValueError(
+                "Local returns and translated local excess require zero or missing hedges"
+            )
     if isinstance(request.frequency, str):
         groups = {request.frequency: request.prices.columns.tolist()}
     elif isinstance(request.frequency, pd.Series):

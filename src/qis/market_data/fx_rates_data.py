@@ -418,7 +418,11 @@ class FxRatesData:
     def _get_period_cash_returns(self, return_index: pd.DatetimeIndex, local_ccy: str,
                                  freq: str, is_log_returns: bool,
                                  cash_rate_lag: int = 1) -> pd.Series:
-        """Accrue ACT/365F cash on actual boundaries, sharing QIS funding's primitive."""
+        """Accrue ACT/365F cash on actual boundaries, sharing QIS funding's primitive.
+
+        ``freq`` is retained for signature stability with existing callers; only
+        ``return_index`` determines elapsed days and quote/reset boundaries.
+        """
         if isinstance(cash_rate_lag, bool) or not isinstance(cash_rate_lag, (int, np.integer)) \
                 or cash_rate_lag < 0:
             raise ValueError("cash_rate_lag must be a nonnegative integer")

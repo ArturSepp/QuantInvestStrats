@@ -8,7 +8,7 @@ myst:
 
 # Self-financed FX accounting
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-11-08](https://github.com/ArturSepp/QuantInvestStrats/commit/fae104880a01c21f3882fe8af3a6796cd669b96d)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
@@ -85,7 +85,7 @@ and reset L to minus the current held local asset value. Keep units u unchanged 
 trade is explicitly scheduled. Under reference financing, equity purchases instead debit C.
 
 Local settlement is a strategy decision. With unit equity prices 100, 110, 100 and FX 1, 2, 1,
-zero rates and one held unit, settling each increment gives 10 x 2 - 10 x 1 = 10 reference
+zero rates and one held unit, settling each increment gives $10 \times 2 - 10 \times 1 = 10$ reference
 P&L; endpoint settlement gives zero. Resampling a completed account must not silently replace
 its financing/settlement calendar.
 
@@ -174,6 +174,8 @@ cash-flow tests also cover signed equity books, full and partial principal hedge
 payment, capital resizing, negative capital, stale observations and non-USD reference accounts.
 
 ## Implementation in qis
+
+[Account API](api/generated/qis.backtest_fx_account.rst), [account policy](api/generated/qis.FxAccountSpec.rst) and [account result](api/generated/qis.FxAccountData.rst).
 
 Use `FxAccountSpec`, `backtest_fx_account` and `FxAccountData`. The source is
 [portfolio/fx_accounting.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/fx_accounting.py).

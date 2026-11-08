@@ -64,11 +64,11 @@ the analytics.
 | `reference_ccy`, $R$ | Portfolio's reporting and funding currency, such as USD, EUR, CHF or GBP |
 | `fx_spots` | Date-by-currency panel in **USD per unit of currency**; the USD column is 1 |
 | `domestic_rates`, $y^C_t$ | Annual decimal short-rate quotes for currency $C$, e.g. 0.04 means 4% per annum |
-| $S^{L/R}_t$, $g^{L/R}_t$ | Reference currency per local unit and its simple return |
+| $S^{L/R}_t$, $r^{FX}_{c,t}$ | Reference currency per local unit and its simple return |
 | $r^L_{i,t}$, $r^R_{i,t}(h)$ | Local total return and reference-currency total return under hedge policy $h$ |
 | $r^{f,R}_t$ | Periodic reference-currency cash accrual; not an annual yield |
 | $\tilde r^R_{i,t}$, $\tilde\ell^R_{i,t}$ | Arithmetic and log returns in excess of reference cash |
-| $f^{L/R}_{t-1}$ | QIS local/reference cash-growth premium for the forthcoming period; not the forward-price premium |
+| $f_{t-1,t}$ | QIS local/reference cash-growth premium for the forthcoming period; not the forward-price premium |
 
 Spots and rates must cover the local currencies and the reference currency, with enough
 history before the first return being measured. The foreign-asset path obtains both currencies'
@@ -96,7 +96,7 @@ investor overlay. Convert prices in pence to pounds consistently with their meta
 $$
 S^{L/R}_t=\frac{\operatorname{spot}_t(L)}{\operatorname{spot}_t(R)},
 \qquad
-g^{L/R}_t=\frac{S^{L/R}_t}{S^{L/R}_{t-1}}-1.
+r^{FX}_{c,t}=\frac{S^{L/R}_t}{S^{L/R}_{t-1}}-1.
 $$
 
 For example, `fx_spots['EUR'] / fx_spots['CHF']` is CHF per EUR. USD is the storage
@@ -105,7 +105,7 @@ numeraire for the spot panel, not a restriction on the portfolio reference curre
 **Identity (unhedged funded asset).**
 
 $$
-1+r^R_{i,t}(0)=(1+r^L_{i,t})(1+g^{L/R}_t).
+1+r^R_{i,t}(0)=(1+r^L_{i,t})(1+r^{FX}_{c,t}).
 $$
 
 **Proof.** Reference-currency wealth is local wealth multiplied by the contemporaneous spot
@@ -119,15 +119,15 @@ asset return. Only decisions and contracted inputs fixed at the period start are
 ### Apply the opening-principal hedge and forward carry
 
 QIS uses a rate-implied forward under covered interest parity (CIP); it does not infer an
-executable forward price from spot alone. With $\Delta_t=\mathrm{calendar\ days}(t-1,t)/365$,
+executable forward price from spot alone. With $\tau_t=\mathrm{calendar\ days}(t-1,t)/365$,
 
 $$
-1+f^{L/R}_{t-1}
-=\frac{1+\Delta_t y^L_{t-1}}{1+\Delta_t y^R_{t-1}}.
+1+f_{t-1,t}
+=\frac{1+\tau_t y^L_{t-1}}{1+\tau_t y^R_{t-1}}.
 $$
 
-The actual reference-per-local forward satisfies $F_{t-1}/S_{t-1}=1/(1+f^{L/R}_{t-1})$.
-Consequently, the short-forward cost is $f/(1+f)$, **not** $f$. Rate-only CIP omits
+The actual reference-per-local forward satisfies $F_{t-1,t}/S_{t-1}=1/(1+f_{t-1,t})$.
+Consequently, the short-forward cost is $\kappa_{t-1,t}=f_{t-1,t}/(1+f_{t-1,t})$, **not** $f$. Rate-only CIP omits
 cross-currency basis and execution costs; see the
 [BIS discussion](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis).
 
@@ -135,14 +135,14 @@ cross-currency basis and execution costs; see the
 
 $$
 r^R_{i,t}(h)
-=r^L_{i,t}(1+g^{L/R}_t)
- +(1-h_{i,t-1})g^{L/R}_t
- -h_{i,t-1}\frac{f^{L/R}_{t-1}}{1+f^{L/R}_{t-1}}.
+=r^L_{i,t}(1+r^{FX}_{c,t})
+ +(1-h_{i,t-1})r^{FX}_{c,t}
+ -h_{i,t-1}\kappa_{t-1,t}.
 $$
 
 **Proof.** Hold local opening wealth $P^L_{i,t-1}$ and sell
 $h_{i,t-1}P^L_{i,t-1}$ local units forward. Terminal reference wealth is
-$P^L_{i,t}S_t+h_{i,t-1}P^L_{i,t-1}(F_{t-1}-S_t)$. Divide by opening wealth
+$P^L_{i,t}S_t+h_{i,t-1}P^L_{i,t-1}(F_{t-1,t}-S_t)$. Divide by opening wealth
 $P^L_{i,t-1}S_{t-1}$, subtract one and substitute the CIP forward ratio. $\square$
 
 At `h=1`, the direct FX return on opening principal disappears, but the local investment
@@ -179,8 +179,9 @@ $$
 =\log(1+r^R_{i,t}(h))-\log(1+r^{f,R}_t).
 $$
 
-`is_log_returns=False, is_excess_returns=True` selects arithmetic excess;
-`is_log_returns=True, is_excess_returns=True` selects log excess. For the latter, QIS first
+An `FxAssetReturnsRequest` with `return_type=FxReturnType.REFERENCE_EXCESS`
+selects arithmetic excess with `coordinate=FxReturnCoordinate.SIMPLE`, or log excess with
+`coordinate=FxReturnCoordinate.LOG`. For the latter, QIS first
 computes the complete hedged simple payoff, takes its logarithm, then subtracts log cash.
 It does not add hedged local and FX log legs as though that were an exact hedge payoff.
 
@@ -201,8 +202,9 @@ $\square$
 
 A LOCAL_EXCESS request instead uses each asset's native cash rate
 without any FX translation. That is useful for a deliberately native-currency analysis,
-but it is not a replacement for investor-currency risk inputs. Its third output contains
-annual rate quotes, not ready-to-subtract periodic accruals.
+but it is not a replacement for investor-currency risk inputs. Read each cadence's
+`FxReturnsData.values`; annual quotes remain on `FxRatesData.domestic_rates` and are
+not ready-to-subtract periodic accruals.
 
 ### Separate asset returns from MATF factor definitions
 
@@ -283,7 +285,7 @@ for hedge in (0.0, 0.5, 1.0):
     total = terminal_usd / (100.0 * 1.10) - 1.0
     cash = 0.048 * dt
     for log_returns in (False, True):
-        converted_1 = qis.compute_fx_returns(
+        reference_excess = qis.compute_fx_returns(
             fx_check, qis.FxAssetReturnsRequest(
                 prices=(eur_asset).to_frame(), local_ccys='EUR',
                 return_type=qis.FxReturnType.REFERENCE_EXCESS,
@@ -291,7 +293,7 @@ for hedge in (0.0, 0.5, 1.0):
                 reference_ccy='USD', hedge_ratios=hedge,
                 frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
             ))['ME']
-        excess = converted_1.values.iloc[:, 0]
+        excess = reference_excess.values.iloc[:, 0]
         expected = np.log1p(total) - np.log1p(cash) if log_returns else total - cash
         np.testing.assert_allclose(excess.iloc[-1], expected, atol=1e-12)
         assert pd.isna(excess.iloc[0])  # No pre-inception holding period.
@@ -356,7 +358,7 @@ assert asset_log_excess.columns.equals(prices.columns)
 assert asset_log_excess.iloc[0].isna().all()
 
 # Reporting uses total returns, with otherwise identical inputs and hedge policy.
-fx_result_38 = qfx.compute_fx_returns(
+reference_total = qfx.compute_fx_returns(
                                fx_data,
                                qfx.FxAssetReturnsRequest(
                                    prices=prices,
@@ -368,9 +370,9 @@ fx_result_38 = qfx.compute_fx_returns(
                                    frequency='ME',
                                    cash_policy=qfx.FxCashPolicy(quote_lag=1),
                                    zero_return_to_nan=False))['ME']
-total_navs = fx_result_38.to_index(qfx.FxIndexNormalization(
+total_navs = reference_total.to_index(qfx.FxIndexNormalization(
     1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
-total_simple = fx_result_38.values
+total_simple = reference_total.values
 reference_cash = rates[reference_ccy].shift(1) * rates.index.to_series().diff().dt.days / 365
 np.testing.assert_allclose(
     asset_log_excess,
@@ -433,7 +435,7 @@ for investor_ccy in ('USD', 'CHF'):
     for hedge in (0.0, 0.5, 1.0):
         key = (investor_ccy, hedge)
         for use_logs, outputs in ((False, simple_by_view), (True, log_by_view)):
-            converted_2 = qis.compute_fx_returns(
+            investor_excess = qis.compute_fx_returns(
                 fx_data, qis.FxAssetReturnsRequest(
                     prices=(comparison_asset).to_frame(), local_ccys='USD',
                     return_type=qis.FxReturnType.REFERENCE_EXCESS,
@@ -441,7 +443,7 @@ for investor_ccy in ('USD', 'CHF'):
                     reference_ccy=investor_ccy, hedge_ratios=hedge,
                     frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
                 ))['ME']
-            outputs[key] = converted_2.values.iloc[:, 0]
+            outputs[key] = investor_excess.values.iloc[:, 0]
 
         # Independent check: terminal asset value plus the contracted forward payoff.
         cross = spots['USD'] / spots[investor_ccy]  # Investor currency per USD.
@@ -578,7 +580,7 @@ principal_fx = qis.FxRatesData(
     fx_spots=pd.DataFrame({'USD': 1.0, 'CHF': [1.0, 1.0 / 1.10]}, index=principal_dates),
     domestic_rates=pd.DataFrame({'USD': 0.0, 'CHF': 0.0}, index=principal_dates),
 )
-converted_3 = qis.compute_fx_returns(
+principal_hedged_result = qis.compute_fx_returns(
     principal_fx, qis.FxAssetReturnsRequest(
         prices=(pd.Series([100.0, 110.0], index=principal_dates)).to_frame(), local_ccys='USD',
         return_type=qis.FxReturnType.REFERENCE_EXCESS,
@@ -586,7 +588,7 @@ converted_3 = qis.compute_fx_returns(
         reference_ccy='CHF', hedge_ratios=1.0,
         frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
     ))['ME']
-principal_return = converted_3.values.iloc[:, 0]
+principal_return = principal_hedged_result.values.iloc[:, 0]
 terminal_chf = 110.0 * 1.10 + 100.0 * (1.0 - 1.10)
 np.testing.assert_allclose(terminal_chf, 111.0, rtol=0, atol=1e-12)
 np.testing.assert_allclose(principal_return.iloc[-1], terminal_chf / 100 - 1, atol=1e-12)

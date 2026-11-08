@@ -204,6 +204,51 @@ def prose_lines(text: str) -> tuple[list[tuple[int, str]], list[Issue], str]:
     return visible, issues, metadata
 
 
+
+def check_math_source(text: str) -> list[Issue]:
+    """Reject hidden controls and unescaped known macros in rendered mathematics."""
+    issues = []
+    fence = ''
+    display = False
+    comment = False
+    bare_macro = re.compile(
+        r'(?<![\\A-Za-z])(?:log|exp|kappa|varphi|mathrm|tau|Delta|sqrt|frac)(?![A-Za-z])'
+    )
+    for number, source in enumerate(text.split('\n'), start=1):
+        for match in re.finditer(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', source):
+            issues.append(Issue(number, f'Invalid control character U+{ord(match[0]):04X}.'))
+        line = source
+        if comment:
+            if '-->' not in line:
+                continue
+            line = line.split('-->', 1)[1]
+            comment = False
+        while '<!--' in line:
+            before, after = line.split('<!--', 1)
+            if '-->' in after:
+                line = before + after.split('-->', 1)[1]
+            else:
+                line, comment = before, True
+        match = FENCE.match(line)
+        if fence:
+            if match and match[1][0] == fence[0] and len(match[1]) >= len(fence):
+                fence = ''
+            continue
+        if match:
+            fence = match[1]
+            continue
+        line = re.sub(r'(`+).*?\1', '', line)
+        if line.strip() == '$$':
+            display = not display
+            continue
+        fragments = [line] if display else re.findall(r'(?<!\\)\$(?!\$)(.*?)(?<!\\)\$', line)
+        for fragment in fragments:
+            fragment = re.sub(r'\\(?:text|mathrm|operatorname)\{[^{}]*\}', '', fragment)
+            if (match := bare_macro.search(fragment)):
+                issues.append(Issue(number, f'Math macro {match[0]} needs a backslash.'))
+    return issues
+
+
 def valid_byline(line: str) -> bool:
     """Check linked attribution and an optional, calendar-valid repository-evidence date."""
     match = BYLINE.fullmatch(line)
@@ -228,6 +273,7 @@ def check_document(text: str, *, methodology: bool) -> list[Issue]:
         Source issues. An empty list means these source checks passed, not that TeX rendered.
     """
     visible, issues, metadata = prose_lines(text)
+    issues.extend(check_math_source(text))
     description = re.search(r'(?m)^[ \t]+description:[ \t]*([^\n]*)', metadata)
     if not description or 'html_meta:' not in metadata or 'myst:' not in metadata:
         issues.append(Issue(1, 'Provide a myst.html_meta.description in front matter.'))

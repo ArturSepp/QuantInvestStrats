@@ -248,7 +248,7 @@ translated = {}
 for label, usd_per_chf in quotes.items():
     spots = pd.DataFrame({'USD': 1.0, 'CHF': usd_per_chf})
     fx = qis.FxRatesData(fx_spots=spots, domestic_rates=spots * 0.0)
-    converted_1 = qis.compute_fx_returns(
+    unhedged_result = qis.compute_fx_returns(
         fx, qis.FxAssetReturnsRequest(
             prices=(asset_usd).to_frame(), local_ccys='USD',
             return_type=qis.FxReturnType.REFERENCE_TOTAL,
@@ -256,7 +256,7 @@ for label, usd_per_chf in quotes.items():
             reference_ccy='CHF', hedge_ratios=0.0,
             frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
         ))['ME']
-    returns = converted_1.values.iloc[:, 0]
+    returns = unhedged_result.values.iloc[:, 0]
     translated[label] = float(returns.iloc[-1])
 assert isclose(translated['Supplied spots'], -0.065, abs_tol=1e-12)
 assert isclose(translated['Index-implied diagnostic'],

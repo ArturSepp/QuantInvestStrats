@@ -7,7 +7,32 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.47.1] - 2026-11-08
+
+### Fixed
+
+- Accept missing additional hedge metadata as absent for local
+  returns and translated local excess. Foreign reference-return hedges still mask
+  missing observations; nonzero local hedges remain invalid.
+- Restore FX glossary mathematics and align cash, spot, forward and excess-return
+  notation with opening-to-closing ACT/365 Fixed intervals. Correct reporting examples,
+  API navigation and historical cash-getter migration notes.
+- Guard documentation against control characters and unescaped known math macros,
+  and verify the Sphinx-generated API index covers every core symbol, including
+  decorated callables and the documented factsheet configuration constant.
+
+### Changed
+
+- Type the single supported embedded-hedge policy with Literal; use named result fields.
+  Document same-currency hedge handling and the cost of defensive account-result copies.
+- Group forward openings by date and use positional spot reads in the FX account ledger,
+  preserving trade order, settlement, valuation and cash-flow calculations.
+
 ## [5.47.0] - 2026-11-08
+
+**Numerical change:** ACT/365 Fixed changes cash accrual and excess returns, including
+still-public deprecated FX methods and `get_local_rate(annualise=False)`. Reproducing
+pre-5.47 cash-based results requires their original version and conventions.
 
 This release publishes the approved FX work validated locally under 5.44.9, 5.45.0,
 5.46.0 and 5.47.0. The previous PyPI release was 5.44.8.
@@ -36,6 +61,10 @@ This release publishes the approved FX work validated locally under 5.44.9, 5.45
 - Use opening-rate ACT/365 Fixed cash accrual in FX local/reference excess returns,
   cash NAVs and matched-period synthetic forward premiums, sharing the existing
   portfolio-funding primitive. Preserve annual rates and existing reset schedules.
+- `FxRatesData.get_local_rate(annualise=False)` now returns end-labelled simple cash
+  from the opening quote times actual calendar days/365. Previously it returned the
+  closing quote divided by the frequency's annualisation factor. `annualise=True`
+  continues to return annual quotes unchanged.
 - Add optional actual interval boundaries to `get_forward_rate_for_local_ccy`.
   Premiums retain their inverse-forward quote direction; default output follows the
   reset grid, and asset conversion passes actual boundaries including weekend month ends.

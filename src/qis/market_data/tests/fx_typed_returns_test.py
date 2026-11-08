@@ -295,3 +295,21 @@ def test_public_request_annotation_resolves_at_runtime():
     """Typed tooling can resolve the canonical service's real data-container annotation."""
     from typing import get_type_hints
     assert get_type_hints(qis.compute_fx_returns)['data'] is qis.FxRatesData
+
+
+@pytest.mark.parametrize('kind', [qis.FxReturnType.LOCAL_TOTAL, qis.FxReturnType.LOCAL_EXCESS,
+                                 qis.FxReturnType.LOCAL_EXCESS_TRANSLATED])
+@pytest.mark.parametrize('shape', ['scalar', 'series', 'dated'])
+def test_local_requests_accept_missing_hedges_as_no_hedge(kind, shape):
+    """A missing additional hedge on a local payoff has the same economics as zero."""
+    fx, prices = market()
+    hedge = {'scalar': np.nan, 'series': pd.Series({'equity': np.nan}),
+             'dated': pd.DataFrame({'equity': [np.nan, 0., np.nan]}, index=prices.index)}[shape]
+    kwargs = dict(prices=prices, local_ccys='EUR', return_type=kind,
+                  coordinate=qis.FxReturnCoordinate.SIMPLE,
+                  reference_ccy='USD' if kind is qis.FxReturnType.LOCAL_EXCESS_TRANSLATED else None)
+    actual = qis.compute_fx_returns(
+        fx, qis.FxAssetReturnsRequest(**kwargs, hedge_ratios=hedge))['ME']
+    zero = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(**kwargs, hedge_ratios=0.0))['ME']
+    pd.testing.assert_frame_equal(actual.values, zero.values)
+    pd.testing.assert_frame_equal(actual.opening_hedge_ratios, zero.opening_hedge_ratios)
