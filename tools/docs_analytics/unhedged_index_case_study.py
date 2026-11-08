@@ -209,11 +209,13 @@ def refit(source_csv, spec, output_dir):
             cross_nav = anchored_nav(fx_return.to_frame('cross'))['cross']
             spots = pd.DataFrame({'USD': 1.0, reference['Reference_ccy']: 1 / cross_nav})
             fx = qis.FxRatesData(fx_spots=spots, domestic_rates=spots * 0.0)
-            _, reproduced = fx.compute_performance_of_local_ccy_asset_in_reference_ccy(
-                asset_price_local_ccy=base_nav, hedge_ratio=0.0, local_ccy='USD',
-                reference_ccy=reference['Reference_ccy'], freq='ME',
-                is_excess_returns=False, is_log_returns=False, cash_rate_lag=1,
-            )
+            reproduced = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
+                prices=base_nav.to_frame(), local_ccys='USD',
+                return_type=qis.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
+                reference_ccy=reference['Reference_ccy'], frequency='ME',
+                hedge_ratios=0.0, cash_policy=qis.FxCashPolicy(quote_lag=1),
+            ))['ME'].values.iloc[:, 0]
             np.testing.assert_allclose(frame[label], reproduced.loc[grid], atol=1e-12)
         nav = anchored_nav(frame[['Observed', 'QIS', 'Index FX holdout']])
         pa = dict(zip(nav.columns, np.atleast_1d(qis.compute_pa_return(nav))))

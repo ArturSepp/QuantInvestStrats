@@ -65,9 +65,13 @@ def run_asset_fx_hedging_report(asset_price_local_ccy: pd.Series,
                                                                               reference_ccy=reference_ccy)
     forward_rate_for_local_ccy = fx_rates_data.get_forward_rate_for_local_ccy(local_ccy=local_ccy,
                                                                               reference_ccy=reference_ccy, freq=freq)
-    carry_fx_nav = fx_rates_data.get_carry_fx_return_nav(local_ccy=local_ccy, reference_ccy=reference_ccy,
-                                                         freq=freq,
-                                                         time_period=time_period)
+    forward_result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
+        (local_ccy,), reference_ccy, qis.FxReturnType.FX_FORWARD, frequency='B'))['B']
+    forward_fx_nav = forward_result.to_index(qis.FxIndexNormalization(
+        initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
+        settlement_frequency='B', reinvestment='each_interval',
+        cash_treatment='as_returned', missing_returns='skip')).iloc[:, 0]
+    forward_fx_nav = qis.df_asfreq(forward_fx_nav, freq=freq).rename(f'{local_ccy}-{reference_ccy}')
 
     kwargs = dict(asset_price_local_ccy=asset_price_local_ccy,
                   local_to_reference_fx_rate=local_to_reference_fx_rate,
@@ -88,8 +92,8 @@ def run_asset_fx_hedging_report(asset_price_local_ccy: pd.Series,
     nav_optimal, _ = compute_performance_of_local_ccy_asset_in_reference_ccy(hedge_ratio=optimal_hedge, **kwargs)
 
     navs = pd.concat([asset_price_local_ccy,
-                      local_to_reference_fx_rate.rename(f"{carry_fx_nav.name} spot return"),
-                      carry_fx_nav.rename(f"{carry_fx_nav.name} carry return"),
+                      local_to_reference_fx_rate.rename(f"{forward_fx_nav.name} spot return"),
+                      forward_fx_nav.rename(f"{forward_fx_nav.name} fwd index"),
                       nav0.rename('h=0.0'), nav05.rename('h=0.5'), nav1.rename('h=1.0'),
                       nav_beta.rename('Beta-Hedged'),
                       nav_carry.rename('Carry-Hedged'),
@@ -107,7 +111,9 @@ def run_asset_fx_hedging_report(asset_price_local_ccy: pd.Series,
     if time_period is not None:
         navs = time_period.locate(navs)
     qis.set_suptitle(fig, title=f"{asset_price_local_ccy.name} local in {local_ccy} reference in {reference_ccy}:"
-                                f" {qis.get_time_period(navs).to_str()}")
+                                f" {qis.get_time_period(navs).to_str()}\n"
+                                "FX forward index: unit notional/capital, "
+                                "daily resets, no added cash")
     qis.plot_ra_perf_table_benchmark(prices=navs,
                                      benchmark=str(asset_price_local_ccy.name),
                                      heatmap_columns=[1, 3],

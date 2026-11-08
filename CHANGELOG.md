@@ -7,6 +7,53 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [5.47.0] - 2026-11-08
+
+This release publishes the approved FX work validated locally under 5.44.9, 5.45.0,
+5.46.0 and 5.47.0. The previous PyPI release was 5.44.8.
+
+### Added
+
+- Add typed `compute_fx_returns`, separate asset/currency requests, explicit economic
+  return kinds, SIMPLE/LOG coordinates, cash policy, dated provenance and owned results.
+- Add exact `LOCAL_EXCESS_TRANSLATED` and `FX_FORWARD` payoffs:
+  `(local_total - local_cash) * spot_gross` and `spot_return + f/(1+f)`.
+  These are signed SIMPLE P&L per opening reference notional, with no automatic NAV.
+- Make synthetic indices optional through explicit `FxIndexNormalization`: capital,
+  notional, settlement, reinvestment, cash and missing-payoff policies are declared.
+- Add self-financed FX accounts with funded equity units, signed local financing,
+  reference cash and zero-cost forwards with distinct fixing and payment dates.
+  Require capital/notional policy, settlement schedules and an observed-spot mask.
+  Preserve signed monetary losses; positive funded NAV reporting is optional.
+- Support principal hedge rolls and capital-sized forward sleeves with independent
+  cash-flow validation and monetary P&L reconciliation. Basis, credit limits,
+  collateral haircuts, margin calls and transaction costs are not modelled.
+- Add offline daily/monthly SIMPLE/LOG examples and executed handbook documentation
+  covering conversion, excess returns, exact payoffs and self-financed accounts.
+
+### Changed
+
+- Use opening-rate ACT/365 Fixed cash accrual in FX local/reference excess returns,
+  cash NAVs and matched-period synthetic forward premiums, sharing the existing
+  portfolio-funding primitive. Preserve annual rates and existing reset schedules.
+- Add optional actual interval boundaries to `get_forward_rate_for_local_ccy`.
+  Premiums retain their inverse-forward quote direction; default output follows the
+  reset grid, and asset conversion passes actual boundaries including weekend month ends.
+- Migrate current FX examples and report currency-index panels to the typed API and
+  exact forward payoffs. Historical preview exhibits retain their recorded conventions.
+- Keep the generic funded portfolio backtester and carry semantics unchanged.
+
+### Deprecated
+
+- Deprecate four `FxRatesData` asset methods: `compute_performance_of_local_ccy_asset_in_reference_ccy`,
+  `compute_returns_in_reference_ccy`, `compute_fx_adjusted_returns` and
+  `compute_returns_adjusted_by_local_rate` (warnings introduced in local 5.45.0).
+- Deprecate `get_daily_carry_local_return`, `get_fx_total_return_nav` and
+  `get_carry_fx_return_nav` (warnings introduced in local 5.46.0).
+- All seven methods first ship with these warnings on PyPI in 5.47.0; removal is
+  scheduled for 6.0.0. Their original algorithms remain during retirement, with no
+  compatibility facade over the typed API. The standalone low-level hedge kernel remains supported.
+
 ## [5.44.8] - 2026-11-06
 
 ### Added

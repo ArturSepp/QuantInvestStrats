@@ -11,21 +11,22 @@ correct. Each spot column is USD per 1 unit of that currency, so USD is identica
 cross rate is a ratio of two columns: ``get_local_to_reference_fx_rate('EUR', 'CHF')`` returns
 CHF per EUR - units of the *reference* currency per one unit of the *local* one.
 
-Carry follows from covered interest parity rather than from a forward panel. Over one period of
-length dt = 1 / annualisation_factor(freq) the premium earned on the local currency is
+Cash uses opening quotes times actual calendar days / 365 on each existing reset interval.
+Carry follows from matched-period covered interest parity rather than a forward panel.
+With dt equal to that ACT/365F fraction, the local/reference cash-growth premium is
 
     simple:  (1 + dt r_loc) / (1 + dt r_ref) - 1
     log:     log( (1 + dt r_loc) / (1 + dt r_ref) )
 
-and the total return of holding a currency pair splits into the spot return of the cross and
-this premium, lagged one period so that the rate earned over [t, t+1] is the one set at t.
-``is_log_returns`` selects the convention and both legs honour it.
+The exact long-local forward payoff adds f/(1+f), not this premium f, to the simple
+spot return. Opening quotes price each interval. The legacy premium-based currency indices
+are deprecated; their retained algorithms are not exact forward settlement.
 
 Main entry points: ``get_local_to_reference_fx_rate`` and ``get_local_rate`` for the raw
-quantities, ``get_fx_total_return_nav`` and ``get_carry_fx_return_nav`` for a tradeable pair,
+quantities, ``compute_fx_returns`` with an ``FxCurrencyReturnsRequest`` for spot/forward P&L,
 ``build_local_cash_nav`` and ``build_cross_fx_cash_nav`` for money-market legs, and
-``compute_returns_in_reference_ccy`` / ``compute_fx_adjusted_returns`` to move a whole asset
-panel into a reference currency at supplied ``hedge_ratios``.
+``compute_fx_returns`` with an ``FxAssetReturnsRequest`` to move a whole asset panel
+into a reference currency. The typed result does not construct a NAV unless requested.
 
 Loading is from the CSV pair written by the data layer, through ``FxRatesData.load`` or
 ``load_fx_rates_data``; building that data from a vendor is ``bbg-fetch``, not this module.
@@ -33,13 +34,19 @@ Choosing the hedge ratio rather than applying it is ``qis/market_data/fx_hedging
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import qis as qis
 from dataclasses import dataclass
-from typing import Tuple, Union, Optional, Dict, Literal
+from typing import Tuple, Union, Optional, Dict, Literal, ClassVar
 
-from qis.market_data.fx_hedging import compute_performance_of_local_ccy_asset_in_reference_ccy
+from qis.market_data.fx_hedging import (
+    compute_local_and_fx_return,
+    compute_performance_of_local_ccy_asset_in_reference_ccy,
+)
+from qis.utils.df_ops import multiply_df_by_dt
 
 @dataclass
 class FxRatesData:
@@ -54,7 +61,9 @@ class FxRatesData:
     Attributes:
         fx_spots: USD per 1 unit of each currency, one column per currency
         domestic_rates: annualised short rate per currency, on the same columns
+        cash_day_count: Fixed ACT/365F analytical cash convention; not a stored panel.
     """
+    cash_day_count: ClassVar[str] = 'ACT/365F'
     fx_spots: pd.DataFrame
     domestic_rates: pd.DataFrame
 
@@ -104,9 +113,9 @@ class FxRatesData:
         """Domestic short rate for ``local_ccy`` sampled at ``freq``.
 
         ``domestic_rates`` are stored as annualised decimals. With
-        ``annualise=False`` (default) the rate is scaled to a per-period rate by
-        ``dt = 1 / annualisation_factor(freq)``; with ``annualise=True`` the
-        annualised rate is returned unchanged.
+        ``annualise=False`` (default) returns earned ACT/365F cash on the
+        existing grid, using the preceding grid date's as-of quote. The first
+        date accrues zero. With ``annualise=True`` annual quotes are unchanged.
 
         Args:
             freq: Resampling frequency for the rate series (e.g. ``'ME'``, ``'B'``).
@@ -116,59 +125,72 @@ class FxRatesData:
         Returns:
             Series of short-rate values sampled at ``freq``.
         """
+        rates = self.domestic_rates[local_ccy].asfreq(freq, method='ffill')
         if annualise:
-            dt = 1.0
-        else:
-            dt = 1.0 / qis.get_annualization_factor(freq)
-        rate = self.domestic_rates[local_ccy].asfreq(freq, method='ffill')
-        return rate*dt
+            return rates
+        return self._get_period_cash_returns(rates.index, local_ccy, freq, False)
 
-    def get_forward_rate_for_local_ccy(self, local_ccy: str = 'USD', reference_ccy: str = 'CHF',
-                                       freq: str = 'ME',
-                                       verbose: bool = False,
-                                       is_log_returns: bool = False
-                                       ) -> pd.Series:
+    def get_forward_rate_for_local_ccy(
+            self, local_ccy: str = 'USD', reference_ccy: str = 'CHF',
+            freq: str = 'ME', verbose: bool = False, is_log_returns: bool = False,
+            period_dates: Optional[pd.DatetimeIndex] = None) -> pd.Series:
+        """Price dated synthetic forwards with opening-rate ACT/365 Fixed accrual.
+
+        The premium remains local cash growth / reference cash growth - 1.
+        For reference-per-local spot, F/S is its reciprocal gross factor.
+        Values are labelled at the opening, for the next date in period_dates.
+        Thus the existing payoff kernel applies its single opening-quote lag.
+
+        Args:
+            local_ccy: Currency delivered by the short forward.
+            reference_ccy: Currency received at delivery.
+            freq: Existing reset cadence when period_dates is omitted.
+            verbose: Print the calculated opening premiums.
+            is_log_returns: Return the log cash-growth ratio instead of ratio minus one.
+            period_dates: Complete actual interval boundaries. No rate after an opening
+                is read for its forward. The final boundary has no subsequent maturity,
+                so its premium is missing. When omitted, use the regular reset calendar
+                through the last source period and one additional known maturity; retain
+                the final usable opening quote. Off-grid source quotes are aligned as-of.
+
+        Returns:
+            Opening-labelled forward premiums in the unchanged quote direction.
+            The default output follows the reset grid, rather than the raw quote grid.
+
+        Raises:
+            ValueError: Boundaries are missing, repeated or unordered, or either
+                cash gross growth factor is nonpositive.
         """
-        Calculate implied forward-rate return over one period of length ``dt``
-        using covered interest-rate parity.
-
-        Let r_loc, r_ref be the annualised local and reference short rates and
-        ``dt = 1 / annualisation_factor(freq)``. Under CIP, the forward
-        local/reference cash-growth premium over one period is
-
-            simple:  (1 + dt * r_loc) / (1 + dt * r_ref) - 1
-            log:     log( (1 + dt * r_loc) / (1 + dt * r_ref) )
-
-        This public quote convention is retained: for an FX rate S quoted as
-        reference per local, the actual forward satisfies F/S = 1/(1+premium).
-        A principal hedge therefore pays premium/(1+premium), not premium.
-        Nonpositive local or reference cash gross factors raise ValueError.
-
-        The previous implementation used ``np.log(a, b)``, where the second
-        argument is silently treated by numpy as an ``out`` buffer rather
-        than a denominator. That produced ``log(1 + dt*r_loc)`` and
-        overwrote the buffer holding ``1 + dt*r_ref``. Fixed here.
-        """
-        dt = 1.0 / qis.get_annualization_factor(freq)
-        rate_data = pd.concat([self.domestic_rates[local_ccy], self.domestic_rates[reference_ccy]],
-                              axis=1, sort=True)
-        numer = 1.0 + dt * rate_data.iloc[:, 0]
-        denom = 1.0 + dt * rate_data.iloc[:, 1]
-        if ((numer <= 0.0) | (denom <= 0.0)).any():
-            raise ValueError("CIP cash gross factors must be strictly positive")
+        default_schedule = period_dates is None
+        if default_schedule:
+            if self.domestic_rates.empty:
+                return pd.Series(dtype=float, name=f'{local_ccy}-{reference_ccy}')
+            offset = pd.tseries.frequencies.to_offset(freq)
+            first = offset.rollforward(self.domestic_rates.index[0])
+            last = offset.rollforward(self.domestic_rates.index[-1])
+            period_dates = pd.date_range(first, last + offset, freq=freq)
+        if (not isinstance(period_dates, pd.DatetimeIndex) or period_dates.hasnans
+                or not period_dates.is_unique or not period_dates.is_monotonic_increasing):
+            raise ValueError('period_dates must be ordered unique nonmissing timestamps')
+        local_cash = self._get_period_cash_returns(
+            period_dates, local_ccy, freq, False, cash_rate_lag=1)
+        reference_cash = self._get_period_cash_returns(
+            period_dates, reference_ccy, freq, False, cash_rate_lag=1)
+        premium = (1.0 + local_cash) / (1.0 + reference_cash) - 1.0
         if is_log_returns:
-            forward_rate = np.log(numer / denom)
-        else:
-            forward_rate = numer / denom - 1.0
+            premium = np.log1p(premium)
+        forward_rate = premium.shift(-1).rename(f'{local_ccy}-{reference_ccy}')
+        if default_schedule:
+            forward_rate = forward_rate.iloc[:-1]
         if verbose:
             print(f"forward_rate=\n{forward_rate}")
-        return forward_rate.rename(f"{local_ccy}-{reference_ccy}")
+        return forward_rate
 
     def get_daily_carry_local_return(self, local_ccy: str = 'USD',
                                      reference_ccy: str = 'CHF',
                                      is_log_returns: bool = False
                                      ) -> Tuple[pd.Series, pd.Series]:
-        """Daily spot and carry return components of a currency pair.
+        """Deprecated daily spot and inverse-forward premium components of a currency pair.
 
         Splits the daily total FX return of holding ``local_ccy`` against
         ``reference_ccy`` into the spot return (return of the cross rate) and the
@@ -184,13 +206,18 @@ class FxRatesData:
             Tuple ``(spot_return, carry_return)`` of daily Series; the carry leg is
             lagged one day with its first observation set to 0.
         """
+        warnings.warn(
+            'get_daily_carry_local_return is deprecated in QIS 5.46.0; '
+            'use compute_fx_returns with FX_FORWARD and explicit FxIndexNormalization. '
+            'Legacy premium-based analytics are unchanged. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         local_return = qis.to_returns(
             prices=self.get_local_to_reference_fx_rate(
                 local_ccy=local_ccy, reference_ccy=reference_ccy),
             is_log_returns=is_log_returns)
         forward_rate_dt = self.get_forward_rate_for_local_ccy(
             local_ccy=local_ccy, reference_ccy=reference_ccy,
-            freq='B', is_log_returns=is_log_returns)
+            freq='B', is_log_returns=is_log_returns, period_dates=local_return.index)
         carry_return = forward_rate_dt.shift(1)
         carry_return.iloc[0] = 0.0
         return local_return, carry_return
@@ -201,7 +228,7 @@ class FxRatesData:
                                 time_period: qis.TimePeriod = None,
                                 freq: Optional[str] = None
                                 ) -> pd.Series:
-        """Total-return NAV of a currency pair (spot return plus carry).
+        """Deprecated synthetic index of spot plus inverse-forward premium, not exact P&L.
 
         Adds the daily spot and carry legs from ``get_daily_carry_local_return``
         and compounds them into a NAV. Uses simple returns throughout.
@@ -217,6 +244,11 @@ class FxRatesData:
         Returns:
             Series of NAV levels (starting at 1.0), at daily or ``freq`` cadence.
         """
+        warnings.warn(
+            'get_fx_total_return_nav is deprecated in QIS 5.46.0; '
+            'use compute_fx_returns with FX_FORWARD and explicit FxIndexNormalization. '
+            'Legacy premium-based analytics are unchanged. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         local_return, carry_return = self.get_daily_carry_local_return(
             local_ccy=local_ccy, reference_ccy=reference_ccy, is_log_returns=False)
         total_return = np.add(local_return, carry_return).rename(f"{local_ccy}-{reference_ccy}")
@@ -235,7 +267,7 @@ class FxRatesData:
                                 freq: Optional[str] = None,
                                 is_causal: bool = False,
                                 ) -> pd.Series:
-        """Carry-only FX return NAV for a currency pair.
+        """Deprecated premium-based carry diagnostic; not an exact forward payoff index.
 
         The ``is_normalise_by_spot_vol`` path adjusts the carry return
         stream by adding the demeaned spot return with an Itô-type
@@ -267,6 +299,11 @@ class FxRatesData:
         Returns:
             Series of NAV levels indexed by date.
         """
+        warnings.warn(
+            'get_carry_fx_return_nav is deprecated in QIS 5.46.0; '
+            'use compute_fx_returns with FX_FORWARD and explicit FxIndexNormalization. '
+            'Legacy premium-based analytics are unchanged. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         local_return, carry_return = self.get_daily_carry_local_return(
             local_ccy=local_ccy, reference_ccy=reference_ccy, is_log_returns=False)
 
@@ -308,11 +345,11 @@ class FxRatesData:
         Returns a Series of NAV levels in the local currency.
         """
         rate_per_period = self.get_local_rate(freq=freq, local_ccy=local_ccy, annualise=False)
-        # Step-forward NAV: NAV(t) = NAV(t-1) * (1 + r_{t-1} * dt).
-        # Lag the rate by one period so the t-th return uses the rate
-        # known at t-1 (avoids look-ahead).
-        period_returns = rate_per_period.shift(1).fillna(0.0)
+        # get_local_rate already uses opening quotes and the actual interval.
+        period_returns = rate_per_period
         nav = qis.returns_to_nav(returns=period_returns, is_log_returns=False)
+        # Unknown accrued cash cannot be repaired by treating it as zero interest.
+        nav = nav.where(~period_returns.isna().cummax())
         nav.name = f'cash_{local_ccy}'
         return nav
 
@@ -362,27 +399,35 @@ class FxRatesData:
         # FX-translation machinery handles the spot-rate composition;
         # ``hedge_ratio=0.0`` means no forward-rate adjustment is
         # applied — the position carries full FX exposure.
-        nav_ref, _ = self.compute_performance_of_local_ccy_asset_in_reference_ccy(
-            asset_price_local_ccy=cash_nav_local,
-            hedge_ratio=0.0,
-            local_ccy=local_ccy,
-            reference_ccy=reference_ccy,
-            freq=output_freq,
-            is_log_returns=False,
-            is_excess_returns=False,
+        from qis.market_data.fx_returns import (
+            FxAssetReturnsRequest, FxReturnType, FxReturnCoordinate,
+            FxIndexNormalization, compute_fx_returns,
         )
+        result = compute_fx_returns(self, FxAssetReturnsRequest(
+            prices=cash_nav_local.to_frame(), local_ccys=local_ccy,
+            reference_ccy=reference_ccy, return_type=FxReturnType.REFERENCE_TOTAL,
+            coordinate=FxReturnCoordinate.SIMPLE, hedge_ratios=0.0,
+            frequency=output_freq))[output_freq]
+        nav_ref = result.to_index(FxIndexNormalization(
+            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
+            settlement_frequency=output_freq, reinvestment='each_interval',
+            cash_treatment='as_returned', missing_returns='skip')).iloc[:, 0]
         nav_ref.name = f'cash_{local_ccy}_in_{reference_ccy}'
         return nav_ref
 
     def _get_period_cash_returns(self, return_index: pd.DatetimeIndex, local_ccy: str,
                                  freq: str, is_log_returns: bool,
                                  cash_rate_lag: int = 1) -> pd.Series:
-        """Convert cash quotes on the asset return grid with the selected observation lag."""
+        """Accrue ACT/365F cash on actual boundaries, sharing QIS funding's primitive."""
         if isinstance(cash_rate_lag, bool) or not isinstance(cash_rate_lag, (int, np.integer)) \
                 or cash_rate_lag < 0:
             raise ValueError("cash_rate_lag must be a nonnegative integer")
-        cash = self.domestic_rates[local_ccy].reindex(return_index, method='ffill')
-        cash = (cash / qis.get_annualization_factor(freq)).shift(int(cash_rate_lag))
+        if return_index.empty:
+            return self.domestic_rates[local_ccy].reindex(return_index)
+        cash = multiply_df_by_dt(
+            df=self.domestic_rates[local_ccy], dates=return_index,
+            lag=int(cash_rate_lag), is_actual_calendar_dt=True,
+            annualization_factor=365.0)
         if (cash <= -1.0).any():
             raise ValueError("Cash gross factors must be strictly positive")
         return np.log1p(cash) if is_log_returns else cash
@@ -402,13 +447,18 @@ class FxRatesData:
 
         When ``is_excess_returns=True``, arithmetic excess is ``R - cash``;
         log excess is ``log1p(R) - log1p(cash)``, the log return relative to cash.
-        Cash uses the reference-currency short rate observed at the start of
+        Cash uses ACT/365F and the reference-currency short rate observed at the start of
         each actual asset-return period by default (``cash_rate_lag=1``).
         ``cash_rate_lag=0`` uses the quote on the return date for descriptive
         estimation; it does not represent cash accrued over the preceding period.
         The two excess conventions are not expm1 equivalents. A principal-only
         FX hedge leaves the local investment gain exposed to terminal FX.
         """
+        warnings.warn(
+            'compute_performance_of_local_ccy_asset_in_reference_ccy on FxRatesData '
+            'is deprecated in QIS 5.45.0; '
+            'use compute_fx_returns with FxAssetReturnsRequest. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         if local_ccy == reference_ccy:
             local_return = qis.to_returns(
                 prices=asset_price_local_ccy, freq=freq,
@@ -417,9 +467,13 @@ class FxRatesData:
         else:
             local_to_reference_fx_rate = self.get_local_to_reference_fx_rate(
                 local_ccy=local_ccy, reference_ccy=reference_ccy)
+            interval_returns, _ = compute_local_and_fx_return(
+                asset_price_local_ccy=asset_price_local_ccy,
+                local_to_reference_fx_rate=local_to_reference_fx_rate,
+                freq=freq, is_log_returns=False)
             forward_rate_for_local_ccy = self.get_forward_rate_for_local_ccy(
-                local_ccy=local_ccy, reference_ccy=reference_ccy,
-                freq=freq, is_log_returns=is_log_returns)
+                local_ccy=local_ccy, reference_ccy=reference_ccy, freq=freq,
+                is_log_returns=is_log_returns, period_dates=interval_returns.index)
 
             _, local_return = compute_performance_of_local_ccy_asset_in_reference_ccy(
                 hedge_ratio=hedge_ratio,
@@ -489,6 +543,10 @@ class FxRatesData:
             pure-returns consumers (covariance, alpha) see
             ``compute_fx_adjusted_returns``.
         """
+        warnings.warn(
+            'compute_returns_in_reference_ccy is deprecated in QIS 5.45.0; '
+            'use compute_fx_returns with FxAssetReturnsRequest. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         fx_adjusted_navs, fx_adjusted_returns = {}, {}
         for asset in asset_prices.columns:
             # Extract asset-specific parameters
@@ -580,6 +638,10 @@ class FxRatesData:
             input yields a single-key dict; per-asset freq input yields
             one key per unique frequency in the input.
         """
+        warnings.warn(
+            'compute_fx_adjusted_returns is deprecated in QIS 5.45.0; '
+            'use compute_fx_returns with FxAssetReturnsRequest. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         if isinstance(freq, str):
             # Single frequency for all assets
             converted_prices, fx_adjusted_returns = self.compute_returns_in_reference_ccy(
@@ -679,6 +741,10 @@ class FxRatesData:
             Tuple ``(local_returns, excess_returns, local_rates)`` of DataFrames;
             ``local_rates`` holds the annualised per-asset short rates.
         """
+        warnings.warn(
+            'compute_returns_adjusted_by_local_rate is deprecated in QIS 5.45.0; '
+            'use compute_fx_returns with FxAssetReturnsRequest. Removal: QIS 6.0.0.',
+            DeprecationWarning, stacklevel=2)
         local_returns = qis.to_returns(
             prices=asset_prices, freq=freq, is_log_returns=is_log_returns)
         local_rates = self.fetch_local_rates(local_ccys=local_ccys, freq=freq, annualise=True)

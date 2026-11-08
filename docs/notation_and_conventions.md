@@ -221,9 +221,40 @@ where $d_t$ is the calendar date of observation $t$ and $y_{t-1}$ is the latest 
 before $d_{t-1}$: the rate known at the start of the period on the return grid, whatever the
 calendar of the rate series. With daily quotes and monthly returns, each month accrues the quote
 of the previous month-end. The first return date closes no period and accrues nothing. The rate
-accrues on an ACT/365 day count; per-annum returns use 365.25-day years, and the two day counts are
+accrues on ACT/365 Fixed (365 even in leap years); per-annum returns use 365.25-day years, and the two day counts are
 separate conventions. The cash leg of a qis backtest accrues the same $r^{f}_t$ on its cash
-balance.
+balance. `FxRatesData` uses this same dated cash growth for local/reference excess
+returns and synthetic CIP forwards, retaining each caller's reset schedule. A daily-reset
+cash account and a monthly-reset deposit need not earn identical monthly returns.
+
+### FX aliases, payoffs and account capital
+
+The currency chapters use the following aliases for these conventions. Return labels alone
+do not determine whether a value is a funded return, a cash-relative coordinate or a payoff.
+
+| Symbol / quantity | Meaning and units |
+|---|---|
+| $S_t$ | Reference currency per local currency unit; crosses divide USD-per-local by USD-per-reference |
+| $x_t$ (also $r^{FX}_t$) | Simple spot change $S_t/S_{t-1}-1$; log spot is labelled separately |
+| $c_t^L$, $c_t^R$ | Local/reference cash growth over the actual interval, aliases of currency-specific $r_t^f$ |
+| $e_t$ | Arithmetic excess $r_t-c_t$ |
+| $q_t$ | Cash-relative simple $(1+r_t)/(1+c_t)-1$ |
+| Excess LOG | $log(1+r_t)-log(1+c_t)$; its exponential minus one is $q_t$, not $e_t$ |
+| $f_t$, $kappa_t$ | Cash-growth premium $(1+c_t^L)/(1+c_t^R)-1$ and exact hedge cost $f_t/(1+f_t)$ |
+| $p_t^R$ | Translated local financed payoff $(r_t^L-c_t^L)(1+x_t)$ per opening reference notional |
+| $arphi_t$ | Long-local forward payoff $x_t+kappa_t$ per opening reference notional |
+| $V_t$ | Actual account capital in reference currency, including marked unpaid claims |
+
+The short hedge costs $kappa_t$; the long-local forward earns $x_t+kappa_t$.
+The premium $f_t$ is neither a raw forward-price ratio nor the exact earned forward payoff.
+Payoffs may be negative beyond initial notional and need no fabricated NAV or log coordinate.
+An optional normalized synthetic index is distinct from the held-unit cash/debt/contract
+ledger in [self-financed FX accounting](self_financed_fx_accounting.md). A balance not yet
+paid contributes to marked capital but does not earn spendable-cash interest.
+
+See [return conventions and FX adjustments](return_conventions_and_fx_adjustments.md) for
+exact identities and the mapping to typed APIs. Statistical annualisation uses $mathrm{af}$;
+it does not replace actual elapsed days in ACT/365F cash accrual.
 
 ### Timing and information
 

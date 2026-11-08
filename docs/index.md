@@ -38,6 +38,11 @@ an individual page may not exist in both versions.
 
 The core chart, backtest, factsheet and risk examples below support **`qis>=5.37.0`**.
 Native factor-unit and observed-index stress workflows require **`qis>=5.38.1`**.
+The unified typed FX API, exact notional payoffs and explicit account guide require
+**`qis>=5.47.0`**, the first public release of these capabilities. Local validation
+versions 5.45.0/5.46.0 are documented in the
+[FX migration plan](return_conventions_and_fx_adjustments.md#immediate-deprecation-and-direct-migration).
+
 These are verified support floors, not claims about when each API first appeared. Obtain
 repository-only scripts from the matching release or the source revision cited by a guide;
 main may contain later additions.
@@ -130,6 +135,8 @@ the [bibliography](bibliography.md).
 
 ### Part IV: Portfolios
 
+- [Self-financed FX accounting](self_financed_fx_accounting.md): local debt, collateral cash,
+  hedge rolls, fixing, settlement and exact monetary reconciliation.
 - [Portfolio backtesting](portfolio_backtesting.md):
   decisions, execution timing, held units and portfolio histories.
 - [Turnover conventions](turnover_conventions.md):
@@ -159,6 +166,10 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
   funded assets, options and futures in one stress interface.
 - [Stress testing with options](stress_testing_with_options.md):
   five stocks, ten short VOP-priced options and a four-ETF EWMA risk model.
+### Currency: returns, hedging and accounting
+
+- [Return conventions and FX adjustments](return_conventions_and_fx_adjustments.md):
+  typed return coordinates, dated cash/hedge metadata and optional index normalization.
 - [FX hedging and market data](fx_hedging_and_market_data.md):
   currency conversion, hedging assumptions and data contracts.
 - [Reference-currency conversion and excess returns](reference_currency_excess_returns.md):
@@ -271,6 +282,7 @@ Private-asset unsmoothing <private_asset_unsmoothing>
 :caption: Part IV - Portfolios
 
 Portfolio backtesting <portfolio_backtesting>
+Self-financed FX accounting <self_financed_fx_accounting>
 Turnover conventions <turnover_conventions>
 risk_adjusted_returns
 signal_diagnostics
@@ -290,6 +302,14 @@ Portfolio breadth <portfolio_breadth>
 Factor stress testing <stress_testing>
 Instrument portfolios and stress reports <portfolio_stress>
 Stress testing with options <stress_testing_with_options>
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Currency - Returns, hedging and accounting
+
+Return conventions and FX adjustments <return_conventions_and_fx_adjustments>
 FX hedging and market data <fx_hedging_and_market_data>
 Reference-currency conversion and excess returns <reference_currency_excess_returns>
 Cash rate timing and FX adjustments <cash_rate_timing_and_fx_adjustments>

@@ -85,6 +85,15 @@ def _compute_forward_hedge_cost(forward_premium: pd.Series,
     return forward_premium / (1.0 + forward_premium)
 
 
+def _hedged_simple_return(local_return: pd.Series, fx_return: pd.Series,
+                          opening_hedge: pd.Series, opening_premium: pd.Series,
+                          is_log_premium: bool = False) -> pd.Series:
+    """Shared arithmetic principal-hedge kernel; all inputs are interval-end aligned."""
+    cost = _compute_forward_hedge_cost(opening_premium, is_log_premium)
+    return (local_return * (1.0 + fx_return) + (1.0 - opening_hedge) * fx_return
+            - opening_hedge * cost)
+
+
 def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_ccy: pd.Series,
                                                             local_to_reference_fx_rate: pd.Series,
                                                             forward_rate_for_local_ccy: pd.Series,
@@ -163,9 +172,11 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
     fx_return = fx_return.rename(asset_price_local_ccy.name)
 
     # F/S = 1/(1+f): the short-forward cost is f/(1+f), not f.
-    hedge_cost = _compute_forward_hedge_cost(forward_rate_for_local_ccy, is_log_returns)
-    hedged_return = (local_return * (1.0 + fx_return) + (1.0 - h_ratio_1) * fx_return
-                     - h_ratio_1 * hedge_cost.shift(1))
+    if not is_log_returns and (forward_rate_for_local_ccy <= -1.0).any():
+        raise ValueError("Forward gross factors must be strictly positive")
+    hedged_return = _hedged_simple_return(
+        local_return, fx_return, h_ratio_1, forward_rate_for_local_ccy.shift(1),
+        is_log_premium=is_log_returns)
     # First period has NaN from the ``h_ratio_1.shift(1)`` lag (no
     # previous-period hedge to carry forward). Set to 0 for
     # consistency with ``qis.to_returns(..., is_first_zero=True)``

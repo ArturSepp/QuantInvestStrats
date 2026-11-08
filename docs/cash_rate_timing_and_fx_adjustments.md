@@ -29,13 +29,17 @@ absolute error in every currency in this sample. This is descriptive evidence, n
 accrual identity or a forecast. QIS and the production workflow retain lag 1. The cash indices
 are validation inputs, not an additional production data dependency.
 
+The observed rate/12 study below is retained as historical timing evidence. Current QIS FX
+analytics and cash funding use ACT/365 Fixed: opening annual quote times actual interval
+days / 365, including leap days. The study did not compare that day-count change.
+
 ## Inputs, notation, and assumptions
 
 | Convention | This article |
 |---|---|
 | Return basis | Simple asset, FX and cash-index returns; log excess returns are treated separately |
 | Sampling grid | Calendar month ends; realised returns cover the preceding month |
-| Annualisation | $\mathrm{af}=12$; annual decimal short rates divided by 12 estimate one month |
+| Annualisation | Historical study: rate/12; current API example: ACT/365 Fixed on dated intervals |
 | Mean adjustment | None for cash accrual; full-sample OLS with intercept is descriptive only |
 | Timing | Spot uses both endpoints; hedge carry uses the starting quote; cash subtraction defaults to lag 1 |
 | Output units | Decimal returns; scatter axes in percent; errors in monthly basis points |
@@ -132,7 +136,8 @@ $$
 
 Log excess is a log relative return. Its `expm1` is not generally arithmetic excess return.
 
-**Identity.** With total return fixed, changing simple cash subtraction from lag 1 to lag 0 gives
+**Identity.** Under the study's fixed-month convention, with total return fixed,
+changing simple cash subtraction from lag 1 to lag 0 gives
 
 $$
 R_t^{\mathrm{excess},0}-R_t^{\mathrm{excess},1}
@@ -141,6 +146,10 @@ $$
 
 **Proof.** Subtract the two excess-return definitions and cancel the common total return.
 The remaining difference is starting cash minus ending cash. $\square$
+
+For the current ACT/365F API, replace the factor 1/12 by the actual interval's
+calendar days / 365. The quote-timing interpretation and the sign of the change
+are the same.
 
 Rate rises lower lag-0 excess returns relative to lag 1; cuts raise them. These changes can offset
 in the sample mean while changing covariance with factors. Betas, prior selection, residual
@@ -172,9 +181,10 @@ are not annualised.
 
 ### Synthetic timing check
 
-An annual quote rising from 2.4% to 3.6% gives cash estimates of 0.20% with lag 1, 0.30% with
-lag 0, and 0.25% with midpoint. For a 2% simple asset return, excess returns are respectively
-1.80%, 1.70% and 1.75%. Total return stays at 2%.
+For 31 January to 29 February 2024, an annual quote rising from 2.4% to 3.6% gives
+ACT/365F cash estimates of 0.190685% with lag 1 and 0.286027% with lag 0.
+For a 2% simple asset return, excess returns are 1.809315% and 1.713973%.
+Total return stays at 2%. Midpoint remains a separately labelled diagnostic.
 
 ~~~python
 from math import isclose
@@ -187,13 +197,22 @@ rates = pd.DataFrame({'USD': [0.024, 0.036, 0.048]}, index=dates)
 prices = pd.DataFrame({'Asset': [100.0, 102.0, 104.04]}, index=dates)
 ccys = pd.Series({'Asset': 'USD'})
 fx = qis.FxRatesData(fx_spots=spots, domestic_rates=rates)
-total1, excess1, quotes = fx.compute_returns_adjusted_by_local_rate(
-    prices, ccys, freq='ME', is_log_returns=False, cash_rate_lag=1)
-total0, excess0, _ = fx.compute_returns_adjusted_by_local_rate(
-    prices, ccys, freq='ME', is_log_returns=False, cash_rate_lag=0)
+from dataclasses import replace
+request = qis.FxAssetReturnsRequest(
+    prices, ccys, qis.FxReturnType.LOCAL_EXCESS, qis.FxReturnCoordinate.SIMPLE,
+    frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1))
+excess1 = qis.compute_fx_returns(fx, request)['ME'].values
+excess0 = qis.compute_fx_returns(fx, replace(
+    request, cash_policy=qis.FxCashPolicy(quote_lag=0)))['ME'].values
+total1 = qis.compute_fx_returns(fx, replace(
+    request, return_type=qis.FxReturnType.LOCAL_TOTAL))['ME'].values
+total0 = qis.compute_fx_returns(fx, replace(
+    request, return_type=qis.FxReturnType.LOCAL_TOTAL,
+    cash_policy=qis.FxCashPolicy(quote_lag=0)))['ME'].values
+quotes = fx.fetch_local_rates(ccys, freq='ME', annualise=True)
 assert total1.equals(total0)
-assert isclose(excess1['Asset'].iloc[1], 0.018, abs_tol=1e-12)
-assert isclose(excess0['Asset'].iloc[1], 0.017, abs_tol=1e-12)
+assert isclose(excess1['Asset'].iloc[1], 0.02 - 0.024 * 29 / 365, abs_tol=1e-12)
+assert isclose(excess0['Asset'].iloc[1], 0.02 - 0.036 * 29 / 365, abs_tol=1e-12)
 assert isclose(quotes['Asset'].iloc[1], 0.036, abs_tol=1e-12)
 ~~~
 
@@ -289,9 +308,9 @@ NZD, JPCANZ3M Index: 69 paired months. Lag 1 has $R^2=0.966$ and MAE 2.51 bp. Th
 
 | Requirement | Verified entry point | Contract |
 |---|---|---|
-| Native-currency total and excess returns | `FxRatesData.compute_returns_adjusted_by_local_rate` | Total returns, excess returns and annual reporting quotes |
-| Reference-currency total and excess returns | `FxRatesData.compute_returns_in_reference_ccy` | Cash lag applies only when `is_excess_returns=True` |
-| Mixed frequencies | `FxRatesData.compute_fx_adjusted_returns` | Lag on each group's actual return grid |
+| Native-currency total and excess returns | `compute_fx_returns` with LOCAL_TOTAL / LOCAL_EXCESS | Separate typed results; annual quotes stay on the data container |
+| Reference-currency total and excess returns | `compute_fx_returns` with REFERENCE_TOTAL / REFERENCE_EXCESS | Cash subtraction follows the declared kind and coordinate |
+| Mixed frequencies | `FxAssetReturnsRequest.frequency` | Typed result per cadence; lag on each group's actual return grid |
 | Preserve valid zero returns | `zero_return_to_nan=False` | Independent of cash lag and FX valuation |
 | FX payoff | `qis.compute_performance_of_local_ccy_asset_in_reference_ccy` | Prior hedge ratio/carry; realised FX move over the asset period |
 | Scatter regression | `qis.plot_scatter` | `order=1`, `fit_intercept=True`, method as `hue`, `add_45line=True` |

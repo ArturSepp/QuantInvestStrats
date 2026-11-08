@@ -271,6 +271,9 @@ example, and the separate Yahoo SPY/TLT illustration.
 
 ## See also
 
+- [Self-financed FX accounts](self_financed_fx_accounting.md): `backtest_fx_account` keeps
+  local debt and unsettled forwards separate; `instruments_carry` is not a general substitute.
+
 - [Two-sided turnover conventions](turnover_conventions.md)
 - [Portfolio breadth](portfolio_breadth.md)
 - [Performance analytics](performance_analytics_and_sharpe.md)

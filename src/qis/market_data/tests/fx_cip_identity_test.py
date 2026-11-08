@@ -57,12 +57,13 @@ def _terminal_wealth_returns(prices: pd.Series,
 
 
 def _cash_at_period_start(data: FxRatesData, dates: pd.DatetimeIndex,
-                          currency: str, annualization: float) -> pd.Series:
+                          currency: str) -> pd.Series:
     """Read only cash quotes known at each preceding asset observation date."""
     result = [np.nan]
-    for date in dates[:-1]:
-        observed = data.domestic_rates.loc[:date, currency].dropna()
-        result.append(np.nan if observed.empty else float(observed.iloc[-1]) / annualization)
+    for start, end in zip(dates[:-1], dates[1:]):
+        observed = data.domestic_rates.loc[:start, currency].dropna()
+        result.append(np.nan if observed.empty else
+                      float(observed.iloc[-1]) * (end - start).days / 365.0)
     return pd.Series(result, index=dates)
 
 
@@ -78,8 +79,8 @@ def test_hedged_return_matches_terminal_forward_wealth(is_log: bool, hedge_kind:
     nav, actual = fx_hedging.compute_performance_of_local_ccy_asset_in_reference_ccy(
         prices, spots, premium, hedge, is_log_returns=is_log)
     expected_simple = _terminal_wealth_returns(
-        prices, spots, data.domestic_rates['CHF'] / 12.0,
-        data.domestic_rates['USD'] / 12.0, hedge)
+        prices, spots, _cash_at_period_start(data, prices.index, 'CHF').shift(-1),
+        _cash_at_period_start(data, prices.index, 'USD').shift(-1), hedge)
     expected = np.log1p(expected_simple) if is_log else expected_simple
     np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
     np.testing.assert_allclose(nav, (1.0 + expected_simple).cumprod(), rtol=1e-13, atol=1e-14)
@@ -105,16 +106,20 @@ def test_unhedged_log_return_matches_price_product(frequency: str) -> None:
 def test_forward_getter_preserves_reciprocal_quote(is_log: bool, frequency: str) -> None:
     """The public premium getter keeps its existing quote and return convention."""
     data, _ = _market()
-    annualization = 12.0 if frequency == 'ME' else 4.0
-    expected = ((1.0 + data.domestic_rates['CHF'] / annualization)
-                / (1.0 + data.domestic_rates['USD'] / annualization) - 1.0)
+    offset = pd.tseries.frequencies.to_offset(frequency)
+    dates = pd.date_range(offset.rollforward(data.domestic_rates.index[0]),
+                          offset.rollforward(data.domestic_rates.index[-1]) + offset,
+                          freq=frequency)
+    local_cash = _cash_at_period_start(data, dates, 'CHF').shift(-1).iloc[:-1]
+    reference_cash = _cash_at_period_start(data, dates, 'USD').shift(-1).iloc[:-1]
+    expected = (1.0 + local_cash) / (1.0 + reference_cash) - 1.0
     if is_log:
         expected = np.log1p(expected)
     actual = data.get_forward_rate_for_local_ccy(
         'CHF', 'USD', freq=frequency, is_log_returns=is_log)
     np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14)
     missing = data.domestic_rates.copy()
-    missing.iloc[0, :] = np.nan
+    missing.loc[:expected.index[0], :] = np.nan
     data = FxRatesData(data.fx_spots, missing)
     assert pd.isna(data.get_forward_rate_for_local_ccy(
         'CHF', 'USD', freq=frequency, is_log_returns=is_log).iloc[0])
@@ -136,8 +141,8 @@ def test_forward_getter_rejects_nonpositive_rate_gross(
 def test_terminal_cash_hedge_satisfies_exact_covered_interest_parity(is_log: bool) -> None:
     """Hedging terminal local cash exactly reproduces a reference-currency deposit."""
     data, prices = _market()
-    local_cash = data.domestic_rates['CHF'] / 12.0
-    reference_cash = data.domestic_rates['USD'] / 12.0
+    local_cash = _cash_at_period_start(data, prices.index, 'CHF').shift(-1)
+    reference_cash = _cash_at_period_start(data, prices.index, 'USD').shift(-1)
     prices = 100.0 * (1.0 + local_cash.shift(1).fillna(0.0)).cumprod()
     prices.name = 'CASH'
     premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=is_log)
@@ -162,7 +167,7 @@ def test_excess_return_uses_previous_reference_cash_quote(
         prices, 0.5, local_currency, 'USD', is_log_returns=is_log)
     nav, actual = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
         prices, 0.5, local_currency, 'USD', is_log_returns=is_log, is_excess_returns=True)
-    cash = _cash_at_period_start(data, total.index, 'USD', 12.0)
+    cash = _cash_at_period_start(data, total.index, 'USD')
     expected = total - (np.log1p(cash) if is_log else cash)
     np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-14, equal_nan=True)
     assert actual.isna().equals(total.isna())
@@ -185,7 +190,7 @@ def test_excess_cash_rate_lag_zero_uses_current_quote(is_log: bool) -> None:
     _, current = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
         prices, 0.0, 'USD', 'USD', is_log_returns=is_log, is_excess_returns=True,
         cash_rate_lag=0)
-    current_cash = data.domestic_rates['USD'] / 12.0
+    current_cash = data.domestic_rates['USD'] * prices.index.to_series().diff().dt.days / 365.0
     expected = total - (np.log1p(current_cash) if is_log else current_cash)
     np.testing.assert_allclose(default, lagged, rtol=1e-13, atol=1e-14, equal_nan=True)
     np.testing.assert_allclose(current, expected, rtol=1e-13, atol=1e-14, equal_nan=True)
@@ -202,7 +207,8 @@ def test_cash_rate_lag_reaches_panel_and_local_excess_returns() -> None:
         is_log_returns=False, cash_rate_lag=0, zero_return_to_nan=False)['ME']
     local, local_excess, _ = data.compute_returns_adjusted_by_local_rate(
         panel, currencies, cash_rate_lag=0)
-    expected = local['ASSET'] - data.domestic_rates['USD'] / 12.0
+    cash = data.domestic_rates['USD'] * local.index.to_series().diff().dt.days / 365.0
+    expected = local['ASSET'] - cash
     np.testing.assert_allclose(adjusted['ASSET'], expected, equal_nan=True)
     np.testing.assert_allclose(local_excess['ASSET'], expected, equal_nan=True)
 
@@ -235,20 +241,19 @@ def test_panel_excess_cash_uses_actual_return_grid(is_log: bool, frequency: str)
     actual = data.compute_fx_adjusted_returns(
         prices, hedges, currencies, freq=frequency, is_log_returns=is_log,
         is_excess_returns=True)[frequency]
-    annualization = 12.0 if frequency == 'ME' else 26.0
     for asset in prices.columns:
         # Each dispatch can have a different grid before the panel outer join.
         _, asset_total = data.compute_performance_of_local_ccy_asset_in_reference_ccy(
             prices[asset], 0.0, currencies[asset], 'USD', freq=frequency,
             is_log_returns=is_log)
-        cash = _cash_at_period_start(data, asset_total.index, 'USD', annualization)
+        cash = _cash_at_period_start(data, asset_total.index, 'USD')
         expected = asset_total - (np.log1p(cash) if is_log else cash)
         expected = expected.reindex(total.index)
         np.testing.assert_allclose(actual[asset], expected, rtol=1e-13, atol=1e-14, equal_nan=True)
     local, excess, reported_rates = data.compute_returns_adjusted_by_local_rate(
         prices, currencies, freq=frequency, is_log_returns=is_log)
     for asset, currency in currencies.items():
-        cash = _cash_at_period_start(data, local.index, currency, annualization)
+        cash = _cash_at_period_start(data, local.index, currency)
         expected = local[asset] - (np.log1p(cash) if is_log else cash)
         np.testing.assert_allclose(excess[asset], expected, rtol=1e-13, atol=1e-14, equal_nan=True)
     pd.testing.assert_frame_equal(
@@ -290,9 +295,8 @@ def test_compute_performance_of_local_ccy_asset_in_reference_ccy_retains_flat_pe
     original_spots = data.fx_spots.copy(deep=True)
     original_rates = data.domestic_rates.copy(deep=True)
     simple_total = np.array([np.nan, 0.0, 0.0, 0.10, 0.0, 100.0 / 110.0 - 1.0])
-    cash = annual_cash / 12.0
-    if cash_rate_lag:
-        cash = np.r_[np.nan, cash[:-1]]
+    opening_quote = np.r_[np.nan, annual_cash[:-1]] if cash_rate_lag else annual_cash
+    cash = opening_quote * dates.to_series().diff().dt.days.to_numpy() / 365.0
     total_reference = np.log1p(simple_total) if is_log else simple_total
 
     for excess in [False, True]:
@@ -356,7 +360,8 @@ def test_compute_fx_adjusted_returns_preserves_mixed_flat_and_missing_support(
     for excess in [False, True]:
         expected = np.log1p(expected_total) if is_log else expected_total.copy()
         if excess:
-            expected -= np.log1p(0.01) if is_log else 0.01
+            cash = pd.Series(0.12 * dates.to_series().diff().dt.days / 365.0, index=dates)
+            expected = expected.sub(np.log1p(cash) if is_log else cash, axis=0)
         for replace_zero in [False, True]:
             actual = data.compute_fx_adjusted_returns(
                 prices, hedges, currencies, freq=frequency, is_log_returns=is_log,
@@ -450,8 +455,11 @@ def test_optimal_hedge_uses_forward_execution_cost(monkeypatch: pytest.MonkeyPat
     premium = data.get_forward_rate_for_local_ccy('CHF', 'USD', is_log_returns=False)
     optimal, carry, beta_hedge = fx_hedging.compute_fx_optimal_hedge(
         prices, data.fx_spots['CHF'], premium, risk_aversion_lambda=2.0, min_max_hedge=None)
-    forward_over_spot = ((1.0 + data.domestic_rates['USD'] / 12.0)
-                         / (1.0 + data.domestic_rates['CHF'] / 12.0))
+    contract_dates = prices.index.append(
+        pd.DatetimeIndex([prices.index[-1] + pd.offsets.MonthEnd()]))
+    local_cash = _cash_at_period_start(data, contract_dates, 'CHF').shift(-1).iloc[:-1]
+    reference_cash = _cash_at_period_start(data, contract_dates, 'USD').shift(-1).iloc[:-1]
+    forward_over_spot = (1.0 + reference_cash) / (1.0 + local_cash)
     lost_forward_value = 1.0 - forward_over_spot
     expected_carry = 1.0 - lost_forward_value * 12.0 / (2.0 * 2.0 * 0.2 ** 2)
     np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
@@ -509,3 +517,8 @@ def test_optimal_hedge_uses_latest_business_day_forward_quote(
     np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
     assert prices.index[2].day_of_week == 6
     assert known_premium.iloc[2] == premium.loc['2024-03-29']
+
+# Retiring analytics retain their original numeric contract until QIS 6.0.0.
+# The typed suite separately requires all three public deprecation warnings.
+pytestmark = pytest.mark.filterwarnings(
+    'ignore:compute_.*deprecated in QIS 5.45.0:DeprecationWarning')

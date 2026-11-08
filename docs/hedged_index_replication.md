@@ -36,6 +36,11 @@ Observation cutoff is 30 September 2026; the source snapshot was analysed on 2 O
 The partial 1 October observation is excluded. The study does not alter QIS defaults or
 any consuming production configuration.
 
+The empirical tables and stored figures retain the original fixed-month rate/12
+convention. Current QIS uses opening-rate ACT/365 Fixed cash growth on the existing
+reset intervals; those historical replication statistics have not been recomputed
+under the new convention. The synthetic API example below uses ACT/365 Fixed.
+
 ## Inputs, notation, and assumptions
 
 | Convention | This article |
@@ -101,7 +106,7 @@ replication tests.
 
 ### Monthly opening principal hedge
 
-**Definition.** With annual quotes divided by $\mathrm{af}=12$, rate-implied carry is
+**Definition.** In the frozen empirical study, annual quotes are divided by $\mathrm{af}=12$ and rate-implied carry is
 
 $$
 k_{t-1}=
@@ -192,10 +197,11 @@ preceding month end so that the first earned monthly return is not discarded.
 
 ### Synthetic payoff check
 
-A USD asset earns 2% during a month and USD appreciates 1% against CHF. With opening annual
-USD and CHF rates of 4% and 1%, respectively, the rate-implied hedge carry is approximately
--24.92 bp. The hedged asset earns approximately 1.7708%, including the 2 bp asset/FX cross
-term. Removing every FX term would omit those 2 bp.
+For 31 January to 29 February 2024, a USD asset earns 2% and USD appreciates 1%
+against CHF. With opening annual USD and CHF rates of 4% and 1%, ACT/365F
+rate-implied hedge carry is approximately -23.76 bp. The hedged asset earns
+approximately 1.7824%, including the 2 bp asset/FX cross term. Removing every
+FX term would omit those 2 bp.
 
 ~~~python
 from math import isclose
@@ -207,14 +213,20 @@ spots = pd.DataFrame({'USD': 1.0, 'CHF': [1.0, 1.0/1.01, 1.0/1.01]}, index=dates
 rates = pd.DataFrame({'USD': 0.04, 'CHF': 0.01}, index=dates)
 prices = pd.Series([100.0, 102.0, 102.0], index=dates, name='USD asset')
 fx = qis.FxRatesData(fx_spots=spots, domestic_rates=rates)
-_, hedged = fx.compute_performance_of_local_ccy_asset_in_reference_ccy(
-    asset_price_local_ccy=prices, hedge_ratio=1.0, local_ccy='USD',
-    reference_ccy='CHF', freq='ME', is_log_returns=False,
-    is_excess_returns=False)
-carry = (1.0 + 0.01/12.0)/(1.0 + 0.04/12.0) - 1.0
+converted_1 = qis.compute_fx_returns(
+    fx, qis.FxAssetReturnsRequest(
+        prices=(prices).to_frame(), local_ccys='USD',
+        return_type=qis.FxReturnType.REFERENCE_TOTAL,
+        coordinate=qis.FxReturnCoordinate.SIMPLE,
+        reference_ccy='CHF', hedge_ratios=1.0,
+        frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
+    ))['ME']
+hedged = converted_1.values.iloc[:, 0]
+dt = (dates[1] - dates[0]).days / 365
+carry = (1.0 + 0.01 * dt)/(1.0 + 0.04 * dt) - 1.0
 expected = 0.02*1.01 + carry
 assert isclose(hedged.iloc[1], expected, abs_tol=1e-12)
-assert isclose(expected, 0.0177083056478405, abs_tol=1e-12)
+assert isclose(expected, 0.017823989512781194, abs_tol=1e-12)
 assert isclose(expected - (0.02 + carry), 0.0002, abs_tol=1e-12)
 ~~~
 
@@ -551,7 +563,7 @@ This is a diagnostic comparison, not an exact matched-provider replication. The 
 | Calculation | Entry point | Contract |
 |---|---|---|
 | Supplied FX data | `qis.FxRatesData` | FX spots in USD per currency and annual domestic-rate quotes |
-| Monthly total-return hedge | `FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy` | Hedge ratio 1, frequency ME, simple returns, no cash deduction |
+| Monthly total-return hedge | `compute_fx_returns` with REFERENCE_TOTAL / SIMPLE | Hedge ratio 1, frequency ME, no cash deduction |
 | Price-derived return check | `qis.to_returns` | Simple returns; no missing-return invention |
 | NAV and geometric returns | `qis.returns_to_nav`, `qis.compute_pa_return` | Explicit preceding-month anchor; elapsed calendar horizon |
 | Sample tracking error | `qis.compute_te_ir_errors` | Complete month-end grid; sample error standard deviation; annualisation 12 |
@@ -613,7 +625,7 @@ without any private input or Bloomberg access.
 - The reconstruction is a close approximation to monthly movements, not an exact replacement
   for the provider's return history. Both drift and tracking error matter for long-horizon use.
 - Rate-implied carry uses short-rate proxies, including three-month inputs, rather than actual
-  one-month forward quotes. Dividing by 12 is a fixed-period convention, not exact day-count accrual.
+  one-month forward quotes. The archived study divides by 12; the current API uses ACT/365 Fixed.
 - Hedging an aggregate USD-hedged multi-currency NAV does not reconstruct the provider's
   constituent-level hedge book. This matters even with apparently matched family names.
 - Equity targets retain their provider's dividend, withholding-tax and universe conventions.

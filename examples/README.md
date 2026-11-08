@@ -172,7 +172,8 @@ An explicit `run_local(..., output_path=...)` overrides that configuration. See 
 
 | File | What it shows |
 |---|---|
-| `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP forward premia, FX total-return NAVs, cash NAVs, reference-ccy translation. USD rate from `^IRX`, others stylised. |
+| `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, and explicit hedge reset/fixing/payment accounting. Requires QIS 5.47.0 or later. |
+| `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP premia, explicitly normalized exact FX-forward payoff indices, cash NAVs and typed reference-currency returns. USD rate from `^IRX`, others stylised. |
 | `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — real 3M rates, full currency set. **Bloomberg.** |
 | `fx_cip_identity_yahoo_example.py` | Covered-interest-parity check: USD excess vs CHF-hedged excess agree to within bp. |
 | `fx_hedging_yahoo_example.py` | Single/multi-asset FX hedging: optimal/carry/beta ratios, hedged NAVs, EWM FX vol/beta, hedge reports. |

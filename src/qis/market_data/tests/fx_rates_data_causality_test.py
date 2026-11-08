@@ -81,17 +81,18 @@ def test_fx_rates_data_retains_off_grid_rates_for_public_carry(nullable: bool) -
     )
     if nullable:
         expected_rates = expected_rates.astype("Float64")
-    periods_per_year = 252.0
-    initial_carry = (1.0 + 0.04 / periods_per_year) / (1.0 + 0.01 / periods_per_year) - 1.0
-    updated_carry = (1.0 + 0.05 / periods_per_year) / (1.0 + 0.01 / periods_per_year) - 1.0
+    # Retain the supplied irregular reset boundaries; the last has no maturity.
+    initial_carry = (1.0 + 0.04 * 3.0 / 365.0) / (1.0 + 0.01 * 3.0 / 365.0) - 1.0
+    updated_carry = (1.0 + 0.05 / 365.0) / (1.0 + 0.01 / 365.0) - 1.0
     expected_carry = pd.Series(
-        [np.nan, initial_carry, updated_carry, updated_carry],
+        [np.nan, initial_carry, updated_carry, np.nan],
         index=spot_dates,
         name="USD-EUR",
     )
     if nullable:
         expected_carry = expected_carry.astype("Float64")
-    actual_carry = actual.get_forward_rate_for_local_ccy("USD", "EUR", freq="B")
+    actual_carry = actual.get_forward_rate_for_local_ccy(
+        "USD", "EUR", freq="B", period_dates=spot_dates)
 
     pd.testing.assert_series_equal(actual_carry, expected_carry)
     pd.testing.assert_frame_equal(actual.domestic_rates, expected_rates)

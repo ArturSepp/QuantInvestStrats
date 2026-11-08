@@ -12,6 +12,10 @@ import pytest
 from qis.market_data import FxRatesData
 
 
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:get_.*deprecated in QIS 5.46.0:DeprecationWarning")
+
+
 def _make_market(
     *, nullable: bool, timezone: str | None, local_rate: float
 ) -> tuple[FxRatesData, pd.DataFrame, pd.DataFrame]:
@@ -54,6 +58,9 @@ def test_get_carry_fx_return_nav_uses_final_available_completed_period_value() -
     actual = data.get_carry_fx_return_nav("EUR", "USD", is_normalise_by_spot_vol=False, freq="ME")
 
     expected_index = pd.date_range("2024-07-31", periods=2, freq="ME", name="date")
-    # The first return is the synthetic zero; the next 22 business-day returns earn exactly 1%.
-    expected = pd.Series([1.0, 1.01**22], index=expected_index, name="EUR-USD")
+    # Daily resets remain on the stored business-day grid: 18 one-day and four
+    # three-day intervals through Friday 30 August; the reporting label is Saturday.
+    expected = pd.Series([1.0, (1.0 + 2.52 / 365.0)**18
+                          * (1.0 + 2.52 * 3.0 / 365.0)**4],
+                         index=expected_index, name="EUR-USD")
     pd.testing.assert_series_equal(actual, expected, rtol=1e-13, atol=1e-14)

@@ -130,7 +130,7 @@ is zero. An unpriced target in an unheld asset remains in cash rather than being
 A stale mark is not a liquidation value; supply explicit settlement prices and exit targets
 for terminal events. See [Unpriced assets and cash](portfolio_backtesting.md#unpriced-assets-and-cash).
 
-The mixed-frequency FX helper `FxRatesData.compute_fx_adjusted_returns` replaces exact zero
+The typed FX request `FxAssetReturnsRequest(zero_return_to_nan=True)` replaces exact zero
 returns with NaN for estimation. This removes structural zeros and also any genuine exact zero.
 It does not detect stale marks or delistings.
 
@@ -193,7 +193,7 @@ to zero. Costs and holding drift can make realised weights differ from scheduled
 | Schedule a fixed allocation over priced assets | `generate_static_weights_schedule` | Rebalance-date-by-asset target weights |
 | Convert price levels on a stated grid | `to_returns` | Return Series or DataFrame |
 | Apply dated targets with held-unit accounting | `backtest_model_portfolio` | `PortfolioData` |
-| Translate and group assets by their frequencies | `FxRatesData.compute_fx_adjusted_returns` | Return DataFrames keyed by frequency |
+| Translate and group assets by their frequencies | `compute_fx_returns` | Typed results keyed by frequency; statistical consumers read `.values` |
 
 Implementation owners are the [weight-schedule source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/df_to_weights.py),
 [return conversion](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/returns.py),

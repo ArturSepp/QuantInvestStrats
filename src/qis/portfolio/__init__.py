@@ -136,3 +136,5 @@ from qis.portfolio.stress import (
 
 from qis.portfolio.attribution.group_exposures import compute_lookthrough_exposures
 from qis.portfolio.reports.lookthrough_exposures import generate_lookthrough_exposures_factsheet
+
+from qis.portfolio.fx_accounting import FxAccountSpec, FxAccountData, backtest_fx_account

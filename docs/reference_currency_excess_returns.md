@@ -50,11 +50,11 @@ the analytics.
 |---|---|
 | Return basis | Native and converted simple total returns; arithmetic or log excess returns selected explicitly |
 | Sampling grid | Per-asset `freq`; examples use `ME` and `QE`; conversion and hedge reset share that grid |
-| Annualisation | Annual decimal cash quotes divided by $\mathrm{af}$: 12 for `ME`, 4 for `QE`; outputs remain periodic |
+| Annualisation | ACT/365 Fixed cash on actual calendar intervals; statistical $\mathrm{af}$ remains 12 for `ME` and 4 for `QE` |
 | Mean adjustment | None in conversion or cash subtraction; the beta example uses equal-weight OLS with an intercept, equivalent to sample demeaning |
 | Timing | Return at $t$ covers $(t-1,t]$; opening hedge and CIP rates are lagged once; `cash_rate_lag=1` |
 | Output units | Decimal periodic reference-currency returns; tables show percent per month; regression betas are dimensionless |
-| qis default | `compute_fx_adjusted_returns`: simple total returns, `zero_return_to_nan=True`; explicitly request log excess returns and retain genuine zeros |
+| qis default | `compute_fx_returns`: explicit kind/coordinate; genuine zeros retained; no automatic NAV |
 
 | Input or symbol | Meaning and required convention |
 |---|---|
@@ -119,11 +119,11 @@ asset return. Only decisions and contracted inputs fixed at the period start are
 ### Apply the opening-principal hedge and forward carry
 
 QIS uses a rate-implied forward under covered interest parity (CIP); it does not infer an
-executable forward price from spot alone. With $\Delta=1/\mathrm{af}$,
+executable forward price from spot alone. With $\Delta_t=\mathrm{calendar\ days}(t-1,t)/365$,
 
 $$
 1+f^{L/R}_{t-1}
-=\frac{1+\Delta y^L_{t-1}}{1+\Delta y^R_{t-1}}.
+=\frac{1+\Delta_t y^L_{t-1}}{1+\Delta_t y^R_{t-1}}.
 $$
 
 The actual reference-per-local forward satisfies $F_{t-1}/S_{t-1}=1/(1+f^{L/R}_{t-1})$.
@@ -160,12 +160,13 @@ Under the default one-observation lag, cash is as-of aligned to the **actual ret
 scaled to a periodic simple accrual, and shifted once:
 
 $$
-r^{f,R}_t=\frac{y^R_{t-1}}{\mathrm{af}}.
+r^{f,R}_t=y^R_{t-1}\,\frac{\mathrm{calendar\ days}(t-1,t)}{365}.
 $$
 
 Thus `cash_rate_lag=1` means one month on `ME` and one quarter on `QE`, not always one
-calendar month. This is a frequency-factor approximation, not an actual-day-count deposit
-or an observed cash-index return. Changing the lag affects cash subtraction only; hedge
+calendar month. Accrual is ACT/365 Fixed at the opening quote, including weekends and leap
+days, with the original reset schedule retained. It is not an observed cash-index return.
+The first cash accrual is zero; asset inception remains missing. Changing the lag affects cash subtraction only; hedge
 carry remains fixed from the prior observation. The
 [cash-timing chapter](cash_rate_timing_and_fx_adjustments.md) discusses these distinctions.
 
@@ -198,7 +199,7 @@ $\square$
 > pipeline starts from native **total-return** levels, converts them, and subtracts **reference**
 > cash once. Hedging carry is already in the converted total return; do not deduct it again.
 
-`compute_returns_adjusted_by_local_rate` instead subtracts each asset's native cash rate
+A LOCAL_EXCESS request instead uses each asset's native cash rate
 without any FX translation. That is useful for a deliberately native-currency analysis,
 but it is not a replacement for investor-currency risk inputs. Its third output contains
 annual rate quotes, not ready-to-subtract periodic accruals.
@@ -251,15 +252,15 @@ measurement and the hedge-reset cadence.
 
 Reuse the [FX chapter's synthetic EUR/USD example](fx_hedging_and_market_data.md#worked-example):
 a EUR asset rises 2%, USD per EUR rises 10%, and annual EUR/USD rates are respectively 2.4%
-and 4.8%. Monthly USD cash is 0.4%. These are teaching inputs, not market observations.
+and 4.8%. For 31 January to 29 February 2024, ACT/365F USD cash is 0.381370%. These are teaching inputs, not market observations.
 
 | Opening-principal hedge | USD total return | USD arithmetic excess return |
 |---|---:|---:|
-| 0% | 12.200000% | 11.800000% |
-| 50% | 7.299800% | 6.899800% |
-| 100% | 2.399601% | 1.999601% |
+| 0% | 12.200000% | 11.818630% |
+| 50% | 7.295161% | 6.913791% |
+| 100% | 2.390322% | 2.008952% |
 
-Native EUR arithmetic excess is 1.8%; it is a different quantity from every USD column.
+Native EUR arithmetic excess is 1.809315%; it is a different quantity from every USD column.
 The following verifies the table from terminal cash flows, independently of QIS's payoff
 implementation, and then checks the public method against those flows.
 
@@ -274,24 +275,29 @@ fx_check = qis.FxRatesData(
     domestic_rates=pd.DataFrame({'USD': 0.048, 'EUR': 0.024}, index=dates),
 )
 eur_asset = pd.Series([100.0, 102.0], index=dates, name='EUR asset')
-forward = 1.10 * (1.0 + 0.048 / 12) / (1.0 + 0.024 / 12)
+dt = (dates[1] - dates[0]).days / 365
+forward = 1.10 * (1.0 + 0.048 * dt) / (1.0 + 0.024 * dt)
 computed_rows = []
 for hedge in (0.0, 0.5, 1.0):
     terminal_usd = 102.0 * 1.21 + hedge * 100.0 * (forward - 1.21)
     total = terminal_usd / (100.0 * 1.10) - 1.0
-    cash = 0.048 / 12
+    cash = 0.048 * dt
     for log_returns in (False, True):
-        _, excess = fx_check.compute_performance_of_local_ccy_asset_in_reference_ccy(
-            asset_price_local_ccy=eur_asset, hedge_ratio=hedge,
-            local_ccy='EUR', reference_ccy='USD', freq='ME',
-            is_log_returns=log_returns, is_excess_returns=True, cash_rate_lag=1,
-        )
+        converted_1 = qis.compute_fx_returns(
+            fx_check, qis.FxAssetReturnsRequest(
+                prices=(eur_asset).to_frame(), local_ccys='EUR',
+                return_type=qis.FxReturnType.REFERENCE_EXCESS,
+                coordinate=(qis.FxReturnCoordinate.LOG if log_returns else qis.FxReturnCoordinate.SIMPLE),
+                reference_ccy='USD', hedge_ratios=hedge,
+                frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
+            ))['ME']
+        excess = converted_1.values.iloc[:, 0]
         expected = np.log1p(total) - np.log1p(cash) if log_returns else total - cash
         np.testing.assert_allclose(excess.iloc[-1], expected, atol=1e-12)
         assert pd.isna(excess.iloc[0])  # No pre-inception holding period.
     computed_rows.append([100 * total, 100 * (total - cash)])
 np.testing.assert_allclose(
-    computed_rows, [[12.2, 11.8], [7.299800, 6.899800], [2.399601, 1.999601]],
+    computed_rows, [[12.2, 11.818630], [7.295161, 6.913791], [2.390322, 2.008952]],
     rtol=0, atol=0.0000005,
 )
 ```
@@ -305,6 +311,8 @@ does not supply currency metadata. EUR and CHF spots below are synthetic paths d
 other generated series; rates are illustrative annual quotes. There is no vendor download.
 
 ```python
+
+from qis.market_data import fx_returns as qfx
 from qis.datasets.synthetic import generate_synthetic_prices
 
 daily = generate_synthetic_prices(
@@ -331,23 +339,39 @@ rates = pd.DataFrame({
 fx_data = qis.FxRatesData(fx_spots=spots, domestic_rates=rates)
 
 # Always select the return convention; QIS defaults are simple TOTAL returns.
-asset_returns_dict = fx_data.compute_fx_adjusted_returns(
-    prices=prices, local_ccys=local_ccys, hedge_ratios=hedge_ratios,
-    reference_ccy=reference_ccy, freq='ME',
-    is_log_returns=True, is_excess_returns=True,
-    cash_rate_lag=1, zero_return_to_nan=False,
-)
+asset_returns_dict = {cadence: result.values for cadence, result in qfx.compute_fx_returns(
+                         fx_data,
+                         qfx.FxAssetReturnsRequest(
+                             prices=prices,
+                             local_ccys=local_ccys,
+                             return_type=qfx.FxReturnType.REFERENCE_EXCESS,
+                             coordinate=qfx.FxReturnCoordinate.LOG,
+                             reference_ccy=reference_ccy,
+                             hedge_ratios=hedge_ratios,
+                             frequency='ME',
+                             cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                             zero_return_to_nan=False)).items()}
 asset_log_excess = asset_returns_dict['ME']
 assert asset_log_excess.columns.equals(prices.columns)
 assert asset_log_excess.iloc[0].isna().all()
 
 # Reporting uses total returns, with otherwise identical inputs and hedge policy.
-total_navs, total_simple = fx_data.compute_returns_in_reference_ccy(
-    asset_prices=prices, local_ccys=local_ccys, hedge_ratios=hedge_ratios,
-    reference_ccy=reference_ccy, freq='ME',
-    is_log_returns=False, is_excess_returns=False,
-)
-reference_cash = (rates[reference_ccy] / 12).shift(1)
+fx_result_38 = qfx.compute_fx_returns(
+                               fx_data,
+                               qfx.FxAssetReturnsRequest(
+                                   prices=prices,
+                                   local_ccys=local_ccys,
+                                   return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                                   coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                                   reference_ccy=reference_ccy,
+                                   hedge_ratios=hedge_ratios,
+                                   frequency='ME',
+                                   cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                                   zero_return_to_nan=False))['ME']
+total_navs = fx_result_38.to_index(qfx.FxIndexNormalization(
+    1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
+total_simple = fx_result_38.values
+reference_cash = rates[reference_ccy].shift(1) * rates.index.to_series().diff().dt.days / 365
 np.testing.assert_allclose(
     asset_log_excess,
     np.log1p(total_simple).sub(np.log1p(reference_cash), axis=0),
@@ -385,12 +409,12 @@ mean, not a compounded return or a forward CMA.
 
 | Investor currency | Hedge ratio | Mean simple excess (%/month) | Mean log excess (%/month) | OLS beta |
 |---|---:|---:|---:|---:|
-| USD | 0 | 0.493614 | 0.343900 | 0.539930 |
-| USD | 0.5 | 0.493614 | 0.343900 | 0.539930 |
-| USD | 1 | 0.493614 | 0.343900 | 0.539930 |
-| CHF | 0 | 0.448265 | 0.247902 | 0.565295 |
-| CHF | 0.5 | 0.486670 | 0.317036 | 0.553099 |
-| CHF | 1 | 0.525076 | 0.376469 | 0.540981 |
+| USD | 0 | 0.493386 | 0.343673 | 0.539967 |
+| USD | 0.5 | 0.493386 | 0.343673 | 0.539967 |
+| USD | 1 | 0.493386 | 0.343673 | 0.539967 |
+| CHF | 0 | 0.448197 | 0.247834 | 0.565443 |
+| CHF | 0.5 | 0.486523 | 0.316883 | 0.553193 |
+| CHF | 1 | 0.524849 | 0.376233 | 0.541021 |
 
 The following block reproduces the table, independently checks every converted payoff
 against terminal cash flows, and checks the fitted coefficients against centred moments.
@@ -398,7 +422,7 @@ against terminal cash flows, and checks the fitted coefficients against centred 
 ```python
 # Continue the frozen monthly sample above; no additional random draws or downloads.
 comparison_asset = prices['SEQ_US']
-usd_cash = (rates['USD'] / 12).shift(1)
+usd_cash = rates['USD'].shift(1) * rates.index.to_series().diff().dt.days / 365
 factor_log_excess = (
     qis.to_returns(monthly['SEQ_EM'], freq=None, is_log_returns=True)
     - np.log1p(usd_cash)
@@ -409,17 +433,19 @@ for investor_ccy in ('USD', 'CHF'):
     for hedge in (0.0, 0.5, 1.0):
         key = (investor_ccy, hedge)
         for use_logs, outputs in ((False, simple_by_view), (True, log_by_view)):
-            _, outputs[key] = (
-                fx_data.compute_performance_of_local_ccy_asset_in_reference_ccy(
-                    asset_price_local_ccy=comparison_asset, hedge_ratio=hedge,
-                    local_ccy='USD', reference_ccy=investor_ccy, freq='ME',
-                    is_log_returns=use_logs, is_excess_returns=True, cash_rate_lag=1,
-                )
-            )
+            converted_2 = qis.compute_fx_returns(
+                fx_data, qis.FxAssetReturnsRequest(
+                    prices=(comparison_asset).to_frame(), local_ccys='USD',
+                    return_type=qis.FxReturnType.REFERENCE_EXCESS,
+                    coordinate=(qis.FxReturnCoordinate.LOG if use_logs else qis.FxReturnCoordinate.SIMPLE),
+                    reference_ccy=investor_ccy, hedge_ratios=hedge,
+                    frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
+                ))['ME']
+            outputs[key] = converted_2.values.iloc[:, 0]
 
         # Independent check: terminal asset value plus the contracted forward payoff.
         cross = spots['USD'] / spots[investor_ccy]  # Investor currency per USD.
-        cash = (rates[investor_ccy] / 12).shift(1)
+        cash = rates[investor_ccy].shift(1) * rates.index.to_series().diff().dt.days / 365
         forward = cross.shift(1) * (1 + cash) / (1 + usd_cash)
         terminal = (comparison_asset * cross
                     + hedge * comparison_asset.shift(1) * (forward - cross))
@@ -464,12 +490,12 @@ print(comparison_summary.to_string(float_format=lambda value: f'{value:.6f}'))
 np.testing.assert_allclose(
     comparison_summary.to_numpy(),
     [
-        [0.493614, 0.343900, 0.539930],
-        [0.493614, 0.343900, 0.539930],
-        [0.493614, 0.343900, 0.539930],
-        [0.448265, 0.247902, 0.565295],
-        [0.486670, 0.317036, 0.553099],
-        [0.525076, 0.376469, 0.540981],
+        [0.493386, 0.343673, 0.539967],
+        [0.493386, 0.343673, 0.539967],
+        [0.493386, 0.343673, 0.539967],
+        [0.448197, 0.247834, 0.565443],
+        [0.486523, 0.316883, 0.553193],
+        [0.524849, 0.376233, 0.541021],
     ],
     rtol=0, atol=0.0000005,  # Match the six-decimal displayed values.
 )
@@ -483,9 +509,9 @@ for hedge in (0.5, 1.0):
 ```
 
 The USD rows coincide because the asset is already USD-denominated: there is no investor
-FX overlay to hedge. For CHF, the unhedged beta is 0.565295 rather than 0.539930 even though
+FX overlay to hedge. For CHF, the unhedged beta is 0.565443 rather than 0.539967 even though
 the factor has not changed. The additional currency return changes the asset's covariance
-with that factor; half hedging moves the beta to 0.553099 in this particular sample.
+with that factor; half hedging moves the beta to 0.553193 in this particular sample.
 
 #### Why full hedging does not reproduce the USD payoff exactly
 
@@ -536,7 +562,7 @@ vanish under sample demeaning. $\square$
 Thus only the part of the response difference that covaries with the factor changes this
 beta. Even a time-varying difference can leave beta unchanged if its sample covariance with
 the factor is zero. In the table, the full-hedge difference is approximately
-$0.540981-0.539930=0.001051$; it is not inferred from the difference in mean excess returns.
+$0.541021-0.539967=0.001051$; it is not inferred from the difference in mean excess returns.
 Neither equality of betas nor monotonic changes in beta or mean return are general hedging
 identities. The constant-shift result assumes an intercept (or equivalent sample demeaning);
 it need not hold for a regression forced through the origin. See
@@ -552,11 +578,15 @@ principal_fx = qis.FxRatesData(
     fx_spots=pd.DataFrame({'USD': 1.0, 'CHF': [1.0, 1.0 / 1.10]}, index=principal_dates),
     domestic_rates=pd.DataFrame({'USD': 0.0, 'CHF': 0.0}, index=principal_dates),
 )
-_, principal_return = principal_fx.compute_performance_of_local_ccy_asset_in_reference_ccy(
-    asset_price_local_ccy=pd.Series([100.0, 110.0], index=principal_dates),
-    hedge_ratio=1.0, local_ccy='USD', reference_ccy='CHF', freq='ME',
-    is_log_returns=False, is_excess_returns=True, cash_rate_lag=1,
-)
+converted_3 = qis.compute_fx_returns(
+    principal_fx, qis.FxAssetReturnsRequest(
+        prices=(pd.Series([100.0, 110.0], index=principal_dates)).to_frame(), local_ccys='USD',
+        return_type=qis.FxReturnType.REFERENCE_EXCESS,
+        coordinate=qis.FxReturnCoordinate.SIMPLE,
+        reference_ccy='CHF', hedge_ratios=1.0,
+        frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
+    ))['ME']
+principal_return = converted_3.values.iloc[:, 0]
 terminal_chf = 110.0 * 1.10 + 100.0 * (1.0 - 1.10)
 np.testing.assert_allclose(terminal_chf, 111.0, rtol=0, atol=1e-12)
 np.testing.assert_allclose(principal_return.iloc[-1], terminal_chf / 100 - 1, atol=1e-12)
@@ -594,25 +624,33 @@ instrument/estimator metadata. Each output frame is checked against terminal ass
 plus the contracted forward payoff, followed by reference-cash subtraction.
 
 ```python
+
+from qis.market_data import fx_returns as qfx
 asset_freq = pd.Series({'SEQ_US': 'ME', 'SEQ_EU': 'ME', 'SBD_IG': 'QE'})
-mixed_returns = fx_data.compute_fx_adjusted_returns(
-    prices=prices, local_ccys=local_ccys, hedge_ratios=hedge_ratios,
-    reference_ccy=reference_ccy, freq=asset_freq,
-    is_log_returns=True, is_excess_returns=True,
-    cash_rate_lag=1, zero_return_to_nan=False,
-)
+mixed_returns = {cadence: result.values for cadence, result in qfx.compute_fx_returns(
+                    fx_data,
+                    qfx.FxAssetReturnsRequest(
+                        prices=prices,
+                        local_ccys=local_ccys,
+                        return_type=qfx.FxReturnType.REFERENCE_EXCESS,
+                        coordinate=qfx.FxReturnCoordinate.LOG,
+                        reference_ccy=reference_ccy,
+                        hedge_ratios=hedge_ratios,
+                        frequency=asset_freq,
+                        cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                        zero_return_to_nan=False)).items()}
 assert set(mixed_returns) == {'ME', 'QE'}
 assert mixed_returns['ME'].columns.tolist() == ['SEQ_US', 'SEQ_EU']
 assert mixed_returns['QE'].columns.tolist() == ['SBD_IG']
 
 for frequency, frame in mixed_returns.items():
-    af = {'ME': 12, 'QE': 4}[frequency]
-    reference_cash = (rates[reference_ccy].reindex(frame.index, method='ffill') / af).shift(1)
+    dt = frame.index.to_series().diff().dt.days / 365
+    reference_cash = rates[reference_ccy].reindex(frame.index, method='ffill').shift(1) * dt
     for asset in frame:
         local_ccy = local_ccys[asset]
         price = prices[asset].reindex(frame.index, method='ffill')
         cross = (spots[local_ccy] / spots[reference_ccy]).reindex(frame.index)
-        local_cash = (rates[local_ccy].reindex(frame.index, method='ffill') / af).shift(1)
+        local_cash = rates[local_ccy].reindex(frame.index, method='ffill').shift(1) * dt
         forward = cross.shift(1) * (1 + reference_cash) / (1 + local_cash)
         terminal = price * cross + hedge_ratios[asset] * price.shift(1) * (forward - cross)
         gross_payoff = terminal / (price.shift(1) * cross.shift(1))
@@ -634,36 +672,35 @@ not manufacture MATF factors or replace the consuming model's estimator.
 
 ### Select the entry point by the output you need
 
-| Requirement | `FxRatesData` method | Output |
+| Requirement | Typed request / operation | Output |
 |---|---|---|
-| One asset, fixed or time-varying hedge | `compute_performance_of_local_ccy_asset_in_reference_ccy` | `(nav_series, return_series)` |
-| One common frequency, optional dated hedge matrix | `compute_returns_in_reference_ccy` | `(nav_dataframe, return_dataframe)` |
-| Per-asset observation frequencies, estimation input | `compute_fx_adjusted_returns` | `{frequency: return_dataframe}`; a string frequency still returns a dictionary |
-| Deliberately native-currency analysis, no conversion | `compute_returns_adjusted_by_local_rate` | `(native_returns, native_excess_returns, annual_rate_quotes)` |
+| One asset, fixed or time-varying hedge | One-column `FxAssetReturnsRequest` to `compute_fx_returns` | Cadence-keyed `FxReturnsData`; `.values.iloc[:, 0]` |
+| One common frequency, optional dated hedge matrix | `compute_fx_returns` with `FxAssetReturnsRequest` | Typed cadence result; `.values` and optional `.to_index(normalization)` |
+| Per-asset observation frequencies, estimation input | `compute_fx_returns` with per-asset frequency | `{frequency: FxReturnsData}`; a scalar cadence also returns a mapping |
+| Deliberately native-currency analysis, no conversion | LOCAL_TOTAL and LOCAL_EXCESS requests | Separate typed results; source annual quotes remain available separately |
 
-For panel methods, a uniform hedge must be a Series indexed by asset, for example
-`pd.Series(1.0, index=prices.columns)`, not a scalar. A constant currency string is supported
-by the single-frequency panel method; an explicit indexed currency Series is clearer for
+A uniform hedge may be a scalar; an asset-indexed Series declares different static ratios.
+A date-by-asset DataFrame declares changing decisions. A constant currency string is supported
+by `FxAssetReturnsRequest`; an explicit indexed currency Series is clearer for
 a multi-currency universe. Reindex metadata to the price columns and check for missing or
 duplicated identifiers before calling. Do not invent currencies or hedge ratios for missing rows.
 
 For time-varying hedges, pass a date-by-asset DataFrame to
-`compute_returns_in_reference_ccy`. A hedge ratio dated $t$ is a decision for the next holding
+`FxAssetReturnsRequest`. A hedge ratio dated $t$ is a decision for the next holding
 period; the method as-of aligns and lags it internally. Do not shift an already decision-dated
 hedge a second time. The standalone optimal-hedge estimator is separate from this application.
 
 ### Safe estimation and reporting contract
 
-- **Estimation:** explicitly select `is_log_returns=True`, `is_excess_returns=True`,
-  `cash_rate_lag=1`, and `zero_return_to_nan=False` for ROSAA-style log-excess inputs.
-  These are caller choices, not a change to QIS's simple-total-return default.
-- **Reporting:** use `is_log_returns=False`, `is_excess_returns=False`; apply the same
-  declared currency and hedge treatment, while stating any different hedge-reset cadence.
+- **Estimation:** select REFERENCE_EXCESS / LOG, `FxCashPolicy(quote_lag=1)`, and
+  `zero_return_to_nan=False` for ROSAA-style inputs. LOG excess is cash-relative.
+- **Reporting:** request REFERENCE_TOTAL / SIMPLE and an explicit index normalization.
+  Apply the same declared currency and hedge treatment, stating any different reset cadence.
 - **Inception:** `FxRatesData` preserves an undefined first return as NaN, including the
   foreign-asset kernel's synthetic first-index zero. Never train on a fabricated inception
   return. Include earlier observations when a real return is required at the report start.
-- **Valid zeros:** the mixed-frequency helper's default replaces exact zeros in the final
-  return panel. With excess returns enabled, a flat total-return asset usually has a negative
+- **Valid zeros:** the typed API retains exact zeros by default; explicit filtering can mask
+  them in the final return panel. With excess returns enabled, a flat total-return asset usually has a negative
   excess return, not zero; conversely, a zero excess return can be economically meaningful.
   Preserve genuine observations and choose the correct grid for appraisal-based assets.
 - **Unsmoothing:** if required by the model, prepare the native-currency asset history first
@@ -676,8 +713,8 @@ hedge a second time. The standalone optimal-hedge estimator is separate from thi
   cutoff, zero policy and unsmoothing policy with the inputs. Fit each snapshot only through
   its observation cutoff; FX conversion does not enforce downstream estimator warm-up.
 
-For simple excess output, the returned NAV compounds `1 + arithmetic excess`: it is not
-the ratio of investment wealth to cash wealth. For log excess output, compounding exponentiated
+For SIMPLE excess, an explicitly requested capital-proportional synthetic index compounds `1 + arithmetic excess`: it is not
+the ratio of investment wealth to cash wealth. For LOG excess output, compounding exponentiated
 log excess is cash-relative wealth over valid periods. Neither replaces the total-return NAV
 in the factsheet. Missing-data handling during NAV reconstruction also does not turn an
 undefined return into a genuine estimation observation.
@@ -700,7 +737,7 @@ and independently check terminal cash flows, reference-cash deduction, log/simpl
 inception, monthly/quarterly dispatch and the OLS coefficients against centred cross-products.
 The regression uses the public
 [fit_multivariate_ols](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/regression.py)
-wrapper. This guide targets the checked 5.44.0 source contract.
+wrapper. The typed contract is described in the [return-conventions guide](return_conventions_and_fx_adjustments.md).
 
 ## Interpretation and limitations
 
@@ -717,9 +754,11 @@ wrapper. This guide targets the checked 5.44.0 source contract.
   replacement cannot replace proper frequency selection or an observation mask.
 - A quarterly cash approximation and quarterly hedge reset need not match compounded monthly
   cash and monthly hedge resets. State the investment cadence, not just the report cadence.
-- This is the **funded-asset** conversion. For unfunded futures P&L, use the separate
-  `qis.compute_futures_fx_adjusted_returns` convention and model collateral/funding explicitly.
-  Applying a funded principal FX return to a futures factor creates exposure that is not there.
+- This is the **funded-asset** conversion. A locally financed asset uses the typed
+  `LOCAL_EXCESS_TRANSLATED` payoff directly: arithmetic local excess times terminal spot growth.
+  The low-level `qis.compute_futures_fx_adjusted_returns` translates already supplied futures
+  gains; it does not subtract local financing. Never reconstruct a cash-relative excess NAV
+  as an input to approximate financed P&L. Model collateral and funding separately.
 - Log output requires positive gross asset and cash payoffs. CIP ignores market basis,
   bid/ask spreads, collateral terms and additional hedge-implementation costs.
 - A reference-currency risk fit and a native-payoff mean fit answer different questions.

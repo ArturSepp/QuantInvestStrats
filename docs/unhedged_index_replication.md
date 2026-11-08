@@ -248,11 +248,15 @@ translated = {}
 for label, usd_per_chf in quotes.items():
     spots = pd.DataFrame({'USD': 1.0, 'CHF': usd_per_chf})
     fx = qis.FxRatesData(fx_spots=spots, domestic_rates=spots * 0.0)
-    _, returns = fx.compute_performance_of_local_ccy_asset_in_reference_ccy(
-        asset_price_local_ccy=asset_usd, hedge_ratio=0.0,
-        local_ccy='USD', reference_ccy='CHF', freq='ME',
-        is_log_returns=False, is_excess_returns=False, cash_rate_lag=1,
-    )
+    converted_1 = qis.compute_fx_returns(
+        fx, qis.FxAssetReturnsRequest(
+            prices=(asset_usd).to_frame(), local_ccys='USD',
+            return_type=qis.FxReturnType.REFERENCE_TOTAL,
+            coordinate=qis.FxReturnCoordinate.SIMPLE,
+            reference_ccy='CHF', hedge_ratios=0.0,
+            frequency='ME', cash_policy=qis.FxCashPolicy(quote_lag=1),
+        ))['ME']
+    returns = converted_1.values.iloc[:, 0]
     translated[label] = float(returns.iloc[-1])
 assert isclose(translated['Supplied spots'], -0.065, abs_tol=1e-12)
 assert isclose(translated['Index-implied diagnostic'],
@@ -572,7 +576,7 @@ NDDUJN Index paired with NDDLJN Index.
 ## Implementation in qis
 
 The public calculation is
-`qis.FxRatesData.compute_performance_of_local_ccy_asset_in_reference_ccy`,
+`qis.compute_fx_returns` with REFERENCE_TOTAL / SIMPLE and zero additional hedge,
 with `hedge_ratio=0.0`, `is_excess_returns=False`, `freq='ME'` and
 `is_log_returns=False`. The method returns a reference-currency NAV and return series.
 The [FX container source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py)

@@ -83,19 +83,18 @@ fx = FxRatesData.load(local_path=qis.local_path.get_resource_path(), time_period
 | `get_local_to_reference_fx_rate(local_ccy, reference_ccy)` | Cross rate = reference per 1 local (`fx_spots[local] / fx_spots[reference]`). |
 | `get_local_rate(freq, local_ccy, annualise=False)` | Domestic short rate at `freq`; per-period (`annualise=False`) or annualised. |
 | `get_forward_rate_for_local_ccy(local_ccy, reference_ccy, freq, is_log_returns=False)` | Per-period CIP forward premium (see below). |
-| `get_daily_carry_local_return(local_ccy, reference_ccy, is_log_returns=False)` | `(spot_return, carry_return)` daily legs. |
-| `get_fx_total_return_nav(local_ccy, reference_ccy, time_period, freq)` | NAV of spot + carry. |
-| `get_carry_fx_return_nav(local_ccy, reference_ccy, is_normalise_by_spot_vol, time_period, freq, is_causal)` | Carry-only NAV (vol-matched to spot). |
+| `compute_fx_returns(data, FxCurrencyReturnsRequest(...))` | Typed spot returns or exact forward P&L; no automatic NAV. |
 
-**CIP forward premium.** With annualised short rates `r_loc`, `r_ref` and `dt = 1 / annualisation_factor(freq)`,
-the per-period forward premium earned on the local currency is `(1 + dt*r_loc)/(1 + dt*r_ref) - 1`
-(simple) or `log((1 + dt*r_loc)/(1 + dt*r_ref))` (log). This is the financing carry that a fully
-hedged position pays/earns relative to the reference currency.
+**CIP and exact settlement.** Opening annual quotes accrue over actual calendar days / 365.
+For local and reference cash increments `c_local` and `c_reference`, the inverse-quote premium
+is `f = (1+c_local)/(1+c_reference)-1`. The reference-per-local forward is
+`F/S = (1+c_reference)/(1+c_local)`. Long-local forward settlement per opening reference
+notional is `spot_return + f/(1+f)`, not `spot_return + f`.
 
-**Look-ahead note.** `get_carry_fx_return_nav(is_normalise_by_spot_vol=True)` matches the carry NAV's
-realised vol to the spot series. With `is_causal=False` (default) the mean/variance are computed on
-the full sample — fine for ex-post reporting, **not** for backtests. Pass `is_causal=True` for
-expanding-window statistics.
+`get_daily_carry_local_return`, `get_fx_total_return_nav` and `get_carry_fx_return_nav` are
+deprecated from 5.46.0, with removal in 6.0.0. Their retained premium-based histories are not
+exact forward payoffs. Use `FX_FORWARD` and an explicit `FxIndexNormalization` for a synthetic
+capital index. Current report panels use a daily-reset, unit-notional-to-capital forward index.
 
 ---
 
@@ -110,36 +109,26 @@ expanding-window statistics.
 
 ## Multi-asset FX-translation pipeline
 
-The primary entry point consumed by the covariance estimator and the alpha aggregator:
-
-`compute_fx_adjusted_returns` defaults to simple (arithmetic) returns, matching
-`qis.to_returns` and the single-asset FX method. Specify `is_log_returns` at each
-call site. The estimation examples below explicitly request log returns; their
-convention does not depend on the library default.
+The current entry point consumed by covariance estimation and alpha aggregation is typed:
 
 ```python
-returns_by_freq = fx.compute_fx_adjusted_returns(
-    prices=prices,            # native-ccy price panel (columns = assets)
-    hedge_ratios=hedge_ratios,# per-asset hedge ratio in [0, 1] (Series)
-    local_ccys=local_ccys,    # per-asset currency (Series)
-    reference_ccy='USD',
-    freq='ME',                # str (one freq) OR pd.Series (per-asset → grouped)
-    is_log_returns=True,
-    is_excess_returns=False)
-# -> {freq_string: returns_dataframe}
+results = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
+    prices=prices, local_ccys=local_ccys,
+    return_type=qis.FxReturnType.REFERENCE_EXCESS,
+    coordinate=qis.FxReturnCoordinate.LOG,
+    reference_ccy='USD', hedge_ratios=hedge_ratios, frequency='ME',
+    zero_return_to_nan=True))
+returns_by_freq = {freq: result.values for freq, result in results.items()}
 ```
 
-* `compute_returns_in_reference_ccy(...)` is the single-frequency core (returns `(navs, returns)`);
-  `compute_fx_adjusted_returns(...)` wraps it in a per-frequency groupby and replaces structural
-  zero returns with `NaN` (so step-function PE/PD series don't bias rolling β toward zero).
-* `compute_returns_adjusted_by_local_rate(asset_prices, local_ccys, freq, is_log_returns)` returns
-  `(local_returns, excess_returns, local_rates)` in each asset's **own** currency (no FX conversion).
-* `fetch_local_rates(local_ccys, freq, annualise=False)` builds the per-asset short-rate panel.
+The request states the economic kind and coordinate. Zero masking is explicit. Log excess is
+log asset growth minus log cash growth, distinct from arithmetic excess. `LOCAL_EXCESS_TRANSLATED`
+uses arithmetic local excess times spot growth; `FX_FORWARD` is a currency request. Both notional
+payoffs require `SIMPLE`, even if an optional normalized synthetic index is requested. Funded
+reference excess subtracts reference cash once; local financing is a different economic object.
 
-**Excess-return convention.** When `is_excess_returns=True` the excess is taken over the **reference**
-currency risk-free rate, not the asset's local rate. Under CIP the hedged forward premium already
-converts the asset's native rf into the reference rf, so subtracting the reference rf is the correct
-and non-double-counting choice.
+See the [executed convention and migration guide](../../../docs/return_conventions_and_fx_adjustments.md)
+for all supported kinds, exact identities, optional normalization and deprecated methods.
 
 ---
 
@@ -154,9 +143,10 @@ Pure, stateless functions on plain price/return Series:
 | `compute_fx_vol_beta(..., freq, span)` | `(fx_vol, fx_beta)` — EWMA annualised FX vol and the local-on-FX beta. |
 | `compute_fx_optimal_hedge(..., freq, span, risk_aversion_lambda, min_max_hedge)` | `(optimal, max_carry, beta_hedged)` hedge-ratio series. |
 
-**Hedged return.** `hedged_return = local_return*(1 + fx_return) + (1 - h)*fx_return - h*forward_premium`,
-with the hedge ratio `h` and the forward premium **lagged one period** so the return over `[t-1, t]`
-uses the hedge decided at `t-1` (no look-ahead). The first period is forced to 0 so the NAV starts at 1.0.
+**Hedged return.** `local_return*(1 + fx_return) + (1 - h)*fx_return - h*kappa`,
+where `kappa=f/(1+f)` uses opening cash quotes and `h` is the opening principal hedge.
+The local gain remains exposed to terminal spot. Typed results retain a missing first return;
+synthetic indices require explicit normalization.
 
 **Hedge strategies** (from EWMA vol/beta and the annualised forward premium):
 `carry_ratio = (annualised_forward / fx_var) / (2*risk_aversion_lambda)`; `Max Carry = 1 - carry_ratio`;

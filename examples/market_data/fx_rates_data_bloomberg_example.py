@@ -20,6 +20,8 @@ pinned to 1.0; GBp = 0.01 * GBP; XAU = 1.0. ``domestic_rates`` are short rates a
 Bloomberg fields are quoted in percent, so they are scaled by 0.01; XAU uses the USD curve as a
 financing-cost proxy and GBp shares the GBP curve.
 """
+
+from qis.market_data import fx_returns as qfx
 import pandas as pd
 import matplotlib.pyplot as plt
 import qis as qis
@@ -149,11 +151,17 @@ def run_local(local: Locals):
         qis.plot_prices(prices=crosses, ax=ax, title='FX cross rates (reference per local)')
 
     elif local == Locals.FX_TOTAL_RETURN_NAVS:
-        # spot move + carry, as a total-return NAV for each pair vs USD
-        navs = pd.concat([fx_rates_data.get_fx_total_return_nav(local_ccy=l, reference_ccy='USD')
-                          for l in ('EUR', 'GBP', 'CHF', 'JPY', 'AUD')], axis=1)
+        result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
+            ('EUR', 'GBP', 'CHF', 'JPY', 'AUD'), 'USD', qis.FxReturnType.FX_FORWARD,
+            frequency='B'))['B']
+        navs = result.to_index(qis.FxIndexNormalization(
+            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
+            settlement_frequency='B', reinvestment='each_interval',
+            cash_treatment='as_returned', missing_returns='skip'))
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
-        qis.plot_prices(prices=navs, ax=ax, title='FX total-return NAVs vs USD (spot + carry)')
+        qis.plot_prices(
+            prices=navs, ax=ax,
+            title='Exact FX forward indices vs USD (capital-normalized, daily reset)')
 
     elif local == Locals.CARRY_FORWARD_PREMIUM:
         # annualised CIP forward premium of each ccy vs USD (per-period rate * periods-per-year)
@@ -176,12 +184,38 @@ def run_local(local: Locals):
         # translate the USD benchmark panel into a CHF investor's frame, unhedged vs fully hedged
         assets = fetch_usd_assets_from_bloomberg()
         local_ccys = pd.Series('USD', index=assets.columns)
-        navs_unhedged, _ = fx_rates_data.compute_returns_in_reference_ccy(
-            asset_prices=assets, hedge_ratios=pd.Series(0.0, index=assets.columns),
-            local_ccys=local_ccys, reference_ccy=REFERENCE_CCY, freq=FREQ)
-        navs_hedged, _ = fx_rates_data.compute_returns_in_reference_ccy(
-            asset_prices=assets, hedge_ratios=pd.Series(1.0, index=assets.columns),
-            local_ccys=local_ccys, reference_ccy=REFERENCE_CCY, freq=FREQ)
+        fx_result_179 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy=REFERENCE_CCY,
+                hedge_ratios=pd.Series(0.0, index=assets.columns),
+                frequency=FREQ,
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )[FREQ]
+        navs_unhedged = fx_result_179.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', FREQ, 'each_interval', 'as_returned', 'skip'))
+        fx_result_182 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy=REFERENCE_CCY,
+                hedge_ratios=pd.Series(1.0, index=assets.columns),
+                frequency=FREQ,
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )[FREQ]
+        navs_hedged = fx_result_182.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', FREQ, 'each_interval', 'as_returned', 'skip'))
         eq = pd.concat([navs_unhedged['Equities'].rename(f'Equities in {REFERENCE_CCY} (unhedged)'),
                         navs_hedged['Equities'].rename(f'Equities in {REFERENCE_CCY} (hedged)')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)

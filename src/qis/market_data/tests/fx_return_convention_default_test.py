@@ -76,3 +76,8 @@ def test_fx_panel_default_is_explicit_arithmetic(
             np.testing.assert_allclose(
                 simple, np.expm1(log), rtol=1e-13, atol=1e-14, equal_nan=True)
 
+
+# Retiring analytics retain their original numeric contract until QIS 6.0.0.
+# The typed suite separately requires all three public deprecation warnings.
+pytestmark = pytest.mark.filterwarnings(
+    'ignore:compute_.* is deprecated in QIS 5.45.0:DeprecationWarning')

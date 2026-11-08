@@ -11,6 +11,8 @@ The FX spots here are real Yahoo data; domestic rates are USD-real plus stylised
 fx_rates_data_yahoo_example) — the identity is a property of the container's rate accounting and
 holds regardless of whether the rates are real or stylised, exactly as the unit test checks.
 """
+
+from qis.market_data import fx_returns as qfx
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -27,14 +29,20 @@ FREQ = 'ME'
 
 def _excess_return(fx_rates_data, prices, hedge_ratio: float, reference_ccy: str) -> pd.Series:
     """Per-period reference-ccy EXCESS return of a USD asset at a given hedge ratio."""
-    res = fx_rates_data.compute_fx_adjusted_returns(
-        prices=prices,
-        hedge_ratios=pd.Series({ASSET: hedge_ratio}),
-        local_ccys=pd.Series({ASSET: 'USD'}),
-        reference_ccy=reference_ccy,
-        freq=FREQ,
-        is_log_returns=False,
-        is_excess_returns=True)
+    res = {cadence: result.values for cadence, result in qfx.compute_fx_returns(
+        fx_rates_data,
+        qfx.FxAssetReturnsRequest(
+            prices=prices,
+            local_ccys=pd.Series({ASSET: 'USD'}),
+            return_type=qfx.FxReturnType.REFERENCE_EXCESS,
+            coordinate=qfx.FxReturnCoordinate.SIMPLE,
+            reference_ccy=reference_ccy,
+            hedge_ratios=pd.Series({ASSET: hedge_ratio}),
+            frequency=FREQ,
+            cash_policy=qfx.FxCashPolicy(quote_lag=1),
+            zero_return_to_nan=True,
+        ),
+    ).items()}
     return res[FREQ][ASSET].dropna()
 
 

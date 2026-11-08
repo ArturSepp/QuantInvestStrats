@@ -35,3 +35,8 @@ def test_zero_return_policy_preserves_opt_in_zeros(per_asset_frequency: bool) ->
     pd.testing.assert_series_equal(default['MOVING'], retained['MOVING'])
     pd.testing.assert_frame_equal(default.replace({np.nan: 0.0}).iloc[1:],
                                   retained.fillna(0.0).iloc[1:])
+
+# Retiring analytics retain their original numeric contract until QIS 6.0.0.
+# The typed suite separately requires all three public deprecation warnings.
+pytestmark = pytest.mark.filterwarnings(
+    'ignore:compute_.* is deprecated in QIS 5.45.0:DeprecationWarning')

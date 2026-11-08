@@ -15,6 +15,8 @@ funding rates or executable forward quotes. Production work needs convention-mat
 from the reader's provider. The FX spots are observed Yahoo data. Downloads run serially and
 fail clearly if a requested series has no observations.
 """
+
+from qis.market_data import fx_returns as qfx
 import pandas as pd
 import matplotlib.pyplot as plt
 import yfinance as yf
@@ -133,12 +135,17 @@ def run_local(local: Locals):
         qis.plot_prices(prices=crosses, ax=ax, title='FX cross rates (reference per local)')
 
     elif local == Locals.FX_TOTAL_RETURN_NAVS:
-        # spot move + carry, as a total-return NAV for each pair vs USD
-        navs = pd.concat([
-            fx_rates_data.get_fx_total_return_nav(local_ccy=local, reference_ccy='USD')
-            for local in ('EUR', 'GBP', 'CHF', 'JPY')], axis=1)
+        result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
+            ('EUR', 'GBP', 'CHF', 'JPY'), 'USD', qis.FxReturnType.FX_FORWARD,
+            frequency='B'))['B']
+        navs = result.to_index(qis.FxIndexNormalization(
+            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
+            settlement_frequency='B', reinvestment='each_interval',
+            cash_treatment='as_returned', missing_returns='skip'))
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
-        qis.plot_prices(prices=navs, ax=ax, title='FX total-return NAVs vs USD (spot + carry)')
+        qis.plot_prices(
+            prices=navs, ax=ax,
+            title='Exact FX forward indices vs USD (capital-normalized, daily reset)')
 
     elif local == Locals.CARRY_FORWARD_PREMIUM:
         # annualised CIP forward premium of each ccy vs USD (per-period rate * periods-per-year)
@@ -167,12 +174,38 @@ def run_local(local: Locals):
             raise ValueError(
                 'Yahoo returned no overlapping SPY/TLT/GLD history; retry the download.')
         local_ccys = pd.Series('USD', index=assets.columns)
-        navs_unhedged, _ = fx_rates_data.compute_returns_in_reference_ccy(
-            asset_prices=assets, hedge_ratios=pd.Series(0.0, index=assets.columns),
-            local_ccys=local_ccys, reference_ccy='CHF', freq='ME')
-        navs_hedged, _ = fx_rates_data.compute_returns_in_reference_ccy(
-            asset_prices=assets, hedge_ratios=pd.Series(1.0, index=assets.columns),
-            local_ccys=local_ccys, reference_ccy='CHF', freq='ME')
+        fx_result_170 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy='CHF',
+                hedge_ratios=pd.Series(0.0, index=assets.columns),
+                frequency='ME',
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )['ME']
+        navs_unhedged = fx_result_170.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
+        fx_result_173 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy='CHF',
+                hedge_ratios=pd.Series(1.0, index=assets.columns),
+                frequency='ME',
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )['ME']
+        navs_hedged = fx_result_173.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
         spy = pd.concat([navs_unhedged['SPY'].rename('SPY in CHF (unhedged)'),
                          navs_hedged['SPY'].rename('SPY in CHF (hedged)')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)

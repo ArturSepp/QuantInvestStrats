@@ -15,3 +15,8 @@ from qis.market_data.reports.fx_hedging_report import (
     plot_multi_asset_fx_hedging_report,
     run_asset_fx_hedging_report,
 )
+
+from qis.market_data.fx_returns import (
+    FxReturnType, FxReturnCoordinate, FxCashPolicy, FxIndexNormalization,
+    FxAssetReturnsRequest, FxCurrencyReturnsRequest, FxReturnsData, compute_fx_returns,
+)
