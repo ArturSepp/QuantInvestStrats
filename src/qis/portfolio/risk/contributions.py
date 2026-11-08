@@ -256,7 +256,22 @@ def compute_benchmark_portfolio_risk_contributions(w_portfolio: Union[np.ndarray
     else:
         raise ValueError(f"unsupported types {type(w_portfolio)}, {type(w_benchmark)} "
                          f"and {type(covar)}")
-    active_weights = w_portfolio - w_benchmark
+    # Sparse maximum/minimum can round integer levels; retain native sparse arithmetic.
+    if (w_portfolio.dtype.kind in 'bu' and w_benchmark.dtype.kind in 'bu'
+            and 'u' in (w_portfolio.dtype.kind, w_benchmark.dtype.kind)
+            and not any(isinstance(w.dtype, pd.SparseDtype) for w in (w_portfolio, w_benchmark))):
+        # Subtract in nonnegative order before promotion: float conversion would erase
+        # small active positions between large integers. Standalone risk needs only
+        # this magnitude, retaining its native floating result dtype.
+        magnitude = np.maximum(w_portfolio, w_benchmark) - np.minimum(w_portfolio, w_benchmark)
+        active_weights = magnitude
+        if not is_independent_risk:
+            # Labels are already aligned; compare values without extension-kernel dispatch.
+            sign = np.where(np.asarray(w_portfolio) >= np.asarray(w_benchmark),
+                            np.int8(1), np.int8(-1))
+            active_weights = magnitude * sign
+    else:
+        active_weights = w_portfolio - w_benchmark
     covar = fill_unavailable_unheld(covar, active_weights)
     if is_independent_risk:
         rc = np.abs(active_weights) * np.sqrt(np.diag(covar))
