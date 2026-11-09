@@ -5,6 +5,15 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Correct dense and nullable unsigned active-weight subtraction in
+  `compute_benchmark_portfolio_risk_contributions` for Euler and standalone risk.
+  Small integer differences are preserved when native alignment retains unsigned
+  storage; existing alignment conversions and standalone output dtypes are unchanged.
+
 ## [6.0.0] - 2026-11-09
 
 ### Changed

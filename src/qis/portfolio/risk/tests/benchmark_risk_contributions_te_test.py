@@ -112,3 +112,112 @@ def test_standalone_option_is_the_undiversified_bound() -> None:
     assert standalone.index.tolist() == ASSETS
     np.testing.assert_allclose(standalone.to_numpy(), [0.02, 0.01, 0.03], atol=1e-15)
     assert standalone.sum() >= np.sqrt(0.00244)
+
+
+@pytest.mark.parametrize('carrier,dtype', [
+    ('numpy', 'uint8'), ('labelled-array', 'uint16'), ('series', 'uint32'),
+    ('series', 'UInt8'), ('series', 'UInt64'), ('mixed-boolean', 'UInt8'),
+])
+@pytest.mark.parametrize('standalone', [False, True])
+def test_compute_benchmark_portfolio_risk_contributions_with_unsigned_weights(
+        carrier: str, dtype: str, standalone: bool) -> None:
+    """An active short remains negative after alignment, including mixed Boolean storage."""
+    assets = pd.Index(['A', 'B'], name='asset')
+    covar = pd.DataFrame([[.01, .005], [.005, .04]], index=assets, columns=assets)
+    portfolio = pd.Series([1, 0], index=assets, dtype=dtype, name='portfolio')
+    benchmark = pd.Series([1, 0], index=assets[::-1], dtype=dtype, name='benchmark')
+    if carrier == 'mixed-boolean':
+        benchmark = benchmark.astype(bool)
+    if carrier in ('numpy', 'labelled-array'):
+        portfolio = portfolio.to_numpy()
+        benchmark = benchmark.iloc[::-1].to_numpy()
+    if carrier == 'numpy':
+        covar = covar.to_numpy()
+    before = (portfolio.tolist(), benchmark.tolist(), portfolio.dtype, benchmark.dtype)
+
+    actual = qis.compute_benchmark_portfolio_risk_contributions(
+        portfolio, benchmark, covar, is_independent_risk=standalone)
+
+    # d=(1,-1): S*d=(.005,-.035), variance=.04. Correlation exposes a lost sign.
+    expected = [.1, .2] if standalone else [.025, .175]
+    if carrier == 'numpy':
+        assert isinstance(actual, np.ndarray)
+        np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=1e-15)
+    else:
+        result_dtype = 'Float64' if dtype.startswith('UInt') else 'float64'
+        pd.testing.assert_series_equal(
+            actual, pd.Series(expected, index=assets, dtype=result_dtype),
+            rtol=1e-13, atol=1e-15)
+    assert (portfolio.tolist(), benchmark.tolist(), portfolio.dtype, benchmark.dtype) == before
+    if isinstance(portfolio, pd.Series):
+        assert tuple(portfolio.index) == ('A', 'B') and portfolio.index.name == 'asset'
+        assert tuple(benchmark.index) == ('B', 'A') and benchmark.index.name == 'asset'
+        assert portfolio.name == 'portfolio' and benchmark.name == 'benchmark'
+
+
+@pytest.mark.parametrize('dtype', ['uint64', 'UInt64'])
+@pytest.mark.parametrize('portfolio_level,benchmark_level,other_active', [
+    (2**53 + 1, 2**53, 0), (2**63 + 1, 2**63, 0),
+    (2**63, 2**63 + 1, 1), (2**64 - 1, 0, -1), (0, 2**64 - 1, 1),
+])
+@pytest.mark.parametrize('standalone', [False, True])
+def test_compute_benchmark_portfolio_risk_contributions_keeps_wide_integer_differences(
+        dtype: str, portfolio_level: int, benchmark_level: int,
+        other_active: int, standalone: bool) -> None:
+    """Subtract exactly before floating risk; compare wide operands before rounding them."""
+    assets = ['A', 'B']
+    portfolio = pd.Series([portfolio_level, max(other_active, 0)], index=assets, dtype=dtype)
+    benchmark = pd.Series([benchmark_level, max(-other_active, 0)], index=assets, dtype=dtype)
+    covar = pd.DataFrame([[.01, .005], [.005, .04]], index=assets, columns=assets)
+    if dtype == 'uint64':
+        portfolio, benchmark, covar = portfolio.to_numpy(), benchmark.to_numpy(), covar.to_numpy()
+
+    actual = qis.compute_benchmark_portfolio_risk_contributions(
+        portfolio, benchmark, covar, is_independent_risk=standalone)
+
+    # Python integers retain the one-unit difference independently of NumPy/pandas promotion.
+    d, other = portfolio_level - benchmark_level, other_active
+    if standalone:
+        expected = [abs(d) * .1, abs(other) * .2]
+    else:
+        te = np.sqrt(.01 * d * d + .01 * d * other + .04 * other * other)
+        expected = [d * (.01 * d + .005 * other) / te,
+                    other * (.005 * d + .04 * other) / te]
+    np.testing.assert_allclose(np.asarray(actual, dtype=float), expected, rtol=1e-13, atol=1e-15)
+    if dtype == 'UInt64':
+        assert isinstance(actual, pd.Series) and actual.dtype == 'Float64'
+        assert actual.index.tolist() == assets
+
+
+def test_compute_benchmark_portfolio_risk_contributions_keeps_standalone_precision() -> None:
+    """Unsigned magnitude needs no signed promotion in the standalone branch."""
+    actual = qis.compute_benchmark_portfolio_risk_contributions(
+        np.array([1, 0], dtype=np.uint16), np.array([0, 1], dtype=np.uint16),
+        np.diag(np.array([.01, .04], dtype=np.float32)), is_independent_risk=True)
+
+    assert actual.dtype == np.dtype(np.float32)
+    np.testing.assert_array_equal(actual, np.array([.1, .2], dtype=np.float32))
+
+
+def test_compute_benchmark_portfolio_risk_contributions_retains_boolean_rejection() -> None:
+    """Mixed unsigned/Boolean promotion must not admit a Boolean-only subtraction."""
+    with pytest.raises(TypeError, match='boolean subtract'):
+        qis.compute_benchmark_portfolio_risk_contributions(
+            np.array([True, False]), np.array([False, True]), np.diag([.01, .04]))
+
+
+@pytest.mark.parametrize('standalone', [False, True])
+def test_compute_benchmark_portfolio_risk_contributions_preserves_sparse_integer_differences(
+        standalone: bool) -> None:
+    """Sparse maximum/minimum would round away a difference native subtraction retains."""
+    portfolio = pd.Series([2**53 + 1, 0], index=['A', 'B'], dtype=pd.SparseDtype('uint64', 0))
+    benchmark = pd.Series([2**53, 0], index=['A', 'B'], dtype=pd.SparseDtype('uint64', 0))
+    covar = pd.DataFrame([[.01, .005], [.005, .04]], index=['A', 'B'], columns=['A', 'B'])
+
+    actual = qis.compute_benchmark_portfolio_risk_contributions(
+        portfolio, benchmark, covar, is_independent_risk=standalone)
+
+    # The exact active position is (1, 0), so either risk mode gives (sqrt(.01), 0).
+    pd.testing.assert_series_equal(
+        actual, pd.Series([.1, 0.], index=['A', 'B'], dtype=pd.SparseDtype('float64', 0)),
+        rtol=1e-13, atol=1e-15)
