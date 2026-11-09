@@ -266,8 +266,12 @@ def read_redirect_manifest(path: Optional[Path] = None) -> dict:
     sources = set()
     for rule in manifest["redirects"]:
         source, target = rule["from_url"], urlsplit(rule["to_url"])
+        is_source_download = source.startswith("/_sources/") and source.endswith(
+            (".rst.txt", ".md.txt")
+        )
         if (not source.startswith("/") or source.startswith(("//", "/en/"))
-                or not source.endswith(".html") or ".." in source.split("/")
+                or not (source.endswith(".html") or is_source_download)
+                or ".." in source.split("/")
                 or any(char in source for char in "*?#") or source in sources):
             raise ValueError(f"Invalid or duplicate legacy page URL: {source}")
         if (target.scheme != "https" or not target.hostname or target.username

@@ -42,13 +42,21 @@ def test_manifest_keeps_reviewed_legacy_and_compiled_entry_points():
         "limit_weights_to_max_var_limit",
     }
     mirrors = {"gallery", "factsheets", "frequency_convention_note", "REMOVED_5_0"}
+    raw_sources = {
+        f"/_sources/api/generated/qis.{name}.rst.txt"
+        for name in {"OhlcEstimatorType", "TrainLivePeriod", "TrainLiveSamples",
+                     "estimate_hf_ohlc_vol", "estimate_ohlc_var"}
+    } | {"/_sources/_included/factsheets.md.txt"}
     assert sources == {f"/api/generated/qis.{name}.html" for name in names} | {
         f"/_included/{name}.html" for name in mirrors
-    }
+    } | raw_sources
     assert all(r["http_status"] == 301 and r["force"] is False for r in manifest["redirects"])
 
 
-@pytest.mark.parametrize("change", ["duplicate", "forced", "temporary", "self", "query"])
+@pytest.mark.parametrize(
+    "change", ["duplicate", "forced", "temporary", "self", "query",
+               "non_source_text", "unknown_source_suffix", "source_traversal"],
+)
 def test_manifest_rejects_unsafe_or_inconsistent_hosting_rules(tmp_path, change):
     """Reject loops, duplicates, forced redirects and accidental temporary responses."""
     manifest = copy.deepcopy(SEO["read_redirect_manifest"]())
@@ -61,6 +69,12 @@ def test_manifest_rejects_unsafe_or_inconsistent_hosting_rules(tmp_path, change)
         rule["http_status"] = 302
     elif change == "self":
         rule["to_url"] = manifest["site"] + "/en/stable" + rule["from_url"]
+    elif change == "non_source_text":
+        rule["from_url"] = "/api/generated/qis.example.rst.txt"
+    elif change == "unknown_source_suffix":
+        rule["from_url"] = "/_sources/example.txt"
+    elif change == "source_traversal":
+        rule["from_url"] = "/_sources/../example.rst.txt"
     else:
         rule["to_url"] = rule["to_url"].split("#")[0] + "?token=not-allowed"
     file = tmp_path / "redirects.json"

@@ -227,6 +227,60 @@
       "http_status": 301,
       "force": false,
       "enabled": true
+    },
+    {
+      "from_url": "/_sources/api/generated/qis.OhlcEstimatorType.rst.txt",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "Retired Sphinx source download; OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_sources/api/generated/qis.TrainLivePeriod.rst.txt",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/REMOVED_5_0.html#upgrade-checks",
+      "description": "Retired Sphinx source download; Removed train/live containers; consult the migration guide and changelog for current supported imports.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_sources/api/generated/qis.TrainLiveSamples.rst.txt",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/REMOVED_5_0.html#upgrade-checks",
+      "description": "Retired Sphinx source download; Removed train/live containers; consult the migration guide and changelog for current supported imports.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_sources/api/generated/qis.estimate_hf_ohlc_vol.rst.txt",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "Retired Sphinx source download; OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_sources/api/generated/qis.estimate_ohlc_var.rst.txt",
+      "to_url": "https://stochvolmodels.readthedocs.io/en/latest/api.html#ohlc-volatility-estimation",
+      "description": "Retired Sphinx source download; OHLC estimation moved from QIS to stochvolmodels.estimation; see the current API contract.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
+    },
+    {
+      "from_url": "/_sources/_included/factsheets.md.txt",
+      "to_url": "https://quantinveststrats.readthedocs.io/en/stable/factsheets.html",
+      "description": "Retired Sphinx source download; use the current factsheet documentation.",
+      "redirect_type": "page",
+      "http_status": 301,
+      "force": false,
+      "enabled": true
     }
   ]
 }
