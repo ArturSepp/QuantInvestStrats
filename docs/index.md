@@ -38,10 +38,12 @@ an individual page may not exist in both versions.
 
 The core chart, backtest, factsheet and risk examples below support **`qis>=5.37.0`**.
 Native factor-unit and observed-index stress workflows require **`qis>=5.38.1`**.
-The unified typed FX API, exact notional payoffs and explicit account guide require
-**`qis>=5.47.0`**, the first public release of these capabilities. Local validation
-versions 5.45.0/5.46.0 are documented in the
-[FX migration plan](return_conventions_and_fx_adjustments.md#immediate-deprecation-and-direct-migration).
+The current FX workflow uses **`qis>=6.0.0`**: the `qis.fx` namespace, typed returns,
+exact notional payoffs, monthly cash measurement and explicit account financing. Factor-price
+inputs live in `qis.portfolio.risk.factors_data`. The holdings-alpha coverage example also
+requires **`qis>=6.0.0`**. See the
+[FX migration guide](return_conventions_and_fx_adjustments.md#immediate-deprecation-and-direct-migration)
+for removed interfaces and saved-checkpoint migration.
 
 These are verified support floors, not claims about when each API first appeared. Obtain
 repository-only scripts from the matching release or the source revision cited by a guide;
@@ -52,6 +54,7 @@ main may contain later additions.
 | Offline charts, held-unit backtests and factsheets | `qis>=5.37.0` |
 | Ex-ante/ex-post risk and tracking-error workflows | `qis>=5.37.0` |
 | Native factor-unit and observed-index stress workflows | `qis>=5.38.1` |
+| Current FX workflow, common monthly cash and holdings-alpha coverage | `qis>=6.0.0` |
 
 The PyPI classifier remains **Beta**. It does not promise that every exported helper has a
 frozen signature. The generated [API reference](api/index.rst) distinguishes the core API
@@ -171,7 +174,8 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 ### Part VI: Currency returns, hedging and accounting
 
 - [Multi-currency portfolio P&L in Python](multi_currency_portfolio_pnl.md):
-  an offline workflow from four return views to a funded account with hedge resets and settlement.
+  an offline workflow covering four return views, common monthly cash, signed local financing,
+  hedge resets and settlement.
 - [Return conventions and FX adjustments](return_conventions_and_fx_adjustments.md):
   typed return coordinates, dated cash/hedge metadata and optional index normalization.
 - [Self-financed FX accounting](self_financed_fx_accounting.md):

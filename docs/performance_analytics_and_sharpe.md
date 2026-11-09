@@ -602,9 +602,8 @@ cash adjustment or fee deduction. It sorts the index intersection, drops pairs w
 rejects infinities and requires at least 24 observations. HAC lags count retained observations;
 resolve material calendar gaps before calling it.
 
-The three-lag default described here is in development version **5.44.0 (unreleased)**.
-Earlier development snapshots selected lags automatically when the argument was omitted.
-Pass `n_lags=None` explicitly to retain that behaviour.
+The default is `n_lags=3`. Pass `n_lags=None` explicitly for automatic lag selection.
+The selected lag count is reported with the result.
 
 Write $\hat\theta_i=\bar r_i/\hat\sigma_i$ with population variance (`ddof=0`), and
 $z_{it}=(r_{it}-\bar r_i)/\hat\sigma_i$. The difference's influence series is

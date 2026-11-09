@@ -8,7 +8,7 @@ myst:
 
 # Multi-currency portfolio P&L in Python
 
-*Author: [Artur Sepp](https://github.com/ArturSepp)*
+*Author: [Artur Sepp](https://github.com/ArturSepp) / First recorded: [2026-11-08](https://github.com/ArturSepp/QuantInvestStrats/commit/476c7967ca8225a9b363da90c5a8c1b241c57fee)*
 
 Implemented in [qis — Quantitative Investment Strategies](https://github.com/ArturSepp/QuantInvestStrats).
 Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
@@ -16,7 +16,8 @@ Software citation: [CITATION.cff](https://github.com/ArturSepp/QuantInvestStrats
 Use QIS to compare an asset's local and reference-currency returns, then account for a
 portfolio's positions, cash and FX hedges. The offline workflow below shows local, excess
 local, USD and excess USD returns together, followed by an account with an explicit hedge
-reset and delayed settlement. All prices, spots and rates are synthetic teaching inputs.
+reset and delayed settlement. Further cases compare monthly cash measurement across grids
+and signed local financing. All prices, spots and rates are synthetic teaching inputs.
 
 ## Choose the calculation
 
@@ -115,10 +116,41 @@ is the **forward FX return** $\varphi$, long local currency through a forward.
 The API names remain `LOCAL_EXCESS_TRANSLATED` and `FX_FORWARD`; see the
 [notation and conventions](notation_and_conventions.md#fx-aliases-payoffs-and-account-capital).
 
-> **Pitfall.** The analytical frequency sets the cash and additional-hedge reset intervals.
+> **Pitfall.** With the default `PERIOD_OPENING` policy, the analytical frequency sets the
+> cash and additional-hedge reset intervals.
 > Business-day cash includes intervening calendar days. A month-end request recomputes those
 > intervals; it does not just sum daily excess returns. Resampling the reporting of an already
 > completed account leaves that account's trading and settlement events intact.
+
+## Sample one monthly cash index at different frequencies
+
+The same runnable example includes a changing-rate case under
+`FxCashPolicy(accrual=FxCashAccrual.MONTHLY_INDEX)`. `compute_monthly_cash_index` builds one
+ACT/365 Fixed account, with simple interest within each calendar month and reinvestment at
+month-end. Daily observations sample that account without resetting it. Annual decimal
+quotes and their provider basis remain unchanged; opening quotes are never backfilled.
+
+The example checks daily, monthly and quarterly LOG excess returns on the same **unhedged**
+wealth path against independent USD cash deposits: 2% for 31 days, 8% for 29 days and 3% for
+31 days. January, February and March cash factors multiply, giving cash growth of 1.01063409
+(to eight decimals). The quarterly opening-rate convention instead holds 2% over all 91 days.
+
+```python
+import numpy as np
+
+cash_demo = workflow["monthly_cash"]
+comparison = cash_demo["comparison"]
+np.testing.assert_allclose(comparison.iloc[:3], comparison.iloc[0], rtol=0, atol=1e-14)
+assert abs(comparison.iloc[-1] - comparison.iloc[-2]) > 1e-4
+print(comparison.round(8).to_string())
+```
+
+LOG excess aggregates because it is the log ratio of the same wealth and cash indices.
+Arithmetic excess returns do not generally sum or compound to longer-interval arithmetic
+excess. `MONTHLY_INDEX` is an excess-return measurement policy only: it does not change
+forward strikes, analytical hedge resets, local financing or the account's cash schedule.
+Changing hedge reset frequency can still change the underlying wealth path. The library
+keeps `PERIOD_OPENING` as its default; this demonstration opts in explicitly.
 
 ## Follow the account through reset and settlement
 
@@ -161,6 +193,8 @@ Opening cash earns or pays interest once, under the specified financing policy.
 | Object from `workflow` | What to reuse |
 |---|---|
 | `comparisons[(frequency, coordinate)]` | Four asset-return views and two explicitly SIMPLE payoff panels. |
+| `monthly_cash` | Common cash index and daily/monthly/quarterly LOG excess comparison. |
+| `local_accounts` | Zero/nonzero-net locally financed books and explicit settlement histories. |
 | `cash_relative` | Typed monthly cash-relative result; read its `.values`. |
 | `normalized_forward_index` | Optional synthetic forward-payoff index starting at 100 under the declared normalisation. |
 | `account.accounts` and `account.nav` | Monetary balances and marked reference-currency capital. |
@@ -171,6 +205,27 @@ An optional payoff index is not account capital and does not add collateral cash
 portfolio can have zero net target exposure while requiring positive capital and financing
 balances; net exposure is not a return denominator. See the
 [account-capital rules](self_financed_fx_accounting.md#reconciliation-and-capital) for that case.
+
+## Compare zero and nonzero net local financing
+
+`workflow["local_accounts"]` contains two locally financed signed books, with opening
+weights `[0.5, -0.5]` and `[0.7, -0.3]`. Both use **USD capital 100** and fixed-capital
+notionals. The account holds units between 31 January and 30 April; local financing is
+swept on 29 February and at final closure on 30 April. Annual rates accrue on the explicit
+valuation intervals using ACT/365 Fixed. These are teaching schedules, not daily resets.
+
+```python
+for ledger in workflow["local_accounts"].values():
+    assert ledger.nav.iloc[0] == 100.0
+    assert ledger.asset_units.iloc[-1].eq(0).all()
+    np.testing.assert_allclose(ledger.local_balances.iloc[-1], 0, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(ledger.pnl.to_numpy().sum(), ledger.nav.iloc[-1] - 100.0)
+```
+
+The runnable source independently calculates both local debt balances, their interest,
+translated sweeps and reference-cash interest. It checks the full three-date NAV path.
+Zero opening net exposure still requires capital and can develop nonzero marked exposure.
+The preceding reference-financed example separately covers hedge resets and delayed payment.
 
 ## Checks and scope
 

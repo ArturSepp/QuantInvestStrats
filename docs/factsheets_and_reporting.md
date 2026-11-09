@@ -215,7 +215,7 @@ does not change the analytics sample cutoff.
 
 Page count depends on the report type, selected appendices and available history.
 Strategy factsheets include a separate **Performance confidence and stability** page by
-default from the 5.47.2 development source. The order is summary, full-history monthly-return
+default. The order is summary, full-history monthly-return
 appendix when needed, inference, then other requested appendices. Set
 `add_performance_inference_sheet=False` to retain the previous page set; page one and its
 calculations are unchanged. The inference page has two columns:
@@ -279,7 +279,7 @@ fabricated inference. The Sharpe side remains independently available where elig
 
 ### Optional holdings-alpha coverage
 
-Available in the **unreleased 6.0.0 source**: all three factsheet entry points accept
+All three factsheet entry points accept
 `alpha_coverage=None`, which retains strict coverage and the existing page set. Passing
 `qis.HoldingsAlphaCoverage` explicitly enables report-only coverage assistance and adds
 paginated coverage audit pages after the inference pages. It does not modify portfolio NAV,
@@ -323,6 +323,30 @@ coverage = qis.HoldingsAlphaCoverage(
     proxy_map={"Young fund": "Approved risk-matched index"},
     proxy_prices=proxy_prices,
 )
+```
+
+A complete offline example renders both strict and assisted quarterly factsheets:
+
+```console
+python -m examples.factsheets.holdings_alpha_coverage
+```
+
+The [runnable source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/factsheets/holdings_alpha_coverage.py)
+uses the frozen synthetic universe, an explicitly declared proxy and a tiny missing-beta
+holding. It removes instrument history **only from the reporting copy after backtesting**;
+NAV, units and weights remain identical. This isolates reporting coverage from investment
+performance. The quarterly preset uses six-year (24-return) rolling inference windows.
+The fixed recent five- and three-year inference rows remain unavailable at quarterly
+frequency because they contain fewer than 24 returns; this is an expected eligibility
+check, not a failed calculation. The coverage audit shows proxy/dust usage, exclusions and the strict comparator. A different
+real-asset proxy requires its own economic justification and point-in-time data validation.
+
+```python
+from examples.factsheets.holdings_alpha_coverage import run_example as run_coverage_example
+
+coverage_workflow = run_coverage_example()
+assert any("coverage audit" in figure.get_suptitle()
+           for figure in coverage_workflow["reports"]["assisted"])
 ```
 
 The same instrument mapping is used for both sides of a paired comparison; multi-strategy
@@ -383,7 +407,7 @@ generated report previews and supporting outputs remain outside the source check
 
 ### Paired strategy-benchmark inference
 
-From the 5.47.2 development source, `generate_strategy_benchmark_factsheet_plt` adds a
+`generate_strategy_benchmark_factsheet_plt` adds a
 default-on **Incremental performance** page **before Brinson**, leaving page one unchanged.
 Set `add_performance_inference_sheet=False` to omit inference both here and in any standalone
 strategy factsheets appended by this call. The flag retains its previous forwarding behaviour.
@@ -453,7 +477,7 @@ the estimators remain in their canonical modules.
 
 ### Multi-strategy inference against a base
 
-From the 5.47.2 development source, `generate_multi_portfolio_factsheet` adds a default-on
+`generate_multi_portfolio_factsheet` adds a default-on
 **Incremental performance vs base** overview immediately after its unchanged first page,
 before group reports and standalone strategy appendices. `base_portfolio_id=0` selects the
 first portfolio by position, not by its observed performance. All other portfolios are

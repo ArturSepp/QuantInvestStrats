@@ -779,6 +779,41 @@ and [factors_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/s
 The EWM beta recursion is in
 [ewm.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/linear/ewm.py).
 
+### Supplying factor prices
+
+`FactorsData` lives in `qis.portfolio.risk.factors_data` and is also exported as
+`qis.FactorsData`. It stores supplied tradable-factor prices; it does not fit a factor model
+or build factors. An optional enum checks that its named columns are present, while panel
+column order and any additional columns are preserved:
+
+```python
+from enum import Enum
+from qis.datasets.synthetic import generate_synthetic_prices
+from qis.portfolio.risk.factors_data import FactorsData
+
+class TeachingFactors(str, Enum):
+    """Two supplied synthetic factor series."""
+    EQUITY = "SEQ_US"
+    BONDS = "SBD_TSY"
+
+factor_panel = generate_synthetic_prices(apply_quirks=False)[["SEQ_US", "SBD_TSY"]]
+factor_data = FactorsData(factor_panel, factors=TeachingFactors)
+assert factor_data.factor_names == ["SEQ_US", "SBD_TSY"]
+assert factor_data.get_factor_prices(TeachingFactors.EQUITY).equals(factor_panel.SEQ_US)
+assert factor_data.get_prices(qis.TimePeriod("2020", "2020-12-31")).index.year.tolist() == [
+    2020] * len(factor_panel.loc["2020"])
+try:
+    FactorsData(factor_panel[["SEQ_US"]], factors=TeachingFactors)
+except ValueError as error:
+    assert "SBD_TSY" in str(error)
+else:
+    raise AssertionError("The missing factor must be rejected")
+```
+
+`FactorsData.load(...)` retains the CSV basename `futures_risk_factors` and accepts the same
+enum and optional time slice. `from_sql(...)` is an unimplemented hook that raises
+`NotImplementedError`; a consumer must supply its own database ingestion.
+
 ### The RiskModel contract
 
 - **Construction.** `covar` is required and non-empty; every field is a dict keyed by date, and

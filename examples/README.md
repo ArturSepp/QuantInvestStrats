@@ -153,10 +153,11 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 
 | File | What it shows |
 |---|---|
+| [holdings_alpha_coverage.py](factsheets/holdings_alpha_coverage.py) | Offline strict/proxy-assisted quarterly factsheets with bounded dust, explicit proxy mapping, coverage audit and unchanged NAV/units/weights. Six-year rolling inference. |
 | `strategy.py` | `generate_strategy_factsheet` on a volparity portfolio. |
-| `strategy_benchmark.py` | Strategy vs benchmark; `Locals.PAIRED_INFERENCE` produces the default-on paired Sharpe / marginal holdings-alpha page before Brinson (5.47.2 development source). VolParity minus EqualWeight, common market reference SPY, monthly sampling and explicit zero cash. |
+| `strategy_benchmark.py` | Strategy vs benchmark; `Locals.PAIRED_INFERENCE` produces the default-on paired Sharpe / marginal holdings-alpha page before Brinson. VolParity minus EqualWeight, common market reference SPY, monthly sampling and explicit zero cash. |
 | `multi_assets.py` | `generate_multi_asset_factsheet` on an asset-class universe. |
-| `multi_strategy.py` | VolParity span sweep; `Locals.PERFORMANCE_INFERENCE` shows the default-on three-by-two overview against `base_portfolio_id=0` (span 5): paired Sharpe differences, marginal holdings alpha vs SPY, pointwise HAC CIs and a single complete Holm family across all comparisons/windows. Monthly, zero cash; 5.47.2 development source. |
+| `multi_strategy.py` | VolParity span sweep; `Locals.PERFORMANCE_INFERENCE` shows the default-on three-by-two overview against `base_portfolio_id=0` (span 5): paired Sharpe differences, marginal holdings alpha vs SPY, pointwise HAC CIs and a single complete Holm family across all comparisons/windows. Monthly, zero cash. |
 | [sharpe_difference_table.py](factsheets/sharpe_difference_table.py) | Offline paired HAC Sharpe comparisons from `MultiPortfolioData`, with a selected base and NAV window. Uses month-end returns with inferred annualisation, synthetic backtests with transaction costs or existing portfolio NAVs, and display or PNG/CSV export via `Locals.EXPORT`. |
 | `strategy_reporting_frequencies.py` | `generate_strategy_factsheet` reproduced across the DAILY/WEEKLY/MONTHLY/QUARTERLY × {long, short} reporting-frequency grid via `fetch_default_report_kwargs`, on one volparity portfolio. |
 | `strategy_benchmark_reporting_frequencies.py` | `generate_strategy_benchmark_factsheet_plt` across the same reporting-frequency grid — volparity vs equal-weight. |
@@ -198,9 +199,9 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 
 | File | What it shows |
 |---|---|
-| `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, and explicit hedge reset/fixing/payment accounting. Uses the QIS 6 namespace; root object imports are retained. |
+| `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, monthly cash measurement across daily/monthly/quarterly grids, zero/nonzero-net local financing, and explicit hedge reset/fixing/payment accounting. Uses the QIS 6 namespace; root object imports are retained. |
 | `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP premia, explicitly normalized exact FX-forward payoff indices, cash NAVs and typed reference-currency returns. USD rate from `^IRX`, others stylised. |
-| `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — real 3M rates, full currency set. **Bloomberg.** |
+| `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — supplied term rates and overnight CAD/SGD benchmarks; forward-filled observations without opening-rate backfill. **Bloomberg.** |
 | `fx_cip_identity_yahoo_example.py` | Covered-interest-parity check: USD excess vs CHF-hedged excess agree to within bp. |
 | `fx_hedging_yahoo_example.py` | Single/multi-asset FX hedging: optimal/carry/beta ratios, hedged NAVs, EWM FX vol/beta, hedge reports. |
 | `fx_hedging_example.py` | Yahoo FX/ETF demo by default, with illustrative non-USD rate spreads. `use_local_data=True` selects YAML `RESOURCE_PATH`; `input_dir` overrides it for reader-supplied `fx_hedging_data_fx_spots.csv`, `fx_hedging_data_domestic_rates.csv` and `fx_hedging_data_usd_assets.csv`; these files are not bundled. |

@@ -1,18 +1,11 @@
 """
 Build an FxRatesData container from Bloomberg via bbg-fetch and illustrate it.
 
-This is the production data path: real 3M domestic rates (overnight for SGD) and the full rosaa
-currency set, in contrast to the Yahoo example (free, but USD-rate-plus-stylised-spreads because
-Yahoo carries no usable non-USD short rate). It requires a Bloomberg terminal and the ``bbg-fetch``
-package (which wraps ``blpapi``); the import is deferred into the fetch helpers so this module still
-imports without a terminal present.
-
-The ticker universe and the spot/rate construction below are extracted from the rosaa production
-builder ``create_fx_rates_data``. The difference is scope: ``create_fx_rates_data`` also fetches the
-benchmark asset panel and *persists* all three frames to CSV (and stays in rosaa); this example
-builds the ``FxRatesData`` container in-memory and exercises the same analytics as the Yahoo example
-(cross rates, CIP forward premia, FX total-return NAVs, money-market cash NAVs, reference-currency
-translation, and the hedging reports).
+This provider-specific teaching basket uses domestic term rates and overnight CAD/SGD
+benchmarks. It requires a Bloomberg terminal and ``bbg-fetch`` (which wraps ``blpapi``).
+Imports are deferred so the module also imports in an offline/core-only environment.
+The consuming pipeline owns ticker selection, benchmark suitability and historical coverage;
+this example builds the container in memory and does not persist or update production data.
 
 Conventions (identical to the container contract): ``fx_spots`` columns are units of USD per 1 unit
 of the local currency (FX pairs are quoted local/USD on Bloomberg, e.g. 'EURUSD Curncy'); USD is
@@ -54,7 +47,7 @@ FX_SPOTS = {
     'SEKUSD Curncy': 'SEK',
 }
 
-# Short-term domestic rates for the carry/forward calculation (3-month, except SGD = overnight).
+# Domestic term rates and overnight CAD/SGD benchmarks for carry/forward calculations.
 # Bloomberg PX is in percent and is scaled to decimals in the builder below.
 DOMESTIC_RATES = {
     'EUR003M Index': 'EUR',
@@ -63,7 +56,7 @@ DOMESTIC_RATES = {
     'GJTB3MO Index': 'JPY',
     'BBSW3M Index': 'AUD',
     'usgg3m Index': 'USD',
-    'CDOR03 Index': 'CAD',
+    'CAONREPO Index': 'CAD',
     'NDSOC BGN Curncy': 'NZD',
     'HIHD03M Index': 'HKD',
     'SIBCSORA Index': 'SGD',  # overnight SORA (SIBOR/SOR discontinued); MAS, history from Jul-2005
@@ -78,11 +71,11 @@ FREQ = 'ME'
 def fetch_fx_rates_data_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('31Dec1998')) -> FxRatesData:
     """Build an in-memory FxRatesData container from Bloomberg (PX_LAST) via bbg-fetch.
 
-    Mirrors the spot/rate construction in rosaa's ``create_fx_rates_data``: fetches the FX spot pairs
+    Fetches the FX spot pairs
     (already quoted local/USD), pins USD = 1.0, derives GBp = 0.01 * GBP and an XAU = 1.0 mapping;
     fetches the domestic short rates and scales them from percent to decimals, with XAU on the USD
-    curve and GBp on the GBP curve. Unlike the production builder this does not write CSVs — the
-    persisted-CSV path (and the benchmark-asset fetch) stay in rosaa.
+    curve and GBp on the GBP curve. Leading missing rates remain unknown; no later quote
+    is copied into the prehistory. This example does not write CSVs.
 
     Args:
         start_date: First date to request from Bloomberg.
@@ -98,10 +91,10 @@ def fetch_fx_rates_data_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('
     fx_spots['GBp'] = 0.01 * fx_spots['GBP']    # pence -> pounds, per the container contract
     fx_spots['XAU'] = 1.0                       # gold quoted in USD; legacy 1.0 mapping
 
-    # Bloomberg rate fields are in percent -> scale to decimals; bfill the short pre-history head.
+    # Convert percent to decimals; forward-fill only after the first observed rate.
     domestic_rates = 0.01 * fetch_field_timeseries_per_tickers(tickers=DOMESTIC_RATES, freq='B',
                                                                field='PX_LAST',
-                                                               start_date=start_date).ffill().bfill()
+                                                               start_date=start_date).ffill()
     domestic_rates['GBp'] = domestic_rates['GBP']   # same sovereign curve as GBP
     domestic_rates['XAU'] = domestic_rates['USD']   # USD rf as the gold financing-cost proxy
 
@@ -140,7 +133,7 @@ def run_local(local: Locals):
     if local == Locals.SHOW_FX_DATA:
         print("fx_spots — units of USD per 1 unit of local ccy (USD pinned to 1.0):")
         print(fx_rates_data.fx_spots.tail())
-        print("\ndomestic_rates — short rates as decimals (3M, overnight for SGD):")
+        print("\ndomestic_rates — short rates as decimals (term rates; overnight for CAD/SGD):")
         print(fx_rates_data.domestic_rates.tail())
 
     elif local == Locals.CROSS_RATES:
@@ -170,7 +163,7 @@ def run_local(local: Locals):
                             for l in ('EUR', 'GBP', 'CHF', 'JPY', 'AUD', 'SGD')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         premia.plot(ax=ax)
-        ax.set_title('Annualised CIP forward premium vs USD (real 3M rates)')
+        ax.set_title('Annualised CIP forward premium vs USD (supplied term/overnight rates)')
         ax.axhline(0.0, color='black', lw=0.5)
 
     elif local == Locals.CASH_NAVS:

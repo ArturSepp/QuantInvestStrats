@@ -6,8 +6,8 @@ results into a ``MultiPortfolioData``, and renders
 ``qis.generate_multi_portfolio_factsheet`` to compare strategies
 side by side. Useful for illustrating sensitivity to a single parameter.
 ``Locals.PERFORMANCE_INFERENCE`` adds the default-on six-panel paired Sharpe / marginal
-holdings-alpha overview against span 5, with SPY as the common market reference. Requires
-5.47.2 development source; optional Yahoo data, no calibration or parameter selection.
+holdings-alpha overview against span 5, with SPY as the common market reference. Uses
+optional Yahoo data; no calibration or parameter selection.
 """
 # packages
 import pandas as pd

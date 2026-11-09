@@ -51,7 +51,10 @@ month-end resets: opening annual decimal quotes accrue ACT/365F simple interest
 within each month, and interest is reinvested at month-end. Each requested return
 interval uses the ratio of index levels at its endpoints. Intramonth measurements
 sample the same account without extra resets. `compute_monthly_cash_index` exposes
-those levels; normalization is one at the first supported month-end.
+those levels; normalization is one at the first supported month-end. The
+[offline workflow](multi_currency_portfolio_pnl.md#sample-one-monthly-cash-index-at-different-frequencies)
+checks changing rates and daily/monthly/quarterly LOG excess aggregation against
+independent opening deposits.
 
 For a fixed underlying wealth path, quarterly log excess equals the sum of its
 monthly log excess returns. SIMPLE still means total return minus the measured
