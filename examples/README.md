@@ -33,7 +33,7 @@ examples/
 ├── plots/                        qis.plots — plotting primitives showcase
 ├── utils/                        qis.utils — date schedules
 ├── case_studies/                 cross-cutting domain studies (VIX, credit)
-└── market_data/                  qis.market_data — FX rates, CIP/carry, FX hedging
+└── fx/                  qis.fx — FX rates, CIP/carry, FX hedging
 ```
 
 ## getting_started — start here, offline
@@ -192,11 +192,13 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 | `vix_spy_scatter_by_year.py` | VIX changes vs SPY returns scattered by year. |
 | `vix_term_structure.py` | VIX term-structure correlation with SPX returns. **Bloomberg.** |
 
-## market_data — FX rates & hedging
+<a id="market_data--fx-rates--hedging"></a>
+
+## FX rates & hedging
 
 | File | What it shows |
 |---|---|
-| `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, and explicit hedge reset/fixing/payment accounting. Requires QIS 5.47.0 or later. |
+| `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, and explicit hedge reset/fixing/payment accounting. Uses the QIS 6 namespace; root object imports are retained. |
 | `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP premia, explicitly normalized exact FX-forward payoff indices, cash NAVs and typed reference-currency returns. USD rate from `^IRX`, others stylised. |
 | `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — real 3M rates, full currency set. **Bloomberg.** |
 | `fx_cip_identity_yahoo_example.py` | Covered-interest-parity check: USD excess vs CHF-hedged excess agree to within bp. |

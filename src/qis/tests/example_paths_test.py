@@ -107,7 +107,7 @@ def test_dendrogram_exports_without_configuration(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('explicit', [False, True])
 def test_fx_local_inputs_use_resource_path(explicit, paths, monkeypatch, tmp_path):
-    from examples.market_data import fx_hedging_example as example
+    from examples.fx import fx_hedging_example as example
 
     source = tmp_path / 'override' if explicit else paths[1]
     source.mkdir(exist_ok=True)

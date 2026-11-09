@@ -36,11 +36,11 @@ The [return conventions](return_conventions_and_fx_adjustments.md) and
 Start with an [installed QIS core package](install.md). From a repository checkout, run:
 
 ```console
-python examples/market_data/fx_returns_and_accounting_example.py
+python examples/fx/fx_returns_and_accounting_example.py
 ```
 
 With only the installed package, save the
-[complete example source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_returns_and_accounting_example.py)
+[complete example source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_returns_and_accounting_example.py)
 as `fx_returns_and_accounting_example.py` and run `python fx_returns_and_accounting_example.py`.
 The same source is included at the end of this page. Execution requires no provider access,
 credentials, optional extras or local data files, and writes no output files.
@@ -85,7 +85,7 @@ cash-relative wealth return; the example checks its relation to LOG excess.
 From a checkout, the existing function also returns its results for further analysis:
 
 ```python
-from examples.market_data.fx_returns_and_accounting_example import run_example
+from examples.fx.fx_returns_and_accounting_example import run_example
 
 workflow = run_example(verbose=False)
 return_kinds = ["local_total", "local_excess", "reference_total", "reference_excess"]
@@ -187,11 +187,11 @@ an equity model or change a production allocation.
 
 ## Complete runnable source
 
-[Open the canonical source on GitHub](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_returns_and_accounting_example.py).
+[Open the canonical source on GitHub](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_returns_and_accounting_example.py).
 The rendered site includes that file directly, so the page and example share one implementation.
 In a Markdown viewer that displays the include directive as text, follow the source link.
 
-```{literalinclude} ../examples/market_data/fx_returns_and_accounting_example.py
+```{literalinclude} ../examples/fx/fx_returns_and_accounting_example.py
 :language: python
 :linenos:
 ```

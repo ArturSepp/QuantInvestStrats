@@ -511,7 +511,7 @@ def test_compute_regime_mixture_covar_tolerates_precision_without_normalizing(
 def test_regimes_depend_only_on_utils_perfstats_and_models():
     """The subpackage never imports plotting, the portfolio layer or the package root."""
     package = pathlib.Path(__file__).resolve().parents[1]
-    forbidden = ('qis.plots', 'qis.portfolio', 'qis.market_data', 'matplotlib', 'seaborn')
+    forbidden = ('qis.plots', 'qis.portfolio', 'qis.fx', 'matplotlib', 'seaborn')
     failures = []
     for path in sorted(package.glob('*.py')):
         for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):

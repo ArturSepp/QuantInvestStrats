@@ -162,7 +162,7 @@ REST_HEADING = """Also exported
 -------------
 
 Exported and importable, not part of the documented core. Signatures may change without a
-deprecation path.
+migration path.
 
 """
 
@@ -199,7 +199,7 @@ CAPABILITY_CHAPTERS: Dict[str, List[str]] = {
     'Factor stress testing': ['stress_testing'],
     'Factsheets and reporting': ['factsheets_and_reporting', 'frequency_convention_note'],
     'EWM estimation': ['ewm_estimators', 'covariance_correlation_pca', 'risk_adjusted_returns'],
-    'Market data and FX': ['return_conventions_and_fx_adjustments',
+    'FX analytics': ['return_conventions_and_fx_adjustments',
                            'fx_hedging_and_market_data', 'self_financed_fx_accounting'],
     'Regime reporting': ['regime_conditional_performance', 'convexity_premium'],
     'Bootstrap': ['reproducibility'],

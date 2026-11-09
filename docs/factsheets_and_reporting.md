@@ -271,11 +271,82 @@ The displayed expanding and rolling curves repeat that mean test on their stated
 not on an already EWMA-smoothed alpha curve. Both return legs use the same supplied cash
 rates, or explicitly assume zero cash. Costs already present in NAV are not deducted again.
 
-All non-zero held instruments need finite, warmed-up betas and known holdings at the opening
-date. Missing coverage makes that period's alpha unavailable; the appendix neither sums a
+By default, all non-zero held instruments need finite, warmed-up betas and known holdings at
+the opening date. Missing coverage makes that period's alpha unavailable; the appendix neither sums a
 partial set of betas nor substitutes beta one or a NAV-regression estimate. Missing holdings
 or a missing reference therefore produce a warning and unavailable alpha diagnostics, not
 fabricated inference. The Sharpe side remains independently available where eligible.
+
+### Optional holdings-alpha coverage
+
+Available in the **unreleased 6.0.0 source**: all three factsheet entry points accept
+`alpha_coverage=None`, which retains strict coverage and the existing page set. Passing
+`qis.HoldingsAlphaCoverage` explicitly enables report-only coverage assistance and adds
+paginated coverage audit pages after the inference pages. It does not modify portfolio NAV,
+actual holdings, page one, Sharpe calculations, the beta estimator or its warm-up.
+
+The policy uses this order at each opening beta-grid date:
+
+1. Use the instrument's own eligible beta whenever available, including tiny positions.
+2. Otherwise, use a proxy **only** if the instrument appears in `proxy_map` and the named
+   column in the supplied `proxy_prices` has an eligible beta to the same first benchmark.
+   Proxy betas use the same EWMA mean adjustment, initialisation, span-length eligibility
+   and one-period application lag. Their prehistory is fitted separately; it does not change
+   the own-instrument fit. Own beta automatically takes precedence once eligible.
+3. Remaining missing-beta exposures may be omitted only within **both** configured limits:
+   `weight_tolerance` per instrument and `total_weight_tolerance` on the sum of absolute
+   omitted weights. Defaults in the opt-in object are 1e-6 and 1e-5 NAV units, respectively
+   (0.01 and 0.1 basis points of NAV). Long and short positions cannot cancel this cap.
+   If the gross cap is exceeded, no dust positions are selected for omission on that date.
+4. Any unresolved material exposure or unknown weight leaves alpha unavailable. Covered
+   weights are never renormalised. Set both tolerances to zero for proxy-only assistance.
+
+Proxy mappings are an explicit modelling assumption, not a discovered substitute. Select them
+before examining significance results. Supply histories on the same reference-currency and
+hedging basis as the instruments, available as of each estimation date. QIS checks identifiers,
+dates and price validity; it cannot certify risk similarity, currency metadata or vintage
+availability from a price DataFrame. A mapping applies over the supplied history: it must be
+defensible over that entire period, not selected retrospectively from future correlations.
+No mappings are inferred from asset groups, no proxy chains are followed, and no missing
+returns or warmed-up betas are backfilled. An unavailable proxy remains unavailable.
+
+The following configuration fragment illustrates the API; `proxy_prices` is supplied by the
+caller and `Young fund` must be an actual holdings column. It is not a recommended real-asset
+mapping. Pass `coverage` as `alpha_coverage=coverage` to `generate_strategy_factsheet`,
+`generate_strategy_benchmark_factsheet_plt` or `generate_multi_portfolio_factsheet`.
+
+<!-- docs-test: skip -->
+```python
+coverage = qis.HoldingsAlphaCoverage(
+    weight_tolerance=1e-6,
+    total_weight_tolerance=1e-5,
+    proxy_map={"Young fund": "Approved risk-matched index"},
+    proxy_prices=proxy_prices,
+)
+```
+
+The same instrument mapping is used for both sides of a paired comparison; multi-strategy
+reports validate the union universe and restrict mappings to each pair/embedded portfolio.
+Marginal alpha still subtracts the two realised adjusted return series on paired dates.
+The declared multiple-testing family is unchanged; no unavailable tests are dropped. Raw Sharpe
+tests do not change, but their Holm-adjusted values can change when alpha p-values or whole-family
+availability change, because the adjustment covers both metrics together.
+
+Audit pages show lagged direct, proxy, omitted and unresolved **gross** exposures, their
+mean/max levels and affected-date counts, every explicit mapping and every excluded return-date
+interval. Unknown weights are shown as unknown, not zero. Paired pages also show joint
+exclusions; single-strategy pages disclose any earlier valid dates discarded by the existing
+latest-continuous-sample rule. Multi-strategy reports show the base coverage audit once.
+Internal report data retain `strict_beta`, `strict_alpha`, `strict_complete_coverage`,
+`direct_gross`, `proxy_gross`, `omitted_gross`, `uncovered_gross`, `total_gross` and
+`unknown_weights` alongside the assisted series. `complete_coverage` means eligible under
+the declared policy, not necessarily direct coverage of every holding.
+
+> **Pitfall.** Proxy-assisted/dust-adjusted holdings alpha is an approximation, not a
+> claim that unknown market exposure is manager skill. Small weights do not guarantee a
+> small beta error. HAC confidence intervals describe the specified adjusted return process;
+> they do not include proxy misspecification or omitted-exposure uncertainty. The strict
+> comparator remains available, and the policy must not be tuned to improve a p-value.
 
 ### Inference sample safeguards and interpretation
 
@@ -283,8 +354,13 @@ Completed sampling boundaries are used; missing interior observations are not fi
 dropped. Minimum eligibility is 24 returns and two observation-equivalent years, with an
 additional HAC requirement of at least five observations per lag term. Automatic lag counts
 use the existing Newey–West rule. These are display safeguards, not finite-sample coverage
-guarantees. A five-year rolling window falls back to three or two complete calendar years
-with a warning; unavailable or undefined estimates remain labelled as such rather than being
+guarantees. Quarterly inference uses a complete six-year rolling window (24 returns), with
+no shorter-window fallback below that minimum. Other sampling grids retain the five-year
+window, falling back to three or two complete calendar years with a warning. The policy is
+applied separately to the Sharpe and alpha grids, including paired and multi-strategy detail
+pages. The fixed recent five- and three-year summary rows are not extended: at quarterly
+frequency they remain unavailable with only 20 and 12 returns. Unavailable or undefined
+estimates remain labelled as such rather than being
 replaced by IID inference. The expanding chart normally warms up for three observation-equivalent
 years, falling back to the eligible minimum with a warning. The two columns can therefore
 have different actual sample dates, warm-ups and fallback windows.
@@ -322,7 +398,7 @@ No benchmark is selected by its p-value or outcome.
 |---|---|---|
 | Summary table | Full, recent five and recent three years: arithmetic Sharpe difference, paired HAC 95% CI and two-sided p-value | The same named windows: annualised mean alpha difference, HAC 95% CI and two-sided p-value |
 | Expanding history | Expanding paired Sharpe difference and pointwise HAC band | Expanding mean alpha difference and pointwise HAC band |
-| Rolling window | Five-year paired Sharpe difference and pointwise HAC band | Five-year mean alpha difference and pointwise HAC band |
+| Rolling window | Six-year at quarterly, otherwise five-year paired Sharpe difference and pointwise HAC band | Six-year at quarterly, otherwise five-year mean alpha difference and pointwise HAC band |
 
 Positive values favour the strategy. The nulls are equal arithmetic Sharpes and zero mean
 incremental exposure-adjusted return, respectively. Let $s$ denote strategy, $c$ comparison,
@@ -357,8 +433,10 @@ Sharpe uses `perf_params.freq_vol`; alpha uses the report's `freq_beta` and
 Each test uses paired dates within its column; alpha warm-up does not shorten the Sharpe
 sample. All [sample safeguards](#inference-sample-safeguards-and-interpretation) apply,
 including no condensation of interior gaps, minimum 24 returns and two observation-equivalent
-years, and the warned 5/3/2-year rolling fallback. Thus quarterly three- and five-year windows
-are unavailable under the 24-observation minimum. CIs remain exploratory, pointwise and
+years, six-year quarterly rolling windows and the warned 5/3/2-year fallback on other grids.
+Quarterly three- and five-year summary tests remain unavailable under the 24-observation
+minimum; this rolling-chart change does not alter the declared multi-strategy test family.
+CIs remain exploratory, pointwise and
 asymptotic; repeated windows and the two diagnostics are not a multiplicity-adjusted family.
 No further calibration is performed, Stage 5 remains incomplete, and legacy defaults and
 acceptance gates are unchanged.

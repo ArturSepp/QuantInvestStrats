@@ -18,7 +18,7 @@
   "optional_adapters": [],
   "development_imports": [
     {
-      "path": "src/qis/market_data/run_local/fx_rates_data_run.py",
+      "path": "src/qis/fx/run_local/fx_rates_data_run.py",
       "modules": [
         "bbg_fetch"
       ],

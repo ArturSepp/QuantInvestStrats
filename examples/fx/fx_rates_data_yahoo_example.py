@@ -1,0 +1,222 @@
+"""
+Build an FxRatesData container from free Yahoo data (yfinance) and illustrate it.
+
+Production users supply their own rates and spot panels to FxRatesData.
+This example provides a self-contained, no-terminal path: it fetches FX spot pairs from Yahoo,
+maps them into the container's quoting convention (units of USD per 1 unit of local currency),
+attaches domestic 3M rates, and exercises the container's analytics (cross rates, CIP forward
+premia, FX total-return NAVs, money-market cash NAVs, and reference-currency translation of an
+asset panel).
+
+Domestic rates: the USD 3M proxy is '^IRX' (the quoted 13-week T-bill yield divided by 100).
+This example does not fetch non-USD rate curves: it adds fixed, illustrative differentials
+to the USD proxy (see _ILLUSTRATIVE_3M_SPREAD_VS_USD). These are teaching inputs, not observed
+funding rates or executable forward quotes. Production work needs convention-matched rates
+from the reader's provider. The FX spots are observed Yahoo data. Downloads run serially and
+fail clearly if a requested series has no observations.
+"""
+
+from qis.fx import fx_returns as qfx
+import pandas as pd
+import matplotlib.pyplot as plt
+import yfinance as yf
+import qis as qis
+from enum import Enum
+from typing import Optional
+
+from qis.fx import FxRatesData
+
+# Yahoo FX tickers quoted directly as USD per 1 unit of local ccy (e.g. EURUSD=X ~ 1.08 USD/EUR).
+_DIRECT_USD_PER_LOCAL = {'EUR': 'EURUSD=X', 'GBP': 'GBPUSD=X', 'AUD': 'AUDUSD=X', 'NZD': 'NZDUSD=X'}
+# Yahoo FX tickers quoted as local per USD (e.g. USDJPY=X ~ 150 JPY/USD); inverted to USD per local.
+_INVERTED_LOCAL_PER_USD = {'JPY': 'USDJPY=X', 'CHF': 'USDCHF=X', 'CAD': 'USDCAD=X'}
+
+# Stylised average 3M rate differentials vs USD (decimals) — ILLUSTRATIVE ONLY.
+# Replace these teaching inputs with observed, convention-matched rates for production work.
+_ILLUSTRATIVE_3M_SPREAD_VS_USD = {'USD': 0.0, 'EUR': -0.005, 'GBP': 0.002, 'CHF': -0.010,
+                                  'JPY': -0.020, 'AUD': 0.005, 'CAD': 0.001, 'NZD': 0.010}
+
+
+def _build_illustrative_domestic_rates(
+        usd_rate: pd.Series, index: pd.DatetimeIndex) -> pd.DataFrame:
+    """
+    Assemble the domestic_rates panel (decimals) from a real USD rate plus stylised per-ccy spreads.
+
+    The USD column is the supplied real rate; every other 3-letter ccy is usd_rate + its stylised
+    differential. The auxiliary columns follow the FxRatesData contract: 'GBp' shares the GBP curve
+    (same sovereign) and 'XAU' uses the USD rate as a financing-cost proxy.
+    """
+    rates = pd.DataFrame(
+        {ccy: usd_rate + spread for ccy, spread in _ILLUSTRATIVE_3M_SPREAD_VS_USD.items()},
+        index=index)
+    rates['GBp'] = rates['GBP']   # GBp shares the GBP sovereign curve
+    rates['XAU'] = rates['USD']   # gold has no native rf; USD proxy, per the container contract
+    return rates
+
+
+def fetch_fx_rates_data_from_yahoo(start_date: str = '2005-12-31',
+                                   end_date: Optional[str] = None
+                                   ) -> FxRatesData:
+    """
+    Construct an FxRatesData container from Yahoo data fetched with yfinance.
+
+    FX spots cover the eight teaching-universe currencies and use the container's
+    convention — each column is units of USD per 1 unit of the local currency, with USD pinned to
+    1.0. Tickers quoted as USD-per-local (EURUSD=X, GBPUSD=X, AUDUSD=X, NZDUSD=X) are used directly;
+    tickers quoted as local-per-USD (USDJPY=X, USDCHF=X, USDCAD=X) are inverted. The auxiliary
+    mappings from the FxRatesData contract are added: GBp = 0.01 * GBP and XAU = 1.0.
+
+    Domestic 3M rates use the real USD rate ('^IRX' / 100) and stylised per-ccy differentials for
+    the rest (see module docstring) — illustrative only.
+
+    Args:
+        start_date: first date of the Yahoo download window
+        end_date: last date of the window. None fetches up to today
+
+    Returns:
+        the container, ready to use: ``__post_init__`` forward-fills the spots and aligns the
+        rates to the spot calendar
+    """
+    fx_tickers = list(_DIRECT_USD_PER_LOCAL.values()) + list(_INVERTED_LOCAL_PER_USD.values())
+    raw = yf.download(fx_tickers, start=start_date, end=end_date, auto_adjust=True,
+                      progress=False, threads=False)['Close'].reindex(columns=fx_tickers)
+    missing = raw.columns[raw.isna().all()].tolist()
+    if missing:
+        raise ValueError(f'Yahoo returned no FX observations for {missing}; retry the download.')
+
+    fx_spots = pd.DataFrame(index=raw.index)
+    fx_spots['USD'] = 1.0
+    for ccy, ticker in _DIRECT_USD_PER_LOCAL.items():
+        fx_spots[ccy] = raw[ticker]                 # already USD per local
+    for ccy, ticker in _INVERTED_LOCAL_PER_USD.items():
+        fx_spots[ccy] = 1.0 / raw[ticker]           # invert local-per-USD -> USD per local
+    fx_spots = fx_spots.ffill().dropna(how='all')
+    fx_spots['GBp'] = 0.01 * fx_spots['GBP']        # pence -> pounds, per the container contract
+    fx_spots['XAU'] = 1.0                           # gold quoted in USD; legacy 1.0 mapping
+
+    irx = yf.download('^IRX', start=start_date, end=end_date, auto_adjust=True,
+                      progress=False, threads=False)['Close']['^IRX']
+    if irx.dropna().empty:
+        raise ValueError('Yahoo returned no ^IRX observations; retry the download.')
+    usd_rate = (irx / 100.0).reindex(fx_spots.index).ffill()
+    domestic_rates = _build_illustrative_domestic_rates(usd_rate=usd_rate, index=fx_spots.index)
+
+    return FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
+
+
+class Locals(Enum):
+    SHOW_FX_DATA = 1
+    CROSS_RATES = 2
+    FX_TOTAL_RETURN_NAVS = 3
+    CARRY_FORWARD_PREMIUM = 4
+    CASH_NAVS = 5
+    TRANSLATE_ASSET_PANEL = 6
+
+
+def run_local(local: Locals):
+    """Illustrate the FxRatesData container built from Yahoo data."""
+    pd.set_option('display.max_columns', 50)
+    pd.set_option('display.width', 1000)
+
+    fx_rates_data = fetch_fx_rates_data_from_yahoo(start_date='2005-12-31')
+
+    if local == Locals.SHOW_FX_DATA:
+        print("fx_spots — units of USD per 1 unit of local ccy (USD pinned to 1.0):")
+        print(fx_rates_data.fx_spots.tail())
+        print("\ndomestic_rates — 3M rates as decimals (USD real, others illustrative):")
+        print(fx_rates_data.domestic_rates.tail())
+
+    elif local == Locals.CROSS_RATES:
+        # cross rate = units of reference ccy per 1 unit of local ccy
+        crosses = pd.concat([
+            fx_rates_data.get_local_to_reference_fx_rate(local_ccy=local, reference_ccy=reference)
+            for local, reference in (('EUR', 'CHF'), ('GBP', 'USD'), ('EUR', 'GBP'))], axis=1)
+        fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
+        qis.plot_prices(prices=crosses, ax=ax, title='FX cross rates (reference per local)')
+
+    elif local == Locals.FX_TOTAL_RETURN_NAVS:
+        result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
+            ('EUR', 'GBP', 'CHF', 'JPY'), 'USD', qis.FxReturnType.FX_FORWARD,
+            frequency='B'))['B']
+        navs = result.to_index(qis.FxIndexNormalization(
+            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
+            settlement_frequency='B', reinvestment='each_interval',
+            cash_treatment='as_returned', missing_returns='skip'))
+        fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
+        qis.plot_prices(
+            prices=navs, ax=ax,
+            title='Exact FX forward indices vs USD (capital-normalized, daily reset)')
+
+    elif local == Locals.CARRY_FORWARD_PREMIUM:
+        # annualised CIP forward premium of each ccy vs USD (per-period rate * periods-per-year)
+        ppy = qis.get_annualization_factor('ME')
+        premia = pd.concat([
+            fx_rates_data.get_forward_rate_for_local_ccy(
+                local_ccy=local, reference_ccy='USD', freq='ME') * ppy
+            for local in ('EUR', 'GBP', 'CHF', 'JPY')], axis=1)
+        fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
+        premia.plot(ax=ax)
+        ax.set_title('Annualised CIP forward premium vs USD')
+        ax.axhline(0.0, color='black', lw=0.5)
+
+    elif local == Locals.CASH_NAVS:
+        # synthetic money-market NAV compounding each local short rate
+        cash = pd.concat([fx_rates_data.build_local_cash_nav(local_ccy=c, freq='B')
+                          for c in ('USD', 'EUR', 'CHF', 'JPY')], axis=1)
+        fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
+        qis.plot_prices(prices=cash, ax=ax, title='Money-market cash NAVs by currency')
+
+    elif local == Locals.TRANSLATE_ASSET_PANEL:
+        # translate a USD asset panel into a CHF investor's frame, unhedged vs fully hedged
+        assets = yf.download(['SPY', 'TLT', 'GLD'], start='2010-12-31', auto_adjust=True,
+                             progress=False, threads=False)['Close'][['SPY', 'TLT', 'GLD']].dropna()
+        if assets.empty:
+            raise ValueError(
+                'Yahoo returned no overlapping SPY/TLT/GLD history; retry the download.')
+        local_ccys = pd.Series('USD', index=assets.columns)
+        fx_result_170 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy='CHF',
+                hedge_ratios=pd.Series(0.0, index=assets.columns),
+                frequency='ME',
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )['ME']
+        navs_unhedged = fx_result_170.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
+        fx_result_173 = qfx.compute_fx_returns(
+            fx_rates_data,
+            qfx.FxAssetReturnsRequest(
+                prices=assets,
+                local_ccys=local_ccys,
+                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                reference_ccy='CHF',
+                hedge_ratios=pd.Series(1.0, index=assets.columns),
+                frequency='ME',
+                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                zero_return_to_nan=False,
+            ),
+        )['ME']
+        navs_hedged = fx_result_173.to_index(qfx.FxIndexNormalization(
+            1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
+        spy = pd.concat([navs_unhedged['SPY'].rename('SPY in CHF (unhedged)'),
+                         navs_hedged['SPY'].rename('SPY in CHF (hedged)')], axis=1)
+        fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
+        qis.plot_prices(prices=spy, ax=ax,
+                        title='USD asset (SPY) in a CHF frame: unhedged vs hedged')
+        print("unhedged-in-CHF NAVs (tail):\n", navs_unhedged.tail())
+        print("\nhedged-in-CHF NAVs (tail):\n", navs_hedged.tail())
+
+
+if __name__ == '__main__':
+
+    run_local(local=Locals.TRANSLATE_ASSET_PANEL)
+
+    plt.show()

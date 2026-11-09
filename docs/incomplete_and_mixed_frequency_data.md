@@ -198,7 +198,7 @@ to zero. Costs and holding drift can make realised weights differ from scheduled
 Implementation owners are the [weight-schedule source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/df_to_weights.py),
 [return conversion](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/returns.py),
 [backtester](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/backtester.py),
-and [FX container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py).
+and [FX container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py).
 The [canonical late-start example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/portfolios/static_weight_with_missing_prices.py)
 demonstrates the larger workflow. Repository tests in
 [test_static_weights_schedule.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/utils/tests/test_static_weights_schedule.py)

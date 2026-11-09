@@ -15,8 +15,8 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from qis.market_data.fx_rates_data import FxRatesData
-from qis.market_data.fx_returns import FxCashPolicy
+from qis.fx.fx_rates_data import FxRatesData
+from qis.fx.fx_returns import FxCashPolicy
 from qis.utils.df_ops import multiply_df_by_dt
 
 __all__ = ["FxAccountSpec", "FxAccountData", "backtest_fx_account"]

@@ -379,7 +379,6 @@ The two figures can be opened at full resolution from their image links.
 | FX volatility and beta | $\sigma_{FX}$, $\beta$ | `qis.compute_fx_vol_beta` |
 | Optimal, beta and carry hedges | $h^{*}$, $1+\beta$, $1-c/(2\lambda\sigma^2_{FX})$ | `qis.compute_fx_optimal_hedge` |
 | Panel of assets and its report | hedged NAVs and statistics | `qis.compute_multi_asset_fx_hedging`, `qis.run_asset_fx_hedging_report`, `qis.plot_multi_asset_fx_hedging_report` |
-| Factor price levels | validated factor panel | `qis.FactorsData` |
 
 ### Minimal offline example
 
@@ -446,10 +445,10 @@ the same exact forward cost, and clipping bounds. Supply enough history and dist
 full-sample normalization from a historical decision rule. Applying a ratio is separate from
 estimating or executing it.
 
-The implementation owners are the [FX container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py)
-and [hedge/payoff functions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_hedging.py).
-The [CIP and payoff tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/tests/fx_cip_identity_test.py)
-check cash-flow identities; [alignment tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/tests/fx_spot_alignment_causality_test.py)
+The implementation owners are the [FX container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py)
+and [hedge/payoff functions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py).
+The [CIP and payoff tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/tests/fx_cip_identity_test.py)
+check cash-flow identities; [alignment tests](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/tests/fx_spot_alignment_causality_test.py)
 check that later quotes do not leak into earlier calculations.
 
 ### Existing real-data hedging examples
@@ -458,8 +457,8 @@ The offline exhibits complement, rather than replace, the existing runnable exam
 
 | Canonical example | Inputs and cases | Requirements and limits |
 |---|---|---|
-| [Yahoo hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_yahoo_example.py) | SPY, TLT, LQD, HYG and GLD in USD viewed in CHF; `HEDGE_RATIOS`, `HEDGED_NAVS`, `FX_VOL_BETA`, `ASSET_HEDGE_REPORT`, `MULTI_ASSET_METRICS`, `MULTI_ASSET_REPORT` | `qis[data]` and network access; real asset prices and spots, but non-USD rate differentials are explicitly illustrative |
-| [CSV-backed hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_example.py) | Supplied USD benchmark assets and FX/rate CSVs; `CHECK_HEDGED_RETURN`, `PLOT_HEDGE_REPORT`, `MULTI_ASSET_HEDGE`, `MULTI_ASSET_HEDGE_REPORT` | Local resource configuration and supplied `fx_hedging_data` CSVs, including `usd_assets`; no data acquisition by the runner |
+| [Yahoo hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_hedging_yahoo_example.py) | SPY, TLT, LQD, HYG and GLD in USD viewed in CHF; `HEDGE_RATIOS`, `HEDGED_NAVS`, `FX_VOL_BETA`, `ASSET_HEDGE_REPORT`, `MULTI_ASSET_METRICS`, `MULTI_ASSET_REPORT` | `qis[data]` and network access; real asset prices and spots, but non-USD rate differentials are explicitly illustrative |
+| [CSV-backed hedging example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_hedging_example.py) | Supplied USD benchmark assets and FX/rate CSVs; `CHECK_HEDGED_RETURN`, `PLOT_HEDGE_REPORT`, `MULTI_ASSET_HEDGE`, `MULTI_ASSET_HEDGE_REPORT` | Local resource configuration and supplied `fx_hedging_data` CSVs, including `usd_assets`; no data acquisition by the runner |
 
 Each script exposes `Locals` and `run_local(local=...)`. Choose `Locals.HEDGE_RATIOS` in the
 Yahoo example for the three hedge decisions, or `Locals.MULTI_ASSET_REPORT` for its performance
@@ -470,7 +469,7 @@ Live-provider histories and supplied local data are not frozen by these scripts.
 
 ### Data acquisition boundary
 
-Free-data [Yahoo examples](https://github.com/ArturSepp/QuantInvestStrats/tree/main/examples/market_data)
+Free-data [Yahoo examples](https://github.com/ArturSepp/QuantInvestStrats/tree/main/examples/fx)
 use the optional `data` extra (`qis[data]`) and require network access. They are separate from the
 offline illustrations. Vendor-specific acquisition belongs in the data layer, including
 `bbg-fetch` for Bloomberg. A Bloomberg account is not required to construct or use `FxRatesData`.
@@ -501,9 +500,9 @@ Local CSV loading reads supplied files; it does not itself update market observa
 - [Reporting-frequency convention](_included/reporting_frequencies.md) and
   [packaged source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/docs/reporting_frequencies.md)
 - {doc}`FxRatesData API <api/generated/qis.FxRatesData>` and
-  [source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py)
+  [source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py)
 - {doc}`FX hedge API <api/generated/qis.compute_performance_of_local_ccy_asset_in_reference_ccy>` and
-  [source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_hedging.py)
+  [source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py)
 
 ## References
 
@@ -511,4 +510,4 @@ Local CSV loading reads supplied files; it does not itself update market observa
 2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
 
 See [typed FX conventions](return_conventions_and_fx_adjustments.md) for current requests,
-optional index normalization and the immediate legacy deprecation/removal schedule.
+optional index normalization and the legacy-method removal and namespace migration.

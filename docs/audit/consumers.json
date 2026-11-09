@@ -172,7 +172,7 @@
     },
     "trendfollowing": {
       "url": "https://github.com/ArturSepp/TrendFollowingSystems.git",
-      "commit": "312bdabb23a2b58fc95de2acb64ee92e6100b9b3",
+      "commit": "0de54ab0f0ff4d2dd47a172c6f81afda8ce525f3",
       "distinct_symbols": 87,
       "call_sites": 428,
       "files_scanned": 106,
@@ -269,7 +269,7 @@
     },
     "privateassets": {
       "url": "https://github.com/ArturSepp/privateassets.git",
-      "commit": "bf72cfc0a6f2361600f7e8fda4c80e78f91541b0",
+      "commit": "ab9cddf555ec0be2e494d2a7b9e26a7c2c4d405c",
       "distinct_symbols": 5,
       "call_sites": 9,
       "files_scanned": 39,

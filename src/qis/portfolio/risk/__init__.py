@@ -3,3 +3,5 @@ from qis.portfolio.risk.ex_post_tracking_error import (
     compute_info_ratio_table,
     compute_te_ir_errors,
 )
+
+from qis.portfolio.risk.factors_data import FactorsData

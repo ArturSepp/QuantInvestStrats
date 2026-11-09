@@ -316,8 +316,8 @@ NZD, JPCANZ3M Index: 69 paired months. Lag 1 has $R^2=0.966$ and MAE 2.51 bp. Th
 | Scatter regression | `qis.plot_scatter` | `order=1`, `fit_intercept=True`, method as `hue`, `add_45line=True` |
 
 Canonical sources are
-[fx_rates_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py)
-and [fx_hedging.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_hedging.py).
+[fx_rates_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py)
+and [fx_hedging.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py).
 There is no midpoint value of `cash_rate_lag`: midpoint is an external diagnostic, not a
 production API extension. Core QIS does not fetch these cash benchmarks.
 

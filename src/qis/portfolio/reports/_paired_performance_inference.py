@@ -7,6 +7,7 @@ import pandas as pd
 
 from qis.perfstats.significance import InterceptInference
 from qis.portfolio.reports._holdings_alpha import compute_holdings_alpha
+from qis.portfolio.reports.alpha_coverage import validate_alpha_coverage
 from qis.portfolio.reports._performance_inference import (
     PerformanceInferenceData, _inference_views, _sample_returns, validate_alpha_inference,
 )
@@ -16,6 +17,7 @@ from qis.portfolio.reports.config import validate_reporting_frequency
 def compute_paired_performance_inference(
     strategy, comparison, benchmark_prices, time_period, freq, rates_data=None,
     *, freq_beta="B", factor_beta_span=260, alpha_inference=InterceptInference.BARTLETT_HAC,
+    alpha_coverage=None,
 ):
     """Compare two actual portfolios on paired dates, against the first market reference.
 
@@ -29,6 +31,7 @@ def compute_paired_performance_inference(
         freq_beta: Holdings-beta and raw alpha grid, shared by both portfolios.
         factor_beta_span: Shared EWM span and per-instrument warm-up in beta-grid observations.
         alpha_inference: Primary marginal-alpha method; alternate is same-sample sensitivity.
+        alpha_coverage: Optional shared coverage policy with explicit instrument mappings.
 
     Returns:
         Paired inference data with marginal unsmoothed alpha and both holdings-beta diagnostics.
@@ -38,6 +41,9 @@ def compute_paired_performance_inference(
     validate_alpha_inference(alpha_inference)
     issues = []
     portfolios = {"Strategy": strategy, "Comparison": comparison}
+    instruments = {column for portfolio in portfolios.values() if portfolio.weights is not None
+                   for column in portfolio.weights.columns}
+    validate_alpha_coverage(alpha_coverage, instruments)
     navs = pd.concat(
         {key: value.get_portfolio_nav() for key, value in portfolios.items()}, axis=1, sort=True)
     try:
@@ -67,7 +73,8 @@ def compute_paired_performance_inference(
     references = benchmark_prices.to_frame() if isinstance(benchmark_prices, pd.Series) else (
         benchmark_prices)
     alpha_meta = dict(benchmark="Unavailable", freq_beta=freq_beta,
-                      factor_beta_span=factor_beta_span, portfolios={})
+                      factor_beta_span=factor_beta_span, portfolios={},
+                      coverage_enabled=alpha_coverage is not None)
     if references is None or references.empty or not references.shape[1]:
         issues.append("Marginal alpha: no market benchmark; no substitute benchmark selected.")
     else:
@@ -87,6 +94,8 @@ def compute_paired_performance_inference(
                         benchmark_prices=first, portfolio_returns=alpha_pair[key],
                         benchmark_returns=market, freq_beta=freq_beta,
                         factor_beta_span=factor_beta_span,
+                        alpha_coverage=(alpha_coverage.for_instruments(portfolio.weights.columns)
+                                        if alpha_coverage is not None else None),
                     )
                     components[key] = alpha
                     diagnostics = diagnostics.join(diagnostic.add_prefix(key + "_"))
@@ -98,6 +107,11 @@ def compute_paired_performance_inference(
     # Subtraction retains NaN whenever either leg is unknown. Never drop dates before HAC.
     marginal = (components.Strategy - components.Comparison).rename("Marginal alpha")
     diagnostics = diagnostics.join(components.add_suffix("_alpha"))
+    if all(key + "_strict_alpha" in diagnostics for key in portfolios):
+        diagnostics["strict_alpha"] = (diagnostics.Strategy_strict_alpha
+                                       - diagnostics.Comparison_strict_alpha)
+    alpha_meta["proxy_assisted"] = any(
+        settings.get("proxy_assisted", False) for settings in alpha_meta["portfolios"].values())
     aw, ae, ar, am = _inference_views(marginal, freq_beta, alpha_end, issues,
                                      alpha=True, paired=True, alpha_inference=alpha_inference)
     alpha_meta.update(am)

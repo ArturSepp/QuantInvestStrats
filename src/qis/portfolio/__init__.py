@@ -86,6 +86,7 @@ from qis.portfolio.reports.multi_assets_factsheet import (
     MultiAssetsReport, generate_multi_asset_factsheet)
 
 from qis.portfolio.reports.strategy_factsheet import generate_strategy_factsheet
+from qis.portfolio.reports.alpha_coverage import HoldingsAlphaCoverage
 
 from qis.portfolio.reports.strategy_benchmark_factsheet import (
     generate_strategy_benchmark_factsheet_plt, generate_strategy_benchmark_active_perf_plt)
@@ -138,3 +139,5 @@ from qis.portfolio.attribution.group_exposures import compute_lookthrough_exposu
 from qis.portfolio.reports.lookthrough_exposures import generate_lookthrough_exposures_factsheet
 
 from qis.portfolio.fx_accounting import FxAccountSpec, FxAccountData, backtest_fx_account
+
+from qis.portfolio.risk.factors_data import FactorsData

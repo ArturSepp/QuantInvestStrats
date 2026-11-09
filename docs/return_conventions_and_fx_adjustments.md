@@ -44,6 +44,28 @@ Prices include any embedded instrument hedges; additional hedge ratios must not 
 is one reset boundary. Lag zero is closing-quote descriptive analytics, not earned opening cash.
 Hedge pricing always uses opening quotes. The policy does not convert the provider's yield basis.
 
+For frequency-consistent historical excess measurement, opt in with
+`FxCashPolicy(accrual=FxCashAccrual.MONTHLY_INDEX)`. The default remains
+`PERIOD_OPENING`. The monthly policy uses one currency cash index with calendar
+month-end resets: opening annual decimal quotes accrue ACT/365F simple interest
+within each month, and interest is reinvested at month-end. Each requested return
+interval uses the ratio of index levels at its endpoints. Intramonth measurements
+sample the same account without extra resets. `compute_monthly_cash_index` exposes
+those levels; normalization is one at the first supported month-end.
+
+For a fixed underlying wealth path, quarterly log excess equals the sum of its
+monthly log excess returns. SIMPLE still means total return minus the measured
+cash return; it is not additive or directly compoundable across intervals.
+Missing opening quotes are not backfilled, and an unknown accrued interval makes
+subsequent index levels unknown. Source rates and their normalization are unchanged.
+
+The monthly policy supports LOCAL_EXCESS and REFERENCE_EXCESS, with opening quotes
+only. It affects excess measurement, never the hedge leg. Total/spot and notional
+payoff requests reject this policy so it cannot silently replace contract financing.
+Forward pricing remains based on opening quotes over each existing hedge interval;
+realized rolling cash growth cannot price an earlier forward. Monthly versus quarterly
+hedged total returns can therefore still differ when their hedge schedules differ.
+
 Dated `local_ccys` describe quote-currency spells, not domicile or economic currency exposure.
 A change of currency is rejected unless `currency_changes='mask_boundary'` explicitly requests
 missing crossing returns. No unit conversion or rebasing factor is inferred. Dated hedge matrices
@@ -209,7 +231,7 @@ capital, resets monthly and reinvests each completed payoff. It adds no collater
 The complete public example is also executed by the documentation gate:
 
 ```python
-from examples.market_data.fx_returns_and_accounting_example import run_example
+from examples.fx.fx_returns_and_accounting_example import run_example
 teaching = run_example(verbose=False)
 assert set(teaching['comparisons']) == {('B', 'simple'), ('B', 'log'),
                                       ('ME', 'simple'), ('ME', 'log')}
@@ -247,7 +269,7 @@ are defined in [cash and local financing](self_financed_fx_accounting.md#cash-an
 These local Markdown anchors are the implementation map; no manuscript equation labels are
 invented or inferred from an out-of-scope publication.
 
-See the repository-only [offline returns and account example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_returns_and_accounting_example.py)
+See the repository-only [offline returns and account example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_returns_and_accounting_example.py)
 for EUR/CHF equities at daily/monthly frequency in simple/log coordinates, both notional
 payoffs, cash-relative checks, and an explicitly settled hedge account. No vendor service or
 optional data package is needed. Different frequency requests change cash/hedge resets;
@@ -281,46 +303,57 @@ payment use the separate [self-financed account](self_financed_fx_accounting.md)
 
 ### Immediate deprecation and direct migration
 
-QIS 5.47.0 is the first public release of the unified FX API, exact notional payoffs,
-and explicit accounting. Local validation introduced typed asset/spot analytics and the
-first warning group in 5.45.0, and exact payoffs and currency-method warnings in 5.46.0.
-The warning messages retain this development lineage; all seven deprecations first ship
-on PyPI in 5.47.0, with removal in 6.0.0. Match examples to the installed QIS version
-and check the built documentation version before relying on `latest` or `stable`.
+QIS 6.0.0 places currency data and analytics in `qis.fx`; the previous
+`qis.market_data` namespace is removed. Module basenames are unchanged. `FactorsData`
+lives in `qis.portfolio.risk.factors_data`. Root object imports such as `qis.FxRatesData`,
+`qis.FactorsData` and `qis.compute_fx_returns` remain available.
 
+The following seven `FxRatesData` methods were deprecated in the public 5.47.x series
+and are removed in 6.0.0. There are no forwarding methods or old-shape adapters.
 
-The following methods emit `DeprecationWarning` from QIS 5.45.0 and are scheduled for removal in
-6.0.0. Their existing implementations remain during this bounded retirement period. There is no
-compatibility facade, old-shape adapter, or redirection that changes their economic meanings.
-
-| Deprecated method on FxRatesData | Direct replacement |
+| Removed method on FxRatesData | Direct replacement |
 |---|---|
-| `compute_performance_of_local_ccy_asset_in_reference_ccy` | One-column asset request; the standalone low-level quote kernel is retained |
-| `compute_returns_in_reference_ccy` | Reference-kind asset request; read `.values`, request `.to_index(...)` explicitly |
-| `compute_fx_adjusted_returns` | Asset request with scalar or per-asset frequency; consume typed cadence results |
-| `compute_returns_adjusted_by_local_rate` | Separate LOCAL_TOTAL and LOCAL_EXCESS requests; annual quotes stay on the data container |
+| `compute_performance_of_local_ccy_asset_in_reference_ccy` | One-column `FxAssetReturnsRequest`; the standalone quote kernel remains |
+| `compute_returns_in_reference_ccy` | Reference-kind asset request; read `.values` |
+| `compute_fx_adjusted_returns` | Asset request with scalar or per-asset frequency; consume cadence-keyed results |
+| `compute_returns_adjusted_by_local_rate` | Separate LOCAL_TOTAL and LOCAL_EXCESS requests; annual quotes stay on the container |
+| `get_daily_carry_local_return` | FX_SPOT for the spot leg; FX_FORWARD for exact forward P&L |
+| `get_fx_total_return_nav` | FX_FORWARD request; explicit `.to_index(...)` if needed |
+| `get_carry_fx_return_nav` | FX_FORWARD diagnostics for the hedge-cost leg, or the normalized forward index |
 
-The currency methods `get_daily_carry_local_return`, `get_fx_total_return_nav` and
-`get_carry_fx_return_nav` emit `DeprecationWarning` from QIS 5.46.0, with removal in 6.0.0.
-Use an `FX_FORWARD` currency request and optional explicit normalization. Their old premium-based
-implementations are retained only for the bounded retirement period; no compatibility facade
-redirects them to new economics. Current examples and report currency-index panels use the exact
-forward payoff. In particular, the old vol-matched carry diagnostic is replaced by a daily-reset
-forward index with unit notional-to-capital, rather than being relabelled as exact carry.
-Dated synthetic forward quote access and standalone low-level principal-hedge kernels remain
-building blocks. In particular the standalone function and the deprecated method with the
-same `compute_performance_of_local_ccy_asset_in_reference_ccy` name have different retirement
-status. Use the typed API in new application examples; do not remove the retained kernel.
+Select the economic kind, coordinate and cash policy explicitly. Asset requests require a
+coordinate; exact zero observations are retained unless `zero_return_to_nan=True` is selected.
+A result does not construct a synthetic NAV by default. Supply `FxIndexNormalization` to
+`.to_index(...)` when an index is useful, stating capital, notional, settlement, reinvestment
+and missing-data policy.
 
-Migration is direct: select kind/coordinate/cash policy, replace tuple or DataFrame assumptions
-with cadence-keyed `FxReturnsData.values`, and request normalization only when needed.
-Replace old spot-plus-premium indices with exact FX_FORWARD under the same cash/reset policy;
-that deliberate payoff delta is not a representation-only migration. Do not translate
-`expm1(LOG excess)` into arithmetic excess: it produces cash-relative simple instead.
-Run exercised FX call sites with `DeprecationWarning` visible, then as errors for the retired
-method messages. Test warning behavior separately while legacy implementations remain.
-Remove the seven container methods only in the named 6.0.0 removal release; no compatibility
-facade is introduced and this documentation stage removes no API.
+Replacing old spot-plus-premium histories with exact FX_FORWARD intentionally changes the
+payoff from `spot + f` to `spot + f/(1+f)`. The old volatility-scaled carry diagnostic has no
+identical typed replacement. Current report panels use a daily-reset forward index with unit
+notional-to-capital. Do not relabel that index as a replication of the old carry history.
+
+Standalone quote, principal-hedge and hedge-selection kernels remain building blocks. In
+particular, `qis.compute_performance_of_local_ccy_asset_in_reference_ccy` is retained;
+the removed method with the same name was on `FxRatesData`. New application workflows use
+the typed service. `qis.portfolio.fx_accounting` remains the home of funded account P&L.
+
+Python checkpoints can contain the old module paths even when source imports used root aliases.
+Use the explicitly invoked [offline checkpoint migration tool](../tools/migrate_fx_checkpoint.py)
+for trusted archives, writing a new file and keeping the original. The tool records source and
+destination hashes and remapped class names; it does not install runtime aliases. CSV tables,
+currency IDs and data-container fields are unchanged. Historical links pinned to QIS 5.47.2
+continue to refer to that release's source tree.
+
+From the QIS repository with QIS 6.0.0 installed, migrate an ordinary trusted pickle with:
+
+```bash
+python tools/migrate_fx_checkpoint.py old.pkl migrated.pkl
+```
+
+The new checkpoint has a `.migration.json` receipt. Consumer-specific checkpoint wrappers
+still require their original restoration context and dependencies; the converter does not
+modify consumer classes. CSV-based loading is unaffected and needs no migration.
+
 
 ## Interpretation and limitations
 
@@ -341,7 +374,7 @@ These results contain quote currencies, not a claim about a security's full econ
 - [Self-financed FX accounting](self_financed_fx_accounting.md)
 
 - [qis bibliography](bibliography.md)
-- [Canonical implementation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_returns.py)
+- [Canonical implementation](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_returns.py)
 
 ## References
 

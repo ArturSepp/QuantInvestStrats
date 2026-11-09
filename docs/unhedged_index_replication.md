@@ -579,7 +579,7 @@ The public calculation is
 `qis.compute_fx_returns` with REFERENCE_TOTAL / SIMPLE and zero additional hedge,
 with `hedge_ratio=0.0`, `is_excess_returns=False`, `freq='ME'` and
 `is_log_returns=False`. The method returns a reference-currency NAV and return series.
-The [FX container source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py)
+The [FX container source](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py)
 owns this implementation. Regression figures use `qis.plot_scatter`, tracking error uses
 `qis.compute_te_ir_errors`, and annual geometric returns use `qis.compute_pa_return`.
 

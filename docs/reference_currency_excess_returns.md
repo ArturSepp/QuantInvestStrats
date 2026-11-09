@@ -314,7 +314,7 @@ other generated series; rates are illustrative annual quotes. There is no vendor
 
 ```python
 
-from qis.market_data import fx_returns as qfx
+from qis.fx import fx_returns as qfx
 from qis.datasets.synthetic import generate_synthetic_prices
 
 daily = generate_synthetic_prices(
@@ -627,7 +627,7 @@ plus the contracted forward payoff, followed by reference-cash subtraction.
 
 ```python
 
-from qis.market_data import fx_returns as qfx
+from qis.fx import fx_returns as qfx
 asset_freq = pd.Series({'SEQ_US': 'ME', 'SEQ_EU': 'ME', 'SBD_IG': 'QE'})
 mixed_returns = {cadence: result.values for cadence, result in qfx.compute_fx_returns(
                     fx_data,
@@ -730,9 +730,9 @@ explains `qis.local_path.get_resource_path()` and private YAML configuration. Lo
 container does not download or refresh vendor data. The examples above are fully offline.
 
 The implementation owner is
-[fx_rates_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py),
+[fx_rates_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py),
 using the funded-payoff kernel in
-[fx_hedging.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_hedging.py).
+[fx_hedging.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py).
 The worked examples are executed by the existing
 [documentation-example harness](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/tests/documentation_examples_test.py)
 and independently check terminal cash flows, reference-cash deduction, log/simple conventions,

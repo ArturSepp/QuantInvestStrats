@@ -55,7 +55,7 @@ that connects their results back to those labels.
 | `qis.utils` | Shared data operations, calendar handling, regression utilities and numerical helpers. |
 | `qis.portfolio` | Portfolio accounting, risk, attribution and reporting objects. |
 | `qis.plots` | Matplotlib/seaborn plots and derived presentation functions. |
-| `qis.market_data` | Market-data transformations and optional integration helpers. |
+| `qis.fx` | Market-data transformations and optional integration helpers. |
 | `qis.datasets` | The fixed synthetic fixture used by offline examples and tests. |
 
 Model-layer attribution, feature attribution, portfolio breadth and Brinson attribution live

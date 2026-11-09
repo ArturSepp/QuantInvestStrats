@@ -11,6 +11,7 @@ import pandas as pd
 
 from qis.perfstats.multiple_testing import MultipleTestingMethod, adjust_pvalues
 from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports.alpha_coverage import validate_alpha_coverage
 from qis.portfolio.reports._paired_performance_inference import compute_paired_performance_inference
 from qis.portfolio.reports._performance_inference import (
     alpha_method_label, validate_alpha_inference,
@@ -57,6 +58,7 @@ def validate_inference_base(portfolios, base_portfolio_id):
 def compute_multi_performance_inference(
     multi_portfolio_data, base_portfolio_id=0, time_period=None, freq="ME", rates_data=None,
     *, freq_beta="B", factor_beta_span=260, alpha_inference=InterceptInference.BARTLETT_HAC,
+    alpha_coverage=None,
 ):
     """Prepare portfolio-minus-base estimates without changing any legacy estimator defaults.
 
@@ -70,6 +72,7 @@ def compute_multi_performance_inference(
         factor_beta_span: Report's EWM span and instrument warm-up on the beta grid.
         alpha_inference: Primary alpha method in the unchanged 6K-test Holm family; the alternate
             method is same-sample sensitivity only, with raw unadjusted p-values.
+        alpha_coverage: Optional universe-wide coverage policy, restricted to each paired report.
 
     Returns:
         All six tests per non-base portfolio, pair-level diagnostics and predeclared family.
@@ -79,6 +82,8 @@ def compute_multi_performance_inference(
     """
     validate_alpha_inference(alpha_inference)
     portfolios = multi_portfolio_data.portfolio_datas
+    validate_alpha_coverage(alpha_coverage, {column for portfolio in portfolios
+                            if portfolio.weights is not None for column in portfolio.weights})
     validate_inference_base(portfolios, base_portfolio_id)
     base = portfolios[base_portfolio_id]
     positions = [i for i in range(len(portfolios)) if i != base_portfolio_id]
@@ -92,7 +97,8 @@ def compute_multi_performance_inference(
                     family_id="multi-strategy-inference-summary", family_size=len(family),
                     adjustment="Holm", adjustment_status="unavailable", freq=freq,
                     freq_beta=freq_beta, factor_beta_span=factor_beta_span,
-                    alpha_inference=alpha_inference.name)
+                    alpha_inference=alpha_inference.name,
+                    coverage_enabled=alpha_coverage is not None)
     if time_period is None:
         navs = multi_portfolio_data.get_navs()
         time_period = TimePeriod(navs.index[0], navs.index[-1])
@@ -107,6 +113,10 @@ def compute_multi_performance_inference(
                 time_period=time_period, freq=freq, rates_data=rates_data,
                 freq_beta=freq_beta, factor_beta_span=factor_beta_span,
                 alpha_inference=alpha_inference,
+                alpha_coverage=(alpha_coverage.for_instruments({
+                    column for portfolio in (portfolios[position], base)
+                    if portfolio.weights is not None for column in portfolio.weights})
+                    if alpha_coverage is not None else None),
             )
         pairs[position] = pair
         issues.extend(f"Portfolio {position} ({portfolios[position].ticker}): {message}"
@@ -186,7 +196,8 @@ def plot_multi_performance_inference(data, figsize=(8.3, 11.7)):
                            fontsize=13, weight="bold", color="#164773")
             figure.text(.065, .905, "Paired Sharpe difference", fontsize=11,
                         weight="bold", color="#164773")
-            figure.text(.55, .905, "Marginal holdings alpha", fontsize=11,
+            figure.text(.55, .905, "Coverage-adjusted marginal alpha" if
+                        meta.get("coverage_enabled") else "Marginal holdings alpha", fontsize=10,
                         weight="bold", color="#164773")
             figure.text(.065, .87, f"Arithmetic | {meta['freq']} | af={sample_meta['af']:g}",
                         fontsize=7)
@@ -272,7 +283,7 @@ def plot_multi_performance_inference(data, figsize=(8.3, 11.7)):
                 "Marginal alpha = return difference − prior holdings beta difference × market "
                 "excess return. No NAV regression.\n"
                 "EWMA-demeaned instrument log betas; simple-return application is approximate. "
-                "Both portfolios need full coverage.\n"
+                "Both portfolios must meet the declared coverage policy.\n"
                 "Minimum: 24 returns and 2 observation-equivalent years; HAC needs N ≥5(L+1). "
                 "Automatic lags; actual paired dates shown.\n"
                 "Unavailable tests stay N/A; no padded zeros, beta=1 prior or dropped "
@@ -287,6 +298,9 @@ def plot_multi_performance_inference(data, figsize=(8.3, 11.7)):
                 "\nAlpha: B = Bartlett; PW = AR(1)-prewhitened Bartlett. Same N/L; alternate raw p "
                 "is sensitivity only, outside Holm."
             )
+            if meta.get("coverage_enabled"):
+                footer += ("\nSee coverage audit pages for assisted exposures and excluded dates. "
+                           "CIs exclude proxy/omission uncertainty.")
             figure.text(.065, .065, footer, fontsize=6.1, color=".35", linespacing=1.55,
                         va="bottom")
             for x, label, target in (

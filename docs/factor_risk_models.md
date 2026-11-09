@@ -775,7 +775,7 @@ The implementations are in
 [ewm_factor_model.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/ewm_factor_model.py),
 [factor_model.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/factor_model.py),
 [contributions.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/contributions.py)
-and [factors_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/factors_data.py).
+and [factors_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/factors_data.py).
 The EWM beta recursion is in
 [ewm.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/linear/ewm.py).
 

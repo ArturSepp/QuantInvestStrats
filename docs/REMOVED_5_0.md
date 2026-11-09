@@ -161,7 +161,7 @@ because Plotly is optional. That module requires the `visualization` extra; impo
 | --- | --- |
 | `qis.DEFAULT_RA_TABLE_COLUMNS` | [examples/_helpers/reporting_helpers.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/_helpers/reporting_helpers.py) |
 | `qis.generate_performance_report` | Same reporting example helper. |
-| `qis.load_usd_assets` | [examples/market_data/fx_hedging_example.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/market_data/fx_hedging_example.py) |
+| `qis.load_usd_assets` | [examples/fx/fx_hedging_example.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_hedging_example.py) |
 
 These helpers now live under the repository's `examples/` tree, outside the installed
 package. They demonstrate workflows and may be reorganised; do not use them as production APIs.
@@ -456,10 +456,10 @@ from qis.utils.df_melt import (
 )
 ```
 
-### `qis.market_data.reports.fx_hedging_report` (3)
+### `qis.fx.reports.fx_hedging_report` (3)
 
 ```python
-from qis.market_data.reports.fx_hedging_report import (
+from qis.fx.reports.fx_hedging_report import (
     compute_multi_asset_fx_hedging,
     plot_multi_asset_fx_hedging_report,
     run_asset_fx_hedging_report

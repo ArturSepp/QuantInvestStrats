@@ -570,8 +570,8 @@ This is a diagnostic comparison, not an exact matched-provider replication. The 
 | Figures | `qis.plot_scatter`, `qis.plot_time_series` | Descriptive linear fit with intercept and relative compounded NAV |
 
 Canonical sources are the
-[FX data container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_rates_data.py),
-[FX payoff functions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/market_data/fx_hedging.py),
+[FX data container](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py),
+[FX payoff functions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py),
 [return functions](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/returns.py)
 and [ex-post tracking error](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/ex_post_tracking_error.py).
 The original source-level OLS check used the internal contributor function

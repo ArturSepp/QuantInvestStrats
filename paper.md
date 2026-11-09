@@ -140,8 +140,8 @@ report portfolio factor exposures and systematic and residual risk contributions
 functions apply specified or conditionally derived factor shocks to current holdings and report
 scenario profit and loss with reconciled factor attribution.
 
-The public interface is `qis.__all__`, which holds 497 names. The module `src/qis/api.py` records
-that list as a literal, together with a documented core of 181 symbols in 14 capability groups.
+The public interface is `qis.__all__`, which holds 500 names. The module `src/qis/api.py` records
+that list as a literal, together with a documented core of 183 symbols in 14 capability groups.
 The broad namespace preserves convenient imports and compatibility for existing consumers, at the
 cost of discoverability. The curated core gives new users a smaller entry point without removing any
 export.

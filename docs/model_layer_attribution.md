@@ -72,6 +72,14 @@ before the return, with the remaining return reported as realised alpha. The
 [two-panel example](benchmark_relative_performance.md#dynamic-holdings-the-two-panel-factsheet-example)
 shows both beta estimates on the same sampling grid and EWMA span.
 
+The inference appendix can optionally use an
+[explicit holdings-alpha coverage policy](factsheets_and_reporting.md#optional-holdings-alpha-coverage)
+for tiny missing-beta exposures and supplied risk-matched proxy histories. This remains a
+holdings-weighted exposure estimate, not model-layer NAV regression. Own and proxy betas
+retain the same warm-up and lag; strict alpha, proxy/omitted exposures and excluded dates
+are retained for audit. `alpha_coverage=None` remains strict. Proxy-assisted confidence
+intervals do not account for uncertainty about the proxy model itself.
+
 | Convention | Holdings-based factsheet | Model-layer lagged NAV regression |
 |---|---|---|
 | Inputs | Instrument prices, current portfolio exposures and portfolio NAV | Benchmark and counterfactual layer NAVs |

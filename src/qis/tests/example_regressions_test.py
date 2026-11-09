@@ -158,7 +158,7 @@ def test_cboe_public_csv(yahoo_panel, monkeypatch):
 def test_fx_example_public_default(yahoo_panel, monkeypatch):
     """The default local-rate workflow needs no production CSV universe."""
     monkeypatch.setattr(sys, 'argv', ['fx_hedging_example'])
-    runpy.run_module('examples.market_data.fx_hedging_example', run_name='__main__')
+    runpy.run_module('examples.fx.fx_hedging_example', run_name='__main__')
 
 
 @pytest.mark.parametrize('missing_ticker', ['USDCAD=X', '^IRX', 'SPY'])
@@ -174,9 +174,9 @@ def test_fx_example_rejects_missing_inputs(missing_ticker, yahoo_panel, monkeypa
         return frame
 
     monkeypatch.setattr(vendor, 'download', partial_download)
-    fx_module = importlib.import_module('examples.market_data.fx_rates_data_yahoo_example')
+    fx_module = importlib.import_module('examples.fx.fx_rates_data_yahoo_example')
     monkeypatch.setattr(fx_module, 'yf', vendor)
-    from examples.market_data.fx_hedging_example import load_example_inputs
+    from examples.fx.fx_hedging_example import load_example_inputs
 
     with pytest.raises(ValueError, match=re.escape(missing_ticker)):
         load_example_inputs()

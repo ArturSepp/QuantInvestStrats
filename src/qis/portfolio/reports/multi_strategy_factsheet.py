@@ -27,6 +27,8 @@ import qis as qis
 from qis import TimePeriod, PerfParams, PerfStat, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports.alpha_coverage import HoldingsAlphaCoverage, validate_alpha_coverage
+from qis.portfolio.reports._alpha_coverage_report import plot_alpha_coverage
 from qis.portfolio.reports._multi_performance_inference import (
     compute_multi_performance_inference, plot_multi_performance_inference, validate_inference_base,
 )
@@ -66,6 +68,7 @@ def generate_multi_portfolio_factsheet(
     base_portfolio_id: int = 0,
     add_performance_inference_sheet: bool = True,
     alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
+    alpha_coverage: Optional[HoldingsAlphaCoverage] = None,
     add_pairwise_inference_sheets: bool = False,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
@@ -80,6 +83,9 @@ def generate_multi_portfolio_factsheet(
     hundred-line legend.
 
     Args:
+        alpha_coverage: Optional explicit tiny-weight/proxy policy for holdings alpha. None keeps
+            strict coverage. Enabled policies append coverage/excluded-date audit pages without
+            changing beta warm-up, Sharpe, page one or portfolio NAV.
         alpha_inference: Primary alpha method for the unchanged 6K-test Holm family. Bartlett
             HAC is default; PREWHITENED_AR1 is opt-in. Alternate same-sample raw p-values are
             sensitivity only, outside Holm. Forwarded to all detail/embedded strategy pages;
@@ -334,6 +340,9 @@ def generate_multi_portfolio_factsheet(
                                                regime_classifier=regime_classifier,
                                                **kwargs)
 
+    validate_alpha_coverage(alpha_coverage, {
+        column for portfolio in multi_portfolio_data.portfolio_datas
+        if portfolio.weights is not None for column in portfolio.weights})
     figs = [fig]
     if add_performance_inference_sheet or add_pairwise_inference_sheets:
         inference = compute_multi_performance_inference(
@@ -342,6 +351,7 @@ def generate_multi_portfolio_factsheet(
             freq_beta=kwargs.get('freq_beta', 'B'),
             factor_beta_span=kwargs.get('factor_beta_span', 260),
             alpha_inference=alpha_inference,
+            alpha_coverage=alpha_coverage,
         )
         if add_performance_inference_sheet:
             figs.extend(plot_multi_performance_inference(inference, figsize=figsize))
@@ -350,6 +360,10 @@ def generate_multi_portfolio_factsheet(
                 figs.append(plot_performance_inference(
                     pair, f"{pair.metadata['strategy']} vs {pair.metadata['comparison']}",
                     figsize=figsize))
+        for index, pair in enumerate(inference.pairs.values()):
+            figs.extend(plot_alpha_coverage(
+                pair, "Portfolio versus base", figsize=figsize,
+                portfolio_keys=None if index == 0 else ("Strategy",)))
     if add_group_exposures_and_pnl:
         figs1 = multi_portfolio_data.plot_group_exposures_and_pnl(
             time_period=time_period,
@@ -374,6 +388,9 @@ def generate_multi_portfolio_factsheet(
                     recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
                     add_performance_inference_sheet=add_performance_inference_sheet,
                     alpha_inference=alpha_inference,
+                    alpha_coverage=(alpha_coverage.for_instruments(portfolio_data.weights.columns)
+                                    if alpha_coverage is not None and
+                                    portfolio_data.weights is not None else alpha_coverage),
                     **kwargs,
                     lookthrough_matrix=lookthrough_matrix,
                     group_data=group_data,

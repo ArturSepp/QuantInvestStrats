@@ -63,6 +63,8 @@ from qis.portfolio.reports.config import (
     validate_reporting_frequency,
 )
 from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports.alpha_coverage import HoldingsAlphaCoverage, validate_alpha_coverage
+from qis.portfolio.reports._alpha_coverage_report import plot_alpha_coverage
 from qis.portfolio.reports._performance_inference import (
     compute_performance_inference,
     plot_performance_inference,
@@ -188,6 +190,7 @@ def generate_strategy_factsheet(
     *,
     add_performance_inference_sheet: bool = True,
     alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
+    alpha_coverage: Optional[HoldingsAlphaCoverage] = None,
     group_data: Optional[pd.Series] = None,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
@@ -208,6 +211,9 @@ def generate_strategy_factsheet(
     computed at.
 
     Args:
+        alpha_coverage: Optional explicit tiny-weight/proxy policy for holdings alpha. None keeps
+            strict coverage. Enabled policies append coverage/excluded-date audit pages without
+            changing beta warm-up, Sharpe, page one or portfolio NAV.
         alpha_inference: Primary alpha uncertainty method. Bartlett HAC remains the default;
             PREWHITENED_AR1 is opt-in. Both use the same eligible sample and lag count, with the
             alternate shown as unadjusted sensitivity only. Does not change Sharpe or page one.
@@ -216,8 +222,8 @@ def generate_strategy_factsheet(
             Sharpe uses perf_params.freq_vol; alpha uses freq_beta/factor_beta_span and only
             the first benchmark, lagged holdings betas and existing cash rates. Windows need
             >=24 returns and two observation-equivalent years; HAC also needs N>=5(L+1).
-            Rolling five-year history falls back to three/two years with a warning; missing,
-            short or undefined samples display unavailable rather than manufacturing returns.
+            Quarterly rolling history uses six years; other grids use five years with a
+            three/two-year fallback warning. Missing, short or undefined samples stay unavailable.
         lookthrough_matrix: Optional static instrument-by-sleeve fractions. Supplied rows
             are finite, nonnegative and sum to one; omitted rows use group_data.
             None preserves categorical reporting. This is an accounting split.
@@ -718,6 +724,8 @@ def generate_strategy_factsheet(
         figs.append(appendix_fig)
 
     if add_performance_inference_sheet:
+        validate_alpha_coverage(alpha_coverage, portfolio_data.weights.columns
+                                if portfolio_data.weights is not None else [])
         inference = compute_performance_inference(
             portfolio_data.get_portfolio_nav(),
             inference_benchmarks,
@@ -729,8 +737,10 @@ def generate_strategy_factsheet(
             freq_beta=freq_beta,
             factor_beta_span=factor_beta_span,
             alpha_inference=alpha_inference,
+            alpha_coverage=alpha_coverage,
         )
         figs.append(plot_performance_inference(inference, portfolio_data.nav.name, figsize=figsize))
+        figs.extend(plot_alpha_coverage(inference, portfolio_data.nav.name, figsize=figsize))
 
     if add_current_position_var_risk_sheet:
         # qqq

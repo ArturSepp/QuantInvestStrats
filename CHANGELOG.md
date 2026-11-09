@@ -5,7 +5,50 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [6.0.0] - 2026-11-09
+
+### Changed
+
+- Move currency data and analytics from `qis.market_data` to `qis.fx`, retaining file
+  basenames. Move `FactorsData` to `qis.portfolio.risk.factors_data`; root object exports
+  remain available. FX examples now live in `examples/fx`. Saved Python checkpoints need
+  explicit offline module-path migration; CSV formats and currency IDs are unchanged.
+
+### Removed
+
+- Remove the seven `FxRatesData` methods deprecated in 5.47.x: `get_daily_carry_local_return`,
+  `get_fx_total_return_nav`, `get_carry_fx_return_nav`,
+  `compute_performance_of_local_ccy_asset_in_reference_ccy`, `compute_returns_in_reference_ccy`,
+  `compute_fx_adjusted_returns`, and `compute_returns_adjusted_by_local_rate`. Use typed
+  `compute_fx_returns` requests and optional explicit index normalization. The standalone
+  principal-hedge kernel remains. There is no legacy namespace or method compatibility layer.
+
+
+### Fixed
+
+- Quarterly performance-inference charts use six-year rolling windows (24 observations)
+  for Sharpe, holdings alpha and their paired differences. Other frequencies retain their
+  5/3/2-year windows; fixed summary tests, minimum samples, beta warm-up and estimators
+  are unchanged. Labels and unavailable-history warnings follow the selected window.
+- Single-strategy alpha inference now uses the latest continuous eligible sample for its
+  history row and expanding chart when holdings coverage has interior gaps. Labels and
+  warnings disclose excluded dates and distinguish finite observations from calendar rows.
+  Recent fixed windows still reject gaps, short latest samples remain unavailable, and beta
+  warm-up, Sharpe estimators, paired families and inference defaults are unchanged.
+
+### Added
+
+- Optional `HoldingsAlphaCoverage` and keyword-only `alpha_coverage` in single, paired and
+  multi-strategy factsheets. `None` retains strict coverage. Explicit policies permit bounded
+  missing-beta dust and user-mapped proxy-price histories with unchanged EWMA warm-up and lag.
+  Own eligible betas take precedence; no renormalisation, NAV regression or NAV changes.
+  Coverage audit pages disclose mappings, gross exposures and excluded dates; diagnostics
+  retain strict alpha. Sharpe, inference methods, minimum samples and test families are unchanged.
+- Opt-in `FxCashAccrual.MONTHLY_INDEX` and `compute_monthly_cash_index`: one ACT/365F
+  monthly-reset cash account per currency, sampled for local/reference excess returns.
+  Existing period-opening defaults, annual rate inputs, hedge pricing and financed
+  payoffs are unchanged. Monthly measurement cash cannot be used to reprice forwards.
+
 
 ## [5.47.2] - 2026-11-08
 

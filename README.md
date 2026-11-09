@@ -100,6 +100,11 @@ For portfolio construction use
 separately installed [`bbg-fetch`](https://github.com/ArturSepp/BloombergFetch) companion; it is
 not a `qis` extra. `qis` is a research and reporting library, not an execution system.
 
+QIS 6.0.0 groups FX analytics in `qis.fx` and factor-price data in
+`qis.portfolio.risk.factors_data`. Root object imports remain available. See the
+[FX migration guide](docs/return_conventions_and_fx_adjustments.md#immediate-deprecation-and-direct-migration)
+for removed container methods and saved-checkpoint migration.
+
 ## Installation <a name="installation"></a>
 
 Install using
@@ -214,9 +219,9 @@ Regime analytics beyond the Bear, Normal and Bull tables live in the subpackage 
 imported explicitly and not re-exported from `qis`. Every quantile classification in qis follows
 one rule, `qis.utils.quantile_buckets`.
 
-`qis.market_data` is an auxiliary module of market-data containers and FX analytics. Examples
+`qis.fx` is an auxiliary module of market-data containers and FX analytics. Examples
 build the containers from free Yahoo data or from Bloomberg through the separately installed
-`bbg-fetch` package; see [`src/qis/market_data/README.md`](src/qis/market_data/README.md) for the
+`bbg-fetch` package; see [`src/qis/fx/README.md`](src/qis/fx/README.md) for the
 data contract and conventions.
 
 ### Analytics at a glance
@@ -465,7 +470,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={5.47.2},
+  version={6.0.0},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

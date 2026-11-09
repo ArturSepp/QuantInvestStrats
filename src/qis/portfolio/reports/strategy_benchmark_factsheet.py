@@ -33,6 +33,8 @@ from qis import TimePeriod, PerfParams, BenchmarkReturnsQuantilesRegime
 from qis.portfolio.portfolio_data import AttributionMetric
 from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports.alpha_coverage import HoldingsAlphaCoverage, validate_alpha_coverage
+from qis.portfolio.reports._alpha_coverage_report import plot_alpha_coverage
 from qis.portfolio.reports._paired_performance_inference import compute_paired_performance_inference
 from qis.portfolio.reports._performance_inference import plot_performance_inference
 from qis.portfolio._asset_display import (
@@ -81,6 +83,7 @@ def generate_strategy_benchmark_factsheet_plt(
     *,
     add_performance_inference_sheet: bool = True,
     alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
+    alpha_coverage: Optional[HoldingsAlphaCoverage] = None,
     group_data: Optional[pd.Series] = None,
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     **kwargs,
@@ -99,6 +102,9 @@ def generate_strategy_benchmark_factsheet_plt(
     fees, funding or other cash flows absent from instrument P&L.
 
     Args:
+        alpha_coverage: Optional explicit tiny-weight/proxy policy for holdings alpha. None keeps
+            strict coverage. Enabled policies append coverage/excluded-date audit pages without
+            changing beta warm-up, Sharpe, page one or portfolio NAV.
         alpha_inference: Primary marginal-alpha uncertainty method; defaults to Bartlett HAC.
             PREWHITENED_AR1 is opt-in; the alternate is shown on the same sample as unadjusted
             sensitivity only. Forwarded to embedded strategy pages; Sharpe stays unchanged.
@@ -394,6 +400,10 @@ def generate_strategy_benchmark_factsheet_plt(
                     **qis.update_kwargs(kwargs, dict(freq=perf_params.freq_reg)))
 
     if add_performance_inference_sheet:
+        validate_alpha_coverage(alpha_coverage, {
+            column for idx in (strategy_idx, benchmark_idx)
+            if multi_portfolio_data.portfolio_datas[idx].weights is not None
+            for column in multi_portfolio_data.portfolio_datas[idx].weights})
         inference = compute_paired_performance_inference(
             strategy=multi_portfolio_data.portfolio_datas[strategy_idx],
             comparison=multi_portfolio_data.portfolio_datas[benchmark_idx],
@@ -402,10 +412,13 @@ def generate_strategy_benchmark_factsheet_plt(
             freq_beta=kwargs.get('freq_beta', 'B'),
             factor_beta_span=kwargs.get('factor_beta_span', 260),
             alpha_inference=alpha_inference,
+            alpha_coverage=alpha_coverage,
         )
         figs.append(plot_performance_inference(
             inference, f"{inference.metadata['strategy']} vs {inference.metadata['comparison']}",
             figsize=figsize))
+
+        figs.extend(plot_alpha_coverage(inference, "Paired portfolios", figsize=figsize))
 
     if add_brinson_attribution:
         brinson_period = time_period if brinson_time_period is None else brinson_time_period
@@ -670,6 +683,9 @@ def generate_strategy_benchmark_factsheet_plt(
                     recent_ra_perf_table_start_date=(recent_ra_perf_table_start_date),
                     add_performance_inference_sheet=add_performance_inference_sheet,
                     alpha_inference=alpha_inference,
+                    alpha_coverage=(alpha_coverage.for_instruments(portfolio_data.weights.columns)
+                                    if alpha_coverage is not None and
+                                    portfolio_data.weights is not None else alpha_coverage),
                     **kwargs,  # time period will be in kwargs
                     lookthrough_matrix=lookthrough_matrix,
                     group_data=group_data,

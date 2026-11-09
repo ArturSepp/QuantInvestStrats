@@ -44,7 +44,7 @@ from qis.models.__init__ import *
 
 from qis.portfolio.__init__ import *
 
-from qis.market_data.__init__ import *
+from qis.fx.__init__ import *  # noqa: F403 - intentional public re-exports
 
 # the event-driven replay is exported as a subpackage rather than wildcarded: its names (Order,
 # Trade, ExecutionModel, ...) are generic enough to collide with a caller's own, so they stay

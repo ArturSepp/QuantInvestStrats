@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qis"
-version = "5.47.2"
+version = "6.0.0"
 description = "Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python"
 readme = "README.md"
 license = "MIT"
@@ -146,7 +146,7 @@ qis = ["*.yaml", "README.md", "docs/*.md"]
 
 [tool.pytest.ini_options]
 # tests live inside the package, in src/qis/<subpackage>/tests/, not in a top-level tests/
-testpaths = ["src/qis"]
+testpaths = ["src/qis", "tools/tests"]
 norecursedirs = [".*", "examples", "notebooks", "build", "dist", "*.egg-info", "__pycache__"]
 # importlib import mode: test modules are resolved by full path, so the two
 # test_signal_diagnostics.py files in different subpackages do not collide
@@ -212,7 +212,7 @@ pandas = "pd"
 "examples/factsheets/using_bbg_fetch/europe_futures.py" = ["TID251"]
 "examples/factsheets/using_bbg_fetch/momentum_indices.py" = ["TID251"]
 # Named source-only provider runner; the AST policy limits this waiver to bbg_fetch.
-"src/qis/market_data/run_local/fx_rates_data_run.py" = ["E501", "TID253", "TID251"]
+"src/qis/fx/run_local/fx_rates_data_run.py" = ["E501", "TID253", "TID251"]
 
 # an __init__.py re-exports: the public API is defined as what these files import, so every
 # one of the 398 imports across them is "unused" by F401's definition and none is a defect

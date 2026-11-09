@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "9b962bd3de6f47745a177ff142a1eafe277ff30b",
+  "measured_at_commit": "875da67bb9ac6331f872271a3b2424e9540a0779",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,13 +46,13 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 8902,
+      "value": 8977,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 1132,
+      "value": 1133,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
@@ -71,33 +71,33 @@
     },
     "consumer_privateassets_call_sites": {
       "value": 9,
-      "how": "tools/audit_consumers.py at bf72cfc0a6f2",
+      "how": "tools/audit_consumers.py at ab9cddf555ec",
       "live": false,
       "paper_phrase": null
     },
     "consumer_privateassets_symbols": {
       "value": 5,
-      "how": "tools/audit_consumers.py at bf72cfc0a6f2",
+      "how": "tools/audit_consumers.py at ab9cddf555ec",
       "live": false,
       "paper_phrase": null
     },
     "consumer_trendfollowing_call_sites": {
       "value": 428,
-      "how": "tools/audit_consumers.py at 312bdabb23a2",
+      "how": "tools/audit_consumers.py at 0de54ab0f0ff",
       "live": false,
       "paper_phrase": null
     },
     "consumer_trendfollowing_symbols": {
       "value": 87,
-      "how": "tools/audit_consumers.py at 312bdabb23a2",
+      "how": "tools/audit_consumers.py at 0de54ab0f0ff",
       "live": false,
       "paper_phrase": null
     },
     "core_symbols": {
-      "value": 181,
+      "value": 183,
       "how": "len(qis.api.core_api_names())",
       "live": true,
-      "paper_phrase": "documented core of 181 symbols"
+      "paper_phrase": "documented core of 183 symbols"
     },
     "exported_module_bindings": {
       "value": 10,
@@ -106,10 +106,10 @@
       "paper_phrase": null
     },
     "exported_symbols": {
-      "value": 497,
+      "value": 500,
       "how": "len(qis.__all__)",
       "live": true,
-      "paper_phrase": "holds 497 names"
+      "paper_phrase": "holds 500 names"
     },
     "first_commit_month": {
       "value": "2022-12",
