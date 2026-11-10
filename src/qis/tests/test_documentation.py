@@ -99,6 +99,39 @@ def _documents() -> List[Path]:
     return [path for path in paths if path.is_file()]
 
 
+def test_published_text_has_no_encoding_corruption() -> None:
+    """Reject UTF-8 text saved after accidental Windows-1252 decoding, including twice."""
+    continuation = ''
+    for value in range(0x80, 0xc0):
+        try:
+            continuation += bytes([value]).decode('cp1252')
+        except UnicodeDecodeError:
+            continue
+    tail = '[' + re.escape(continuation) + ']'
+    corrupted = re.compile(
+        r'[\u00f0-\u00f4]' + tail + '{3}|'
+        r'[\u00e0-\u00ef]' + tail + '{2}|'
+        r'[\u00c2-\u00df]' + tail + r'|\ufffd'
+    )
+    paths = set(_documents())
+    paths.update(REPO_ROOT.joinpath('docs', '_ext').glob('*.py'))
+    paths.update(REPO_ROOT.joinpath('src', 'qis').rglob('*.md'))
+    paths.update(path for path in REPO_ROOT.joinpath('src', 'qis').rglob('*.py')
+                 if 'tests' not in path.parts)
+    failures = []
+    for path in sorted(paths):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        try:
+            text = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            failures.append(f'{relative}: invalid UTF-8')
+            continue
+        for match in corrupted.finditer(text):
+            line = text.count('\n', 0, match.start()) + 1
+            failures.append(f'{relative}:{line}: {ascii(match[0])}')
+    assert not failures, 'Corrupted published text; save as UTF-8:\n' + '\n'.join(failures)
+
+
 def _links_in(path: Path) -> List[Link]:
     """
     the repository-internal links one document contains.

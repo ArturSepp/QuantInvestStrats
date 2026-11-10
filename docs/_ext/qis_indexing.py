@@ -187,8 +187,8 @@ def set_release_navigation(app, pagename, templatename, context, doctree) -> Non
     root = urljoin(base.rstrip('/') + '/', '../')
     links = ''
     if urlsplit(base).netloc.endswith('.readthedocs.io'):
-        links = (f'<a href="{escape(urljoin(root, "stable/"), quote=True)}">Stable</a> Ã‚Â· '
-                 f'<a href="{escape(urljoin(root, "latest/"), quote=True)}">Latest</a> Ã‚Â· ')
+        links = (f'<a href="{escape(urljoin(root, "stable/"), quote=True)}">Stable</a> &middot; '
+                 f'<a href="{escape(urljoin(root, "latest/"), quote=True)}">Latest</a> &middot; ')
     index = escape(urljoin(base.rstrip('/') + '/', 'llms.txt'), quote=True)
     version = escape(str(getattr(app.config, 'release', 'unspecified')))
     notice = ('<aside class="admonition note oss-release-navigation" '

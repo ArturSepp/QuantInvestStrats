@@ -180,7 +180,7 @@ class PortfolioData:
     correctly but has nothing to attribute, so pass the panels if attribution is wanted.
 
     ``instrument_pnl``, when not given, is reconstructed as
-    ``prices.ffill().pct_change() * weights.shift(1)`` â€” arithmetic returns on lagged weights,
+    ``prices.ffill().pct_change() * weights.shift(1)`` — arithmetic returns on lagged weights,
     valued on last observed marks so a resumed quote books its full move. Pass it
     explicitly if the backtester computed pnl on a different convention.
 
@@ -1379,7 +1379,7 @@ class PortfolioData:
                                                        covar_dict: Dict[pd.Timestamp, pd.DataFrame] = None,
                                                        freq: Optional[str] = None
                                                        ) -> pd.Series:
-        """Ex-ante portfolio volatility sqrt(w' Î£ w) implied by dated covariance matrices.
+        """Ex-ante portfolio volatility sqrt(w' Σ w) implied by dated covariance matrices.
 
         With ``freq=None`` the volatility is evaluated on each covariance date with the input
         weights (the realised weights when the input was not a DataFrame) selected as of that
@@ -1438,7 +1438,7 @@ class PortfolioData:
         *,
         lookthrough_matrix: Optional[pd.DataFrame] = None,
     ) -> pd.DataFrame:
-        """Euler risk contributions w_i (Î£ w)_i / sqrt(w' Î£ w) implied by dated covariances.
+        """Euler risk contributions w_i (Σ w)_i / sqrt(w' Σ w) implied by dated covariances.
 
         With ``freq=None`` the contributions are evaluated on each covariance date with the
         input weights (the realised weights when the input was not a DataFrame) selected as of

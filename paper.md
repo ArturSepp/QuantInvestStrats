@@ -12,7 +12,7 @@ authors:
     orcid: 0000-0002-7038-1748
     affiliation: 1
 affiliations:
-  - name: LGT Bank (Schweiz) AG, ZÃƒÂ¼rich, Switzerland
+  - name: LGT Bank (Schweiz) AG, Zürich, Switzerland
     index: 1
 date: 11 October 2026
 bibliography: paper.bib
@@ -70,7 +70,7 @@ numerators, are named and selected explicitly.
 | `ffn` [@ffn] | prices | analytics, with simulation referred to `bt` |
 | `PyPortfolioOpt` [@Martin2021] | prices, or expected returns and a risk model | weights, discrete allocation, performance, and plots |
 
-Table: Documented interfaces of related Python packages, consulted on 11Ã¢â‚¬â€œ14 October 2026.
+Table: Documented interfaces of related Python packages, consulted on 11–14 October 2026.
 \label{tab:field}
 
 The `qis` backtester accepts dated target weights and asset prices directly, with optional

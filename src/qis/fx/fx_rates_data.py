@@ -90,7 +90,7 @@ class FxRatesData:
         Computed as ``fx_spots[local_ccy] / fx_spots[reference_ccy]``. Because each
         ``fx_spots`` column is USD per 1 unit of that currency, the ratio is units
         of reference currency per 1 unit of the local currency (e.g.
-        ``get_local_to_reference_fx_rate('EUR', 'CHF')`` returns EUR/CHF â€” CHF per EUR).
+        ``get_local_to_reference_fx_rate('EUR', 'CHF')`` returns EUR/CHF — CHF per EUR).
 
         Args:
             local_ccy: Base currency (numerator of the cross).
@@ -221,8 +221,8 @@ class FxRatesData:
         The resulting series captures the full FX exposure of the
         ``local_ccy``/``reference_ccy`` pair plus the local-currency rf
         carry. Regressed against MATF factors in isolation, this
-        delivers Fx Î² â‰ˆ +1 for the foreign cash leg, plus small Carry/
-        Rates loadings â€” without contaminating the main asset-universe
+        delivers Fx β ≈ +1 for the foreign cash leg, plus small Carry/
+        Rates loadings — without contaminating the main asset-universe
         factor model.
 
         Args:
@@ -248,7 +248,7 @@ class FxRatesData:
         # Translate to reference ccy via spot, unhedged. The existing
         # FX-translation machinery handles the spot-rate composition;
         # ``hedge_ratio=0.0`` means no forward-rate adjustment is
-        # applied â€” the position carries full FX exposure.
+        # applied — the position carries full FX exposure.
         from qis.fx.fx_returns import (
             FxAssetReturnsRequest, FxReturnType, FxReturnCoordinate,
             FxIndexNormalization, compute_fx_returns,
@@ -349,7 +349,7 @@ def load_fx_rates_data(local_path: str,
         if not last_valid.empty:
             gbp_val = float(last_valid['GBP'].iloc[0])
             gbp_minor_val = float(last_valid['GBp'].iloc[0])
-            # Exact equality â†’ stale mapping. Ratio â‰ˆ 0.01 â†’ already correct.
+            # Exact equality → stale mapping. Ratio ≈ 0.01 → already correct.
             if gbp_val > 0 and abs(gbp_minor_val - gbp_val) < 1e-12:
                 fx_spots['GBp'] = 0.01 * fx_spots['GBP']
 
