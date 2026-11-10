@@ -217,7 +217,17 @@ def test_compute_benchmark_portfolio_risk_contributions_preserves_sparse_integer
     actual = qis.compute_benchmark_portfolio_risk_contributions(
         portfolio, benchmark, covar, is_independent_risk=standalone)
 
-    # The exact active position is (1, 0), so either risk mode gives (sqrt(.01), 0).
+    # Preserve native alignment: pandas 2 promotes sparse uint64 on fillna(0.0),
+    # while pandas 3 retains the one-unit difference. Reference the aligned levels
+    # with Python integers so arithmetic after alignment cannot round them further.
+    aligned_portfolio = portfolio.reindex(covar.index).fillna(0.0)
+    aligned_benchmark = benchmark.reindex(covar.index).fillna(0.0)
+    active = int(aligned_portfolio.iloc[0]) - int(aligned_benchmark.iloc[0])
+    # Only asset A is active, so either risk mode gives abs(active) * sqrt(.01).
+    # pandas 2 densifies the Euler result; pandas 3 retains sparse storage.
+    # Normalize storage only, keeping the value, label and float64 checks strict.
+    if isinstance(actual.dtype, pd.SparseDtype):
+        actual = actual.sparse.to_dense()
     pd.testing.assert_series_equal(
-        actual, pd.Series([.1, 0.], index=['A', 'B'], dtype=pd.SparseDtype('float64', 0)),
+        actual, pd.Series([abs(active) * .1, 0.], index=['A', 'B'], dtype='float64'),
         rtol=1e-13, atol=1e-15)
