@@ -340,7 +340,7 @@ def plot_multi_asset_fx_hedging_report(
     asset_prices: pd.DataFrame,
     fx_rates_data: FxRatesData,
     time_period: qis.TimePeriod = None,
-    local_ccy: str = "USD",
+    local_ccy: Union[str, pd.Series] = "USD",
     reference_ccy: str = "CHF",
     freq: str = "ME",
     span: int = 3 * 12,
@@ -357,7 +357,8 @@ def plot_multi_asset_fx_hedging_report(
         asset_prices: Native-currency price panel (columns are assets).
         fx_rates_data: FX rates container.
         time_period: Optional date filter applied to each asset's NAV panel.
-        local_ccy: Common currency of denomination for all assets.
+        local_ccy: Common currency ID, or an asset-indexed currency Series for a
+            mixed-currency panel, as accepted by ``compute_multi_asset_fx_hedging``.
         reference_ccy: Reporting / investor currency.
         freq: Resampling frequency (e.g. ``'ME'``).
         span: EWMA span (periods of ``freq``) for the FX vol/beta estimates.

@@ -840,7 +840,9 @@ def test_optimal_hedge_uses_forward_execution_cost(monkeypatch: pytest.MonkeyPat
     reference_cash = _cash_at_period_start(data, contract_dates, "USD").shift(-1).iloc[:-1]
     forward_over_spot = (1.0 + reference_cash) / (1.0 + local_cash)
     lost_forward_value = 1.0 - forward_over_spot
-    expected_carry = 1.0 - lost_forward_value * 12.0 / (2.0 * 2.0 * 0.2**2)
+    tau = pd.Series(np.diff(contract_dates.values) / np.timedelta64(1, "D") / 365,
+                    index=prices.index)
+    expected_carry = 1.0 - lost_forward_value / tau / (2.0 * 2.0 * 0.2**2)
     np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
     np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
     np.testing.assert_allclose(beta_hedge, 1.3, rtol=0, atol=0)
@@ -897,7 +899,9 @@ def test_optimal_hedge_uses_latest_business_day_forward_quote(
         [premium.loc[:date].iloc[-1] for date in prices.index], index=prices.index
     )
     forward_over_spot = 1.0 / (1.0 + known_premium)
-    expected_carry = 1.0 - (1.0 - forward_over_spot) * 12.0 / (2.0 * 2.0 * 0.2**2)
+    tau = pd.Series([(date + pd.offsets.MonthEnd() - date).days / 365
+                     for date in prices.index], index=prices.index)
+    expected_carry = 1.0 - (1.0 - forward_over_spot) / tau / (2.0 * 2.0 * 0.2**2)
     np.testing.assert_allclose(carry, expected_carry, rtol=1e-13, atol=1e-14)
     np.testing.assert_allclose(optimal, expected_carry + 0.3, rtol=1e-13, atol=1e-14)
     assert prices.index[2].day_of_week == 6

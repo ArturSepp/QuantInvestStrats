@@ -144,11 +144,12 @@ def produce(spec: dict) -> dict:
         prices, benchmark='SEQ_US', factsheet_name='Synthetic multi-asset universe', **common)[0]
     pages = qis.factsheet(
         strategy, factsheet_name='Volatility parity | synthetic data',
-        add_current_position_var_risk_sheet=True, **common)
+        add_current_position_var_risk_sheet=True, add_performance_inference_sheet=False, **common)
     assert len(pages) == 2
     figures['readme_strategy.png'], figures['readme_strategy_risk.png'] = pages
     pages = qis.factsheet(
-        pair, kind='strategy_benchmark', factsheet_name='VolParity 63 vs EqualWeight | synthetic',
+        pair, kind='strategy_benchmark', add_performance_inference_sheet=False,
+        factsheet_name='VolParity 63 vs EqualWeight | synthetic',
         add_brinson_attribution=True, **common)
     assert len(pages) == 2
     figures['readme_strategy_benchmark.png'], figures['readme_brinson.png'] = pages
@@ -161,7 +162,8 @@ def produce(spec: dict) -> dict:
         np.testing.assert_allclose(line.get_ydata(), active[column].cumsum(), atol=1e-12)
     figures['readme_multi_strategy.png'] = qis.factsheet(
         multi, factsheet_name='Volatility span comparison | synthetic data',
-        add_group_exposures_and_pnl=False, add_strategy_factsheets=False, **common)[0]
+        add_group_exposures_and_pnl=False, add_strategy_factsheets=False,
+        add_performance_inference_sheet=False, **common)[0]
 
     # The README uses readable excerpts of the reports, retaining the plotted values.
     for name, title, detail in (

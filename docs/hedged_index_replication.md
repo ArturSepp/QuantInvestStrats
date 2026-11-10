@@ -27,19 +27,20 @@ a US equity CHF hedge, and two separately labelled regional equity diagnostics.
 
 The main window covers 69 monthly returns, January 2021–September 2026, corresponding to
 a NAV comparison from 31 December 2020 to 30 September 2026. All 18 bond comparisons have
-$R^2$ between 0.99931 and 0.99987, with annual tracking error of 6.9–12.1 basis points.
-However, QIS's annual geometric returns exceed the observed bond returns by 30.6–33.7 bp
-in CHF, 18.7–21.8 bp in EUR and 16.5–19.5 bp in GBP. This is close movement replication,
+$R^2$ between 0.99938 and 0.99987, with annual tracking error of 6.9–11.6 basis points.
+However, QIS's annual geometric returns exceed the observed bond returns by 30.4–33.6 bp
+in CHF, 18.6–21.7 bp in EUR and 16.5–19.5 bp in GBP. This is close movement replication,
 not exact return replication or evidence that the synthetic hedge is economically superior.
 
-Observation cutoff is 30 September 2026; the source snapshot was analysed on 2 October 2026.
+Observation cutoff is 30 September 2026; the raw return snapshot is from October 2026 and the current-kernel reconstruction was verified on 10 November 2026.
 The partial 1 October observation is excluded. The study does not alter QIS defaults or
 any consuming production configuration.
 
-The empirical tables and stored figures retain the original fixed-month rate/12
-convention. Current QIS uses opening-rate ACT/365 Fixed cash growth on the existing
-reset intervals; those historical replication statistics have not been recomputed
-under the new convention. The synthetic API example below uses ACT/365 Fixed.
+The empirical tables and figures use opening-rate ACT/365 Fixed growth on the existing
+monthly reset intervals. The current typed API and an independent forward-delivery
+calculation agree to an absolute error below $10^{-12}$ for all 21 pairs. The provider
+returns and comparison cutoff are unchanged. The input hashes identify the supplied
+raw-return, spot and rate vintage; this is a new validation of the current kernel.
 
 ## Inputs, notation, and assumptions
 
@@ -58,9 +59,9 @@ under the new convention. The synthetic API example below uses ACT/365 Fixed.
 | $r_t^L$ | Supplied base-index return | Simple return over $(t-1,t]$ |
 | $S_t$, $r_t^{FX}$ | FX cross and realised move | Reference currency per local unit; $S_t/S_{t-1}-1$ |
 | $y_{t-1}^L$, $y_{t-1}^R$ | Local and reference short-rate quotes | Annual decimals observed at the preceding month end |
-| $k_{t-1}$ | Rate-implied hedge carry | Ratio of reference to local one-month cash-growth factors, minus one |
-| $R_t^Q$, $R_t^B$ | QIS reconstruction and observed hedged-index return | Simple monthly returns |
-| $e_t$, $\bar e$, $n$ | Replication error, its sample mean and paired count | $e_t=R_t^Q-R_t^B$ |
+| $\kappa_{t-1,t}$ | Short-forward cost | $1-(1+y^R_{t-1}\tau_t)/(1+y^L_{t-1}\tau_t)$, with ACT/365F $\tau_t$ |
+| $r^R_t(1)$, $r^{R,B}_t$ | QIS reconstruction and observed hedged-index return | Simple monthly returns |
+| $e_t$, $\bar e$, $n$ | Replication error, its sample mean and paired count | $e_t=r^R_t(1)-r^{R,B}_t$ |
 | $a$, $b$ | Descriptive regression intercept and slope | Intercept in monthly return units; slope dimensionless |
 | $G_Q$, $G_B$, $\tau$ | Compounded gross returns and elapsed horizon | Products of monthly gross returns; $\tau$ in calendar years |
 
@@ -106,17 +107,18 @@ replication tests.
 
 ### Monthly opening principal hedge
 
-**Definition.** In the frozen empirical study, annual quotes are divided by $\mathrm{af}=12$ and rate-implied carry is
+**Definition.** On the existing monthly grid, use the opening quotes and the actual
+interval year fraction to price the short-forward cost:
 
 $$
-k_{t-1}=
-\frac{1+y_{t-1}^{R}/12}{1+y_{t-1}^{L}/12}-1.
+\tau_t=\frac{\mathrm{calendar\ days}(t-1,t)}{365},\qquad
+\kappa_{t-1,t}=1-\frac{1+y^R_{t-1}\tau_t}{1+y^L_{t-1}\tau_t}.
 $$
 
 **Identity.** For a 100% opening-principal hedge, the QIS simple-return payoff is
 
 $$
-R_t^Q=r_t^L(1+r_t^{FX})+k_{t-1}.
+r^R_t(1)=r_t^L(1+r_t^{FX})-\kappa_{t-1,t}.
 $$
 
 **Proof.** Unhedged reference-currency wealth earns
@@ -138,7 +140,7 @@ not realised cash-index returns or observed forward quotes.
 **Definition.** The descriptive OLS regression is
 
 $$
-R_t^Q=a+bR_t^B+\varepsilon_t.
+r^R_t(1)=a+br^{R,B}_t+\varepsilon_t.
 $$
 
 Fits include an intercept. Exact agreement requires the diagonal, not merely high $R^2$.
@@ -179,7 +181,7 @@ $\sum_t(e_t-\bar e)=0$. Divide by $n$ and substitute the TE definition. $\square
 **Definition.** For an elapsed horizon $\tau$ longer than one year, let
 
 $$
-G_Q=\prod_t(1+R_t^Q),\qquad G_B=\prod_t(1+R_t^B).
+G_Q=\prod_t(1+r^R_t(1)),\qquad G_B=\prod_t(1+r^{R,B}_t).
 $$
 
 The annual geometric-return difference reported in the tables is
@@ -235,49 +237,48 @@ This is a deterministic teaching example, not a fit to the empirical indices.
 ### Common period empirical results
 
 All rows use the same 69 months. Errors are QIS minus observed. TE is annual, MAE monthly,
-and the last column is the difference in annual geometric returns. The original fit table
+and the last column is the difference in annual geometric returns. The registered fit table
 keeps full precision; presentation rounding below does not alter the calculations.
 
 | Observed hedge ticker | Currency | $R^2$ | TE (bp p.a.) | MAE (bp/month) | $\Delta R_{\mathrm{pa}}$ (bp p.a.) |
 |---|---|---:|---:|---:|---:|
-| LEGATRCH Index | CHF | 0.99947 | 10.9 | 2.97 | +30.6 |
-| LEGATREH Index | EUR | 0.99976 | 7.6 | 2.01 | +18.9 |
+| LEGATRCH Index | CHF | 0.99952 | 10.4 | 2.96 | +30.5 |
+| LEGATREH Index | EUR | 0.99978 | 7.4 | 1.97 | +18.8 |
 | LEGATRGH Index | GBP | 0.99981 | 7.1 | 1.74 | +16.6 |
-| LGTRTRCH Index | CHF | 0.99940 | 10.7 | 2.92 | +30.6 |
-| LGTRTREH Index | EUR | 0.99973 | 7.5 | 2.00 | +18.7 |
+| LGTRTRCH Index | CHF | 0.99946 | 10.2 | 2.94 | +30.4 |
+| LGTRTREH Index | EUR | 0.99975 | 7.2 | 1.95 | +18.6 |
 | LGTRTRGH Index | GBP | 0.99979 | 6.9 | 1.71 | +16.5 |
-| LGCPTRCH Index | CHF | 0.99968 | 11.3 | 3.09 | +31.0 |
-| LGCPTREH Index | EUR | 0.99984 | 8.3 | 2.14 | +19.5 |
-| LGCPTRGH Index | GBP | 0.99986 | 8.0 | 1.89 | +17.1 |
-| H23059CH Index | CHF | 0.99962 | 11.8 | 3.26 | +33.7 |
-| H23059EU Index | EUR | 0.99979 | 9.2 | 2.38 | +21.8 |
-| H23059GB Index | GBP | 0.99982 | 8.9 | 2.16 | +19.5 |
-| H04386CH Index | CHF | 0.99972 | 12.1 | 3.29 | +32.1 |
-| H04386EU Index | EUR | 0.99985 | 9.5 | 2.37 | +20.3 |
-| H04386GB Index | GBP | 0.99987 | 9.5 | 2.09 | +17.5 |
-| H21247CH Index | CHF | 0.99931 | 10.8 | 2.93 | +31.8 |
-| H21247EU Index | EUR | 0.99967 | 7.6 | 1.99 | +19.7 |
-| H21247GB Index | GBP | 0.99972 | 7.2 | 1.76 | +17.7 |
-| M0USHCHF Index | CHF | 0.99992 | 13.9 | 4.16 | +46.1 |
-| GBNHC Index | CHF | 0.99519 | 67.2 | 14.21 | +11.1 |
-| M1CXFBC Index | CHF | 0.99818 | 61.4 | 14.63 | -7.6 |
+| LGCPTRCH Index | CHF | 0.99971 | 10.7 | 3.07 | +30.9 |
+| LGCPTREH Index | EUR | 0.99986 | 8.0 | 2.11 | +19.4 |
+| LGCPTRGH Index | GBP | 0.99987 | 8.0 | 1.89 | +17.1 |
+| H23059CH Index | CHF | 0.99965 | 11.3 | 3.31 | +33.6 |
+| H23059EU Index | EUR | 0.99980 | 9.0 | 2.35 | +21.7 |
+| H23059GB Index | GBP | 0.99982 | 8.9 | 2.17 | +19.5 |
+| H04386CH Index | CHF | 0.99974 | 11.6 | 3.31 | +31.9 |
+| H04386EU Index | EUR | 0.99986 | 9.2 | 2.33 | +20.2 |
+| H04386GB Index | GBP | 0.99987 | 9.5 | 2.10 | +17.5 |
+| H21247CH Index | CHF | 0.99938 | 10.3 | 2.96 | +31.6 |
+| H21247EU Index | EUR | 0.99969 | 7.4 | 1.97 | +19.6 |
+| H21247GB Index | GBP | 0.99972 | 7.2 | 1.77 | +17.6 |
+| M0USHCHF Index | CHF | 0.99992 | 13.4 | 4.08 | +46.0 |
+| GBNHC Index | CHF | 0.99518 | 67.3 | 14.19 | +10.9 |
+| M1CXFBC Index | CHF | 0.99817 | 61.5 | 14.65 | -7.7 |
 
-US equities hedged to CHF have $R^2=0.99992$, TE 13.9 bp p.a. and a +46.1 bp annual
+US equities hedged to CHF have $R^2=0.99992$, TE 13.4 bp p.a. and a +46.0 bp annual
 geometric-return difference. The UK and European diagnostics have larger tracking errors,
-67.2 and 61.4 bp p.a.; their pairing/construction limits are stated above.
+67.3 and 61.5 bp p.a.; their pairing/construction limits are stated above.
 
 ### Evidence of a common currency component
 
 For the six bond families, the average cross-family standard deviation of monthly errors
-is only 0.34–0.35 bp. Regressing each family's monthly error on the other five families'
-mean error gives minimum $R^2$ of 0.969 for CHF, 0.947 for EUR and 0.914 for GBP.
-These descriptive checks point towards a shared hedge-input or construction difference
-rather than unrelated instrument-return failures.
+is 0.34–0.35 bp. Regressing each family's monthly error on the other five families'
+mean error gives minimum $R^2$ of 0.966 for CHF, 0.943 for EUR and 0.913 for GBP.
+These descriptive checks point towards a shared hedge-input or construction difference.
 
-For global aggregate CHF, the annualised mean QIS carry term is -2.975%.
+For global aggregate CHF, the annualised mean QIS carry term is -2.977%.
 Subtracting the base return and its FX cross term from the observed hedge gives an implied
-residual term of -3.289%, a difference of 31.5 bp p.a. That implied term includes every
-remaining construction difference; it is not an observed forward quote.
+residual term of -3.289%, a difference of 31.3 bp p.a. That implied term includes
+all remaining construction differences; it is not an observed forward quote.
 
 Bloomberg's methodology uses one-month forwards and, for multi-currency indices, opening
 currency weights and individual currency hedges.
@@ -299,27 +300,27 @@ return differences, so the recent window must not be presented as a full-history
 
 | Observed hedge ticker | First monthly return | Months | $R^2$ | TE (bp p.a.) | $\Delta R_{\mathrm{pa}}$ (bp p.a.) |
 |---|---|---:|---:|---:|---:|
-| LEGATRCH Index | 1999-02-28 | 332 | 0.99817 | 14.1 | +45.5 |
-| LEGATREH Index | 1999-02-28 | 332 | 0.99666 | 19.2 | +53.4 |
-| LEGATRGH Index | 1999-01-31 | 333 | 0.99814 | 14.4 | +30.7 |
-| LGTRTRCH Index | 2000-11-30 | 311 | 0.99814 | 14.3 | +44.7 |
-| LGTRTREH Index | 2000-11-30 | 311 | 0.99653 | 19.8 | +52.3 |
-| LGTRTRGH Index | 2000-11-30 | 311 | 0.99813 | 14.5 | +28.6 |
-| LGCPTRCH Index | 2000-11-30 | 311 | 0.99911 | 15.0 | +45.4 |
-| LGCPTREH Index | 2000-11-30 | 311 | 0.99840 | 20.3 | +53.1 |
-| LGCPTRGH Index | 2000-11-30 | 311 | 0.99916 | 14.9 | +29.1 |
-| H23059CH Index | 2001-04-30 | 306 | 0.99967 | 17.2 | +46.7 |
-| H23059EU Index | 2001-04-30 | 306 | 0.99948 | 21.7 | +55.0 |
-| H23059GB Index | 2001-04-30 | 306 | 0.99975 | 16.1 | +31.1 |
-| H04386CH Index | 2001-10-31 | 300 | 0.99964 | 17.0 | +47.6 |
-| H04386EU Index | 2001-10-31 | 300 | 0.99948 | 21.0 | +54.9 |
-| H04386GB Index | 2001-10-31 | 300 | 0.99977 | 14.6 | +29.5 |
-| H21247CH Index | 2007-03-31 | 235 | 0.99827 | 15.8 | +54.5 |
-| H21247EU Index | 2007-03-31 | 235 | 0.99674 | 22.0 | +62.4 |
-| H21247GB Index | 2007-03-31 | 235 | 0.99838 | 16.1 | +33.0 |
-| M0USHCHF Index | 2002-01-31 | 297 | 0.99985 | 18.4 | +52.4 |
-| GBNHC Index | 2007-04-30 | 234 | 0.99538 | 90.1 | -29.6 |
-| M1CXFBC Index | 2016-04-30 | 126 | 0.99867 | 55.8 | -7.2 |
+| LEGATRCH Index | 1999-02-28 | 332 | 0.99821 | 14.0 | +45.5 |
+| LEGATREH Index | 1999-02-28 | 332 | 0.99664 | 19.3 | +53.4 |
+| LEGATRGH Index | 1999-01-31 | 333 | 0.99810 | 14.5 | +30.7 |
+| LGTRTRCH Index | 2000-10-31 | 312 | 0.99817 | 14.1 | +44.7 |
+| LGTRTREH Index | 2000-10-31 | 312 | 0.99651 | 19.8 | +52.5 |
+| LGTRTRGH Index | 2000-10-31 | 312 | 0.99809 | 14.6 | +28.6 |
+| LGCPTRCH Index | 2000-10-31 | 312 | 0.99913 | 14.9 | +45.4 |
+| LGCPTREH Index | 2000-10-31 | 312 | 0.99838 | 20.3 | +53.3 |
+| LGCPTRGH Index | 2000-10-31 | 312 | 0.99915 | 15.0 | +29.1 |
+| H23059CH Index | 2001-03-31 | 307 | 0.99967 | 17.1 | +46.5 |
+| H23059EU Index | 2001-03-31 | 307 | 0.99948 | 21.8 | +55.0 |
+| H23059GB Index | 2001-03-31 | 307 | 0.99975 | 16.2 | +31.2 |
+| H04386CH Index | 2001-09-30 | 301 | 0.99964 | 16.9 | +47.2 |
+| H04386EU Index | 2001-09-30 | 301 | 0.99947 | 21.1 | +54.6 |
+| H04386GB Index | 2001-09-30 | 301 | 0.99977 | 14.7 | +29.4 |
+| H21247CH Index | 2007-02-28 | 236 | 0.99832 | 15.6 | +54.3 |
+| H21247EU Index | 2007-02-28 | 236 | 0.99672 | 22.0 | +62.3 |
+| H21247GB Index | 2007-02-28 | 236 | 0.99836 | 16.2 | +33.1 |
+| M0USHCHF Index | 2002-01-31 | 297 | 0.99985 | 18.2 | +52.3 |
+| GBNHC Index | 2007-04-30 | 234 | 0.99538 | 90.2 | -29.8 |
+| M1CXFBC Index | 2016-04-30 | 126 | 0.99866 | 55.9 | -7.3 |
 
 ### Empirical comparison figures
 
@@ -331,9 +332,9 @@ tests. Their fixed dates, source hashes and aggregate numbers are registered tog
 
 ![LEGATRUH Index to LEGATRCH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_legatrch.png)
 
-LEGATRUH Index to LEGATRCH Index; 69 paired months. $R^2=0.99947$,
-tracking error 10.9 bp p.a., MAE 2.97 bp/month,
-and annual geometric-return difference +30.6 bp p.a.
+LEGATRUH Index to LEGATRCH Index; 69 paired months. $R^2=0.99952$,
+tracking error 10.4 bp p.a., MAE 2.96 bp/month,
+and annual geometric-return difference +30.5 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -342,9 +343,9 @@ The left panel uses
 
 ![LEGATRUH Index to LEGATREH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_legatreh.png)
 
-LEGATRUH Index to LEGATREH Index; 69 paired months. $R^2=0.99976$,
-tracking error 7.6 bp p.a., MAE 2.01 bp/month,
-and annual geometric-return difference +18.9 bp p.a.
+LEGATRUH Index to LEGATREH Index; 69 paired months. $R^2=0.99978$,
+tracking error 7.4 bp p.a., MAE 1.97 bp/month,
+and annual geometric-return difference +18.8 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -364,9 +365,9 @@ The left panel uses
 
 ![LGTRTRUH Index to LGTRTRCH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_lgtrtrch.png)
 
-LGTRTRUH Index to LGTRTRCH Index; 69 paired months. $R^2=0.99940$,
-tracking error 10.7 bp p.a., MAE 2.92 bp/month,
-and annual geometric-return difference +30.6 bp p.a.
+LGTRTRUH Index to LGTRTRCH Index; 69 paired months. $R^2=0.99946$,
+tracking error 10.2 bp p.a., MAE 2.94 bp/month,
+and annual geometric-return difference +30.4 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -375,9 +376,9 @@ The left panel uses
 
 ![LGTRTRUH Index to LGTRTREH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_lgtrtreh.png)
 
-LGTRTRUH Index to LGTRTREH Index; 69 paired months. $R^2=0.99973$,
-tracking error 7.5 bp p.a., MAE 2.00 bp/month,
-and annual geometric-return difference +18.7 bp p.a.
+LGTRTRUH Index to LGTRTREH Index; 69 paired months. $R^2=0.99975$,
+tracking error 7.2 bp p.a., MAE 1.95 bp/month,
+and annual geometric-return difference +18.6 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -397,9 +398,9 @@ The left panel uses
 
 ![LGCPTRUH Index to LGCPTRCH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_lgcptrch.png)
 
-LGCPTRUH Index to LGCPTRCH Index; 69 paired months. $R^2=0.99968$,
-tracking error 11.3 bp p.a., MAE 3.09 bp/month,
-and annual geometric-return difference +31.0 bp p.a.
+LGCPTRUH Index to LGCPTRCH Index; 69 paired months. $R^2=0.99971$,
+tracking error 10.7 bp p.a., MAE 3.07 bp/month,
+and annual geometric-return difference +30.9 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -408,9 +409,9 @@ The left panel uses
 
 ![LGCPTRUH Index to LGCPTREH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_lgcptreh.png)
 
-LGCPTRUH Index to LGCPTREH Index; 69 paired months. $R^2=0.99984$,
-tracking error 8.3 bp p.a., MAE 2.14 bp/month,
-and annual geometric-return difference +19.5 bp p.a.
+LGCPTRUH Index to LGCPTREH Index; 69 paired months. $R^2=0.99986$,
+tracking error 8.0 bp p.a., MAE 2.11 bp/month,
+and annual geometric-return difference +19.4 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -419,7 +420,7 @@ The left panel uses
 
 ![LGCPTRUH Index to LGCPTRGH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_lgcptrgh.png)
 
-LGCPTRUH Index to LGCPTRGH Index; 69 paired months. $R^2=0.99986$,
+LGCPTRUH Index to LGCPTRGH Index; 69 paired months. $R^2=0.99987$,
 tracking error 8.0 bp p.a., MAE 1.89 bp/month,
 and annual geometric-return difference +17.1 bp p.a.
 The left panel uses
@@ -430,9 +431,9 @@ The left panel uses
 
 ![H23059US Index to H23059CH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h23059ch.png)
 
-H23059US Index to H23059CH Index; 69 paired months. $R^2=0.99962$,
-tracking error 11.8 bp p.a., MAE 3.26 bp/month,
-and annual geometric-return difference +33.7 bp p.a.
+H23059US Index to H23059CH Index; 69 paired months. $R^2=0.99965$,
+tracking error 11.3 bp p.a., MAE 3.31 bp/month,
+and annual geometric-return difference +33.6 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -441,9 +442,9 @@ The left panel uses
 
 ![H23059US Index to H23059EU Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h23059eu.png)
 
-H23059US Index to H23059EU Index; 69 paired months. $R^2=0.99979$,
-tracking error 9.2 bp p.a., MAE 2.38 bp/month,
-and annual geometric-return difference +21.8 bp p.a.
+H23059US Index to H23059EU Index; 69 paired months. $R^2=0.99980$,
+tracking error 9.0 bp p.a., MAE 2.35 bp/month,
+and annual geometric-return difference +21.7 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -453,7 +454,7 @@ The left panel uses
 ![H23059US Index to H23059GB Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h23059gb.png)
 
 H23059US Index to H23059GB Index; 69 paired months. $R^2=0.99982$,
-tracking error 8.9 bp p.a., MAE 2.16 bp/month,
+tracking error 8.9 bp p.a., MAE 2.17 bp/month,
 and annual geometric-return difference +19.5 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
@@ -463,9 +464,9 @@ The left panel uses
 
 ![H04386US Index to H04386CH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h04386ch.png)
 
-H04386US Index to H04386CH Index; 69 paired months. $R^2=0.99972$,
-tracking error 12.1 bp p.a., MAE 3.29 bp/month,
-and annual geometric-return difference +32.1 bp p.a.
+H04386US Index to H04386CH Index; 69 paired months. $R^2=0.99974$,
+tracking error 11.6 bp p.a., MAE 3.31 bp/month,
+and annual geometric-return difference +31.9 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -474,9 +475,9 @@ The left panel uses
 
 ![H04386US Index to H04386EU Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h04386eu.png)
 
-H04386US Index to H04386EU Index; 69 paired months. $R^2=0.99985$,
-tracking error 9.5 bp p.a., MAE 2.37 bp/month,
-and annual geometric-return difference +20.3 bp p.a.
+H04386US Index to H04386EU Index; 69 paired months. $R^2=0.99986$,
+tracking error 9.2 bp p.a., MAE 2.33 bp/month,
+and annual geometric-return difference +20.2 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -486,7 +487,7 @@ The left panel uses
 ![H04386US Index to H04386GB Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h04386gb.png)
 
 H04386US Index to H04386GB Index; 69 paired months. $R^2=0.99987$,
-tracking error 9.5 bp p.a., MAE 2.09 bp/month,
+tracking error 9.5 bp p.a., MAE 2.10 bp/month,
 and annual geometric-return difference +17.5 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
@@ -496,9 +497,9 @@ The left panel uses
 
 ![H21247US Index to H21247CH Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h21247ch.png)
 
-H21247US Index to H21247CH Index; 69 paired months. $R^2=0.99931$,
-tracking error 10.8 bp p.a., MAE 2.93 bp/month,
-and annual geometric-return difference +31.8 bp p.a.
+H21247US Index to H21247CH Index; 69 paired months. $R^2=0.99938$,
+tracking error 10.3 bp p.a., MAE 2.96 bp/month,
+and annual geometric-return difference +31.6 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -507,9 +508,9 @@ The left panel uses
 
 ![H21247US Index to H21247EU Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h21247eu.png)
 
-H21247US Index to H21247EU Index; 69 paired months. $R^2=0.99967$,
-tracking error 7.6 bp p.a., MAE 1.99 bp/month,
-and annual geometric-return difference +19.7 bp p.a.
+H21247US Index to H21247EU Index; 69 paired months. $R^2=0.99969$,
+tracking error 7.4 bp p.a., MAE 1.97 bp/month,
+and annual geometric-return difference +19.6 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -519,8 +520,8 @@ The left panel uses
 ![H21247US Index to H21247GB Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_h21247gb.png)
 
 H21247US Index to H21247GB Index; 69 paired months. $R^2=0.99972$,
-tracking error 7.2 bp p.a., MAE 1.76 bp/month,
-and annual geometric-return difference +17.7 bp p.a.
+tracking error 7.2 bp p.a., MAE 1.77 bp/month,
+and annual geometric-return difference +17.6 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -530,8 +531,8 @@ The left panel uses
 ![NDDUUS Index to M0USHCHF Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_m0ushchf.png)
 
 NDDUUS Index to M0USHCHF Index; 69 paired months. $R^2=0.99992$,
-tracking error 13.9 bp p.a., MAE 4.16 bp/month,
-and annual geometric-return difference +46.1 bp p.a.
+tracking error 13.4 bp p.a., MAE 4.08 bp/month,
+and annual geometric-return difference +46.0 bp p.a.
 The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -540,9 +541,9 @@ The left panel uses
 
 ![NDDLUK Index to GBNHC Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_gbnhc.png)
 
-NDDLUK Index to GBNHC Index; 69 paired months. $R^2=0.99519$,
-tracking error 67.2 bp p.a., MAE 14.21 bp/month,
-and annual geometric-return difference +11.1 bp p.a.
+NDDLUK Index to GBNHC Index; 69 paired months. $R^2=0.99518$,
+tracking error 67.3 bp p.a., MAE 14.19 bp/month,
+and annual geometric-return difference +10.9 bp p.a.
 This is a diagnostic comparison, not an exact matched-provider replication. The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -551,9 +552,9 @@ This is a diagnostic comparison, not an exact matched-provider replication. The 
 
 ![MSDEXKSN Index to M1CXFBC Index: observed versus QIS monthly hedge returns and accumulated replication difference](images/hedged_index_case_study_m1cxfbc.png)
 
-MSDEXKSN Index to M1CXFBC Index; 69 paired months. $R^2=0.99818$,
-tracking error 61.4 bp p.a., MAE 14.63 bp/month,
-and annual geometric-return difference -7.6 bp p.a.
+MSDEXKSN Index to M1CXFBC Index; 69 paired months. $R^2=0.99817$,
+tracking error 61.5 bp p.a., MAE 14.65 bp/month,
+and annual geometric-return difference -7.7 bp p.a.
 This is a diagnostic comparison, not an exact matched-provider replication. The left panel uses
 `qis.plot_scatter` with an intercept and an exact-agreement diagonal; the right uses
 `qis.plot_time_series` on the relative compounded NAV.
@@ -586,20 +587,19 @@ the registry. It checks pair/window completeness, image hashes, finite statistic
 support, TE/RMSE consistency and geometric-return differences. This integrity check is
 not an offline refit of undistributed vendor observations.
 
-The original analysis independently checked each QIS payoff against raw base returns,
-the FX cross term and prior-period cash-growth ratio; price-derived returns matched the raw
-source to numerical tolerance. OLS matched SciPy regression, and QIS TE matched the sample
-standard deviation with annualisation 12. A repeated run produced identical statistics.
+The current reconstruction independently checks every QIS payoff against raw base returns,
+spot marks and the ACT/365F forward delivery price. Descriptive OLS uses SciPy regression,
+and QIS tracking error agrees with the sample standard deviation and statistical
+annualisation 12. Both the recent window and the full available history were recomputed.
 
 The [registry](https://github.com/ArturSepp/QuantInvestStrats/blob/main/tools/docs_analytics/manifest.json)
-records input basenames and hashes, the original implementation identity, aggregate results
+records input basenames and hashes, the validated implementation identity, aggregate results
 and preview hashes. [Published provenance](images/analytics_manifest.json) separately records
-the current bundle source, dependencies and generation time. Preserving an old empirical
-figure does not mean refitting it with the current source.
+the current bundle source, dependencies and generation time. The public bundle preserves the reviewed aggregate evidence. Recomputing it requires
+the private inputs and the explicit current-kernel command below.
 
 The private source artifacts are `Global_CMA_SAA_Universe.xlsx` (raw sheet
-`saa_universe_returns_2026_10_01`), `global_saa_universe_data_prices.csv`,
-`global_saa_universe_data_metadata.csv`, `fx_hedging_data_fx_spots.csv`,
+`saa_universe_returns_2026_10_01`, exported to `returns.csv`), `index_pairs.csv`, `fx_hedging_data_fx_spots.csv`,
 `fx_hedging_data_domestic_rates.csv` and the derived `monthly_comparison.csv`.
 They are not distributed. Only the plots and aggregate statistics are public; private mandates,
 holdings and raw return panels are excluded.
@@ -607,9 +607,10 @@ holdings and raw return panels are excluded.
 An authorised holder of the derived monthly comparison snapshot can recheck all 21 recent
 fits, the derived payoff identity and the figures with the explicit command below.
 It does not re-fetch Bloomberg data, reconstruct raw FX quotes or recheck the undistributed
-full histories. Those full-history aggregates retain the original analysis verification.
+full histories. Use the supplied-panel recomputation command to reprice both windows.
 
 ~~~console
+python -m tools.docs_analytics.hedged_index_case_study --returns-csv /private/returns.csv --spots-csv /private/fx_spots.csv --rates-csv /private/domestic_rates.csv --pairs-csv /private/index_pairs.csv --output-dir /local/new-act365-study
 python -m tools.docs_analytics.hedged_index_case_study --source-csv /private/monthly_comparison.csv --output-dir /local/new-private-recheck
 python -m tools.docs_analytics.run --all --output-dir /local/new-complete-bundle
 python -m tools.docs_analytics.publish --verify --repo /path/to/checkout
@@ -625,7 +626,7 @@ without any private input or Bloomberg access.
 - The reconstruction is a close approximation to monthly movements, not an exact replacement
   for the provider's return history. Both drift and tracking error matter for long-horizon use.
 - Rate-implied carry uses short-rate proxies, including three-month inputs, rather than actual
-  one-month forward quotes. The archived study divides by 12; the current API uses ACT/365 Fixed.
+  one-month forward quotes. The current reconstruction uses ACT/365 Fixed without changing those quote proxies.
 - Hedging an aggregate USD-hedged multi-currency NAV does not reconstruct the provider's
   constituent-level hedge book. This matters even with apparently matched family names.
 - Equity targets retain their provider's dividend, withholding-tax and universe conventions.

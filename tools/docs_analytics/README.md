@@ -255,3 +255,23 @@ checkout to be byte-identical to the source that generated the images.
 A fixed synthetic sample is deliberate. Regeneration time measures implementation freshness;
 the observation cutoff measures sample coverage. Do not advance dates to make an exhibit look
 recent. Cross-version or cross-platform byte-for-byte PNG reproducibility is not promised.
+
+
+### Current-kernel hedged-index validation
+
+The hedged-index chapter uses the reviewed ACT/365F recomputation. Supply private monthly
+simple total returns by ticker, USD-per-local spots, annual-decimal rates and the pairing
+catalogue. Export observed returns without filling missing provider observations. Run from
+an external source export with `AGENT_LOCAL_ROOT` set:
+
+~~~powershell
+& $docsPython -m tools.docs_analytics.hedged_index_case_study `
+  --returns-csv /private/returns.csv --spots-csv /private/fx_spots.csv `
+  --rates-csv /private/domestic_rates.csv --pairs-csv /private/index_pairs.csv `
+  --output-dir /local/new-act365-validation
+~~~
+
+The command writes aggregate statistics, independent payoff checks, input hashes and previews.
+It does not acquire data, publish figures or change production. Review the results and figures,
+update the registered aggregates and hashes, then use the complete-bundle publication procedure.
+The separate cash-rate timing study retains its explicitly labelled historical rate/12 evidence.

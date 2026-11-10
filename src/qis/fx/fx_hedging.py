@@ -231,8 +231,9 @@ def compute_fx_vol_beta(asset_price_local_ccy: pd.Series,
                                        var_init_type=qis.InitType.X0)
     fx_vol = qis.compute_ewm_vol(data=fx_return.to_frame(), span=span,
                                  mean_adj_type=qis.MeanAdjType.EWMA,
-                                 init_value=0.08 ** 2 * 1.0 / 12.0,
-                                 annualize=True)
+                                 init_value=0.08 ** 2 / qis.get_annualization_factor(freq),
+                                 annualize=True,
+                                 annualization_factor=qis.get_annualization_factor(freq))
 
     return fx_vol.iloc[:, 0], fx_beta.iloc[:, 0]
 
@@ -265,8 +266,10 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
             local currency.
         forward_rate_for_local_ccy: Simple local/reference cash-growth ratio minus
             one. Its exact short-forward cost ``f/(1+f)`` is annualised internally
-            using ``dt = 1 / annualisation_factor(freq)``.
-        freq: Resampling frequency (e.g. ``'ME'``); sets ``dt`` and the EWMA cadence.
+            using the ACT/365F year fraction from each decision date to its next
+            scheduled reset. Premiums must price that same ``freq`` interval.
+        freq: Reset and estimation cadence (e.g. ``'ME'``). Calendar days price
+            cash; periods per year annualise only statistical risk estimates.
         span: EWMA span in periods of ``freq`` for the vol/beta estimates.
         risk_aversion_lambda: Mean-variance risk-aversion coefficient (larger ⇒
             smaller carry tilt).
@@ -288,7 +291,11 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
     fx_var = aligned_data['vol'] ** 2
 
     # Calculate carry ratio using mean-variance optimization
-    dt = 1.0 / qis.get_annualization_factor(freq)
+    # This opening-labelled premium prices the next reset, not the preceding return.
+    # Calendar maturity is known at the decision date, including the final decision.
+    offset = pd.tseries.frequencies.to_offset(freq)
+    dt = pd.Series([(date + offset - date).total_seconds() / (365.0 * 86400.0)
+                    for date in aligned_data.index], index=aligned_data.index)
     annualised_forward = _compute_forward_hedge_cost(aligned_data['forward']) / dt
     carry_ratio = ( annualised_forward / fx_var) / (2.0 * risk_aversion_lambda)
     fx_beta = aligned_data['beta']

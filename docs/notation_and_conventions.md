@@ -212,7 +212,7 @@ the variance-ratio correction.
 return and the excess return are
 
 $$
-r^{f}_t=y_{t-1}\,\frac{d_t-d_{t-1}}{365},
+r^{f}_t=y_{t-1}\tau_t,\qquad \tau_t=\frac{d_t-d_{t-1}}{365},
 \qquad
 \tilde r_t=r_t-r^{f}_t,
 $$

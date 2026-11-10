@@ -7,12 +7,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-11-10
+
 ### Fixed
+
+- Annualise FX short-forward costs by the priced ACT/365F interval, including leap
+  years and business-day weekends. Keep rates, resets and payoff timing unchanged.
+- Seed EWMA FX volatility with an 8% annual prior at the requested frequency.
+- Reject MONTHLY_INDEX account policies, which the valuation-grid ledger does not implement.
+- Document the multi-asset hedge plot's existing mixed-currency input support.
+- Preserve registered documentation preview page sets with explicit inference-appendix flags.
 
 - Correct dense and nullable unsigned active-weight subtraction in
   `compute_benchmark_portfolio_risk_contributions` for Euler and standalone risk.
   Small integer differences are preserved when native alignment retains unsigned
   storage; existing alignment conversions and standalone output dtypes are unchanged.
+
+### Added
+
+- Workflow examples for common monthly cash and locally financed zero/nonzero-net books.
+- Current-kernel provider-index validation with independent delivery cash-flow checks.
 
 ## [6.0.0] - 2026-11-09
 

@@ -80,11 +80,14 @@ def produce(spec: dict, *, full_reports: bool = False) -> dict:
 
     one('multi_asset.png', prices, 'Synthetic investment universe',
         benchmark=benchmark.columns[0])
-    one('strategy.png', portfolios[0], 'Balanced allocation | synthetic data')
+    one('strategy.png', portfolios[0], 'Balanced allocation | synthetic data',
+        add_performance_inference_sheet=False)
     one('strategy_vs_benchmark.png', pair, 'Balanced vs Defensive | synthetic data',
-        kind='strategy_benchmark', add_brinson_attribution=False)
+        kind='strategy_benchmark', add_performance_inference_sheet=False,
+        add_brinson_attribution=False)
     one('multi_strategy.png', multi, 'Three allocations | synthetic data',
-        add_group_exposures_and_pnl=False, add_strategy_factsheets=False)
+        add_group_exposures_and_pnl=False, add_strategy_factsheets=False,
+        add_performance_inference_sheet=False)
     if not full_reports:
         layouts = {
             'multi_asset.png': ('Synthetic investment universe', 'Correlation of ME-freq'),

@@ -205,13 +205,120 @@ def refit(source_csv, spec, output_dir):
     return result
 
 
+
+def recompute(returns_csv, spots_csv, rates_csv, pairs_csv, output_dir,
+              cutoff="2026-09-30"):
+    """Validate current ACT/365F payoffs against supplied, unfilled provider returns.
+
+    Inputs are private CSV panels: monthly SIMPLE total returns by ticker, USD-per-local
+    spots, annual-decimal rates, and a pair catalogue with Base_ticker, Observed_ticker,
+    Local_ccy, Reference_ccy, Family and Match_type. No vendor acquisition occurs.
+    The current QIS API constructs the payoff; independently priced forward delivery
+    checks it. Both recent and full available windows retain the observed-data mask.
+    """
+    import qis
+    from scipy.stats import linregress
+    from tools.docs_analytics.run import output_boundary
+
+    output = output_boundary(Path(output_dir))
+    output.mkdir(parents=True)
+    def read_panel(path):
+        """Keep raw observations, rejecting unordered or duplicate timestamps."""
+        panel = pd.read_csv(path, index_col=0, parse_dates=True)
+        if not panel.index.is_unique or not panel.index.is_monotonic_increasing:
+            raise ValueError(f"Unordered or duplicate dates: {path}")
+        return panel.loc[:cutoff]
+    raw, spots, rates = map(read_panel, (returns_csv, spots_csv, rates_csv))
+    pairs = pd.read_csv(pairs_csv)
+    fx = qis.FxRatesData(spots, rates)
+    rows, monthly = [], []
+    max_payoff_error = 0.
+    for identity in pairs.to_dict('records'):
+        base, target = identity['Base_ticker'], identity['Observed_ticker']
+        local, reference = identity['Local_ccy'], identity['Reference_ccy']
+        native = raw[base].dropna()
+        grid = pd.date_range(native.index.min(), native.index.max(), freq='ME')
+        if not native.index.equals(grid):
+            raise ValueError(f"Base return history must have a complete monthly grid: {base}")
+        prices = anchored_nav(native.to_frame())
+        actual = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
+            prices=prices, local_ccys=local, reference_ccy=reference,
+            return_type=qis.FxReturnType.REFERENCE_TOTAL,
+            coordinate=qis.FxReturnCoordinate.SIMPLE, hedge_ratios=1.0,
+            frequency='ME', zero_return_to_nan=False))['ME'].values.iloc[:, 0]
+        dates = prices.index
+        marks = spots.reindex(dates, method='ffill')
+        quotes = rates.reindex(dates, method='ffill')
+        tau = dates.to_series().diff().dt.total_seconds() / (365 * 86400.)
+        cross = marks[local] / marks[reference]
+        gross_spot = cross / cross.shift(1)
+        delivery = (1 + quotes[reference].shift(1) * tau) / (1 + quotes[local].shift(1) * tau)
+        independent = (1 + native) * gross_spot + delivery - gross_spot - 1
+        frame = pd.DataFrame({'Observed': raw[target], 'QIS': actual,
+            'Base index': native, 'No carry': native * gross_spot,
+            'Independent': independent, 'Spot interaction': native * (gross_spot - 1),
+            'QIS carry': delivery - 1}).loc['1999-01-31':cutoff]
+        check = frame[['QIS', 'Independent']].dropna()
+        np.testing.assert_allclose(check.QIS, check.Independent, atol=1e-12, rtol=1e-11)
+        max_payoff_error = max(max_payoff_error, float((check.QIS-check.Independent).abs().max()))
+        for window in ('Full available', RECENT):
+            paired = frame.loc['2021-01-31' if window == RECENT else frame.index.min():].dropna()
+            fit = linregress(paired.Observed, paired.QIS)
+            error = paired.QIS - paired.Observed
+            te, _ = qis.compute_te_ir_errors(error.to_frame('error'))
+            np.testing.assert_allclose(te.iloc[0], error.std(ddof=1)*np.sqrt(12), atol=1e-12)
+            nav = anchored_nav(paired[['Observed', 'QIS']])
+            pa = dict(zip(nav.columns, np.atleast_1d(qis.compute_pa_return(nav))))
+            row = dict(identity, Window=window, Start=str(paired.index.min().date()),
+                End=str(paired.index.max().date()), Months=len(paired),
+                R_squared=fit.rvalue**2, Beta=fit.slope,
+                Intercept_monthly_bp=fit.intercept*10000,
+                MAE_monthly_bp=error.abs().mean()*10000,
+                RMSE_monthly_bp=np.sqrt(np.mean(error**2))*10000,
+                Tracking_error_pa_bp=te.iloc[0]*10000,
+                Mean_error_pa_bp=error.mean()*120000,
+                Observed_return_pa=pa['Observed'], QIS_return_pa=pa['QIS'],
+                CAGR_difference_bp=(pa['QIS']-pa['Observed'])*10000,
+                Missing_internal_months=len(pd.date_range(
+                    paired.index.min(), paired.index.max(), freq='ME'))-len(paired))
+            rows.append(row)
+            if window == RECENT:
+                plot_comparison(paired, row, output)
+                monthly.append(paired.assign(Observed_ticker=target).rename_axis('Date').reset_index())
+    result = pd.DataFrame(rows)
+    result.to_csv(output/'statistics.csv', index=False, float_format='%.17g')
+    pd.concat(monthly, ignore_index=True).to_csv(output/'monthly_comparison.csv', index=False,
+                                               float_format='%.17g')
+    provenance = {'cash_convention': 'ACT/365F; opening quotes; monthly principal resets',
+        'cutoff': cutoff, 'max_independent_payoff_error': max_payoff_error,
+        'input_sha256': {Path(p).name: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+                         for p in (returns_csv, spots_csv, rates_csv, pairs_csv)},
+        'qis_fx_source_sha256': hashlib.sha256(b''.join(p.read_bytes() for p in
+            sorted((Path(qis.__file__).parent/'fx').rglob('*.py')))).hexdigest()}
+    (output/'provenance.json').write_text(json.dumps(provenance, indent=2)+'\n', encoding='utf-8')
+    return result
+
+
 def main():
     """Run an explicit private-input recheck without changing the public frozen study."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source-csv', required=True, type=Path)
+    parser.add_argument('--source-csv', type=Path)
+    parser.add_argument('--returns-csv', type=Path)
+    parser.add_argument('--spots-csv', type=Path)
+    parser.add_argument('--rates-csv', type=Path)
+    parser.add_argument('--pairs-csv', type=Path)
     parser.add_argument('--output-dir', required=True, type=Path)
     args = parser.parse_args()
     manifest = json.loads((ROOT / 'tools/docs_analytics/manifest.json').read_text('utf-8'))
+    if args.returns_csv is not None:
+        if not all((args.spots_csv, args.rates_csv, args.pairs_csv)):
+            parser.error('Recompute requires spots, rates and pairs CSVs')
+        result = recompute(args.returns_csv, args.spots_csv, args.rates_csv,
+                           args.pairs_csv, args.output_dir)
+        print(result.to_string(index=False))
+        return
+    if args.source_csv is None:
+        parser.error('Supply --source-csv to recheck or --returns-csv to recompute')
     result = refit(args.source_csv, manifest['producers']['hedged_index_case_study'],
                    args.output_dir)
     print(f'Verified {len(result)} recent-period pairs against frozen statistics')

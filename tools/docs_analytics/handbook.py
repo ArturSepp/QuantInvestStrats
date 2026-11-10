@@ -738,7 +738,10 @@ def fx_hedging_results(params: dict) -> dict:
             freq='ME', span=cfg['span'])
         aligned = pd.concat([vol.rename('vol'), loading.rename('beta'),
                              forward.rename('forward')], axis=1, sort=True).ffill().asfreq('ME')
-        annual_cost = 12.0 * (1.0 - 1.0 / (1.0 + aligned['forward']))
+        maturity = pd.date_range(aligned.index[0], periods=len(aligned) + 1, freq='ME')
+        tau = pd.Series(np.diff(maturity.values) / np.timedelta64(1, 'D') / 365.0,
+                        index=aligned.index)
+        annual_cost = (1.0 - 1.0 / (1.0 + aligned['forward'])) / tau
         tilt = annual_cost / (2.0 * cfg['risk_aversion'] * aligned['vol'] ** 2)
         # Closed-form objective checks, independent of the hedge constructor's cost helper.
         expected = [1.0 + aligned['beta'] - tilt, 1.0 - tilt, 1.0 + aligned['beta']]

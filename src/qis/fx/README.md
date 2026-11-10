@@ -158,7 +158,9 @@ The local gain remains exposed to terminal spot. Typed results retain a missing 
 synthetic indices require explicit normalization.
 
 **Hedge strategies** (from EWMA vol/beta and annualised short-forward cost):
-`annualised_cost = af * kappa`, where `af` is periods per year and `kappa = f/(1+f)`;
+`annualised_cost = kappa / tau`, where `tau` is the ACT/365F year fraction from the
+opening decision to the next reset and `kappa = f/(1+f)`. Statistical volatility
+uses periods per year and an 8% annual variance prior at the requested frequency;
 `carry_ratio = (annualised_cost / fx_var) / (2*risk_aversion_lambda)`; `Max Carry = 1 - carry_ratio`;
 `Beta Hedge = 1 + fx_beta`; `Optimal = 1 - carry_ratio + fx_beta`. All optionally clipped to `min_max_hedge`.
 

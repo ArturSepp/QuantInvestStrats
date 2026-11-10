@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from qis.fx.fx_rates_data import FxRatesData
-from qis.fx.fx_returns import FxCashPolicy
+from qis.fx.fx_returns import FxCashAccrual, FxCashPolicy
 from qis.utils.df_ops import multiply_df_by_dt
 
 __all__ = ["FxAccountSpec", "FxAccountData", "backtest_fx_account"]
@@ -33,7 +33,8 @@ class FxAccountSpec:
         notional_rule: Size targets on fixed initial capital or current marked NAV.
         cash_rate_policy: Reference benchmark on signed cash, or explicitly no interest.
         missing_quotes: Reject missing marks, or carry valuation only without trading.
-        cash_policy: ACT/365F with opening quotes; no provider-basis conversion.
+        cash_policy: PERIOD_OPENING with ACT/365F on the valuation grid; no
+            provider-basis conversion. MONTHLY_INDEX is not supported by this ledger.
     """
 
     reference_ccy: str
@@ -59,8 +60,9 @@ class FxAccountSpec:
         for name, allowed in choices.items():
             if getattr(self, name) not in allowed:
                 raise ValueError(f"Unknown {name}")
-        if not isinstance(self.cash_policy, FxCashPolicy) or self.cash_policy.quote_lag != 1:
-            raise ValueError("Account cash requires opening quotes and ACT/365F")
+        if (not isinstance(self.cash_policy, FxCashPolicy) or self.cash_policy.quote_lag != 1
+                or self.cash_policy.accrual is not FxCashAccrual.PERIOD_OPENING):
+            raise ValueError("Account cash requires PERIOD_OPENING, opening quotes and ACT/365F")
 
 
 @dataclass(frozen=True, init=False)

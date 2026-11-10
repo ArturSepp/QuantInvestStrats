@@ -178,12 +178,12 @@ All three ratios are clipped to `min_max_hedge`, $[0,1]$ by default.
 The inputs are point-in-time EWMA estimates on the `freq` grid. `compute_fx_vol_beta`
 estimates $\beta$ with `qis.compute_ewm_cross_xy` and the annualised $\sigma_{FX}$ with
 `qis.compute_ewm_vol`, both with EWMA mean adjustment and span 36 by default. The volatility's
-variance recursion is seeded with $0.08^2/12$, the monthly variance of an 8% annual volatility,
-on every grid. The beta's cross moment starts at zero and its FX variance at the first squared FX
-return; up to qis 5.30.3 that variance was seeded with its full-sample mean square, so the early
-betas used later FX returns. The carry $c$ is the
-short-forward cost $f/(1+f)$ multiplied by statistical $\mathrm{af}$. This
-statistical scaling is unchanged; it is distinct from the dated cash year fraction. The default
+variance recursion is seeded with $0.08^2/\mathrm{af}$, the period variance of an
+8% annual volatility at the requested frequency. The beta's cross moment starts at zero
+and its FX variance at the first squared FX return. The carry $c$ is the short-forward
+cost $\kappa=f/(1+f)$ divided by the priced interval's ACT/365F fraction $\tau$.
+The opening-labelled premium and its calendar maturity refer to the next reset.
+Statistical annualisation remains separate and scales only risk estimates. The default
 $\lambda=4/3$ is a modelling choice, not an estimate.
 
 > **Pitfall.** The optimum rises one-for-one with $\beta$. A positive local-on-FX beta, common
@@ -329,7 +329,7 @@ future returns or Sharpe. The unconstrained formula and its clipping have differ
 across assets.
 
 In this teaching sample, unhedged synthetic US equity returns **9.13% p.a.** with Sharpe
-**0.53**, compared with **8.53% / 0.50** for the optimal rule and **7.18% / 0.42** for beta
+**0.53**, compared with **8.51% / 0.50** for the optimal rule and **7.18% / 0.42** for beta
 hedging. The optimal rule's ex-ante objective does not promise the best realised Sharpe.
 The Treasury-driven currency construction also makes some bond hedge ratios hit the 100%
 cap, explaining why their dynamic and fully hedged outcomes can coincide.
@@ -354,7 +354,7 @@ equity_comparison = comparison['performance'].loc[
     comparison['performance']['asset'].eq('SEQ_US')]
 equity_comparison = equity_comparison.set_index('strategy')
 assert round(100 * equity_comparison.loc['Unhedged', 'pa_return'], 2) == 9.13
-assert round(100 * equity_comparison.loc['Optimal', 'pa_return'], 2) == 8.53
+assert round(100 * equity_comparison.loc['Optimal', 'pa_return'], 2) == 8.51
 assert round(100 * equity_comparison.loc['Beta hedge', 'pa_return'], 2) == 7.18
 assert [round(equity_comparison.loc[name, 'sharpe_pa_rf0'], 2)
         for name in ['Unhedged', 'Optimal', 'Beta hedge']] == [0.53, 0.50, 0.42]
