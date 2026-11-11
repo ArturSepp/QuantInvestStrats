@@ -7,7 +7,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import qis_reference as reference
+if __package__:
+    from . import qis_reference as reference
+else:
+    import qis_reference as reference
 
 
 def check(actual, expected, tolerance=1e-10):
