@@ -1,0 +1,12 @@
+Write a Python script that backtests a simple all-weather portfolio: 25% each in the ETFs SPY, TLT, TIP and GLD, from 31 July 2002 to 30 September 2026, using Yahoo Finance prices. The portfolio starts at 100.
+
+At the end print exactly these lines, with numbers as decimals to 4 places, and save the daily portfolio value to nav.csv with columns date,nav:
+
+first_date: YYYY-MM-DD
+last_date: YYYY-MM-DD
+terminal_nav:
+total_return:
+annual_return:
+volatility:
+sharpe:
+max_drawdown:

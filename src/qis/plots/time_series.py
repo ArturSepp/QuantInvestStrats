@@ -59,6 +59,8 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     is ``legend_stats``: the legend carries statistics computed on the plotted window, so the
     numbers beside a series always describe the data actually drawn.
 
+    Pass ``preserve_gaps=True`` in ``kwargs`` to draw missing observations as line breaks.
+
     Arguments shared with every ``plot_*`` function — ``ax``, ``title``, ``var_format``,
     ``x_date_freq``, ``fontsize``, ``colors``, ``xlabel``, ``ylabel``, ``legend_loc``,
     ``markersize``, ``y_limits`` — are documented in ``qis/docs/plotting_kwargs.md``.
@@ -124,9 +126,15 @@ def plot_time_series(df: Union[pd.Series, pd.DataFrame],
     if colors is None:
         colors = put.get_n_colors(n=len(columns), **kwargs)
 
-    sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
-                 markersize=markersize,
-                 linewidth=linewidth, ax=ax)
+    if kwargs.pop('preserve_gaps', False):
+        # Seaborn drops missing observations and draws a line across the gap.
+        for i, column in enumerate(columns):
+            marker = ('o' if markers else None) if isinstance(markers, bool) else markers[i]
+            ax.plot(data1.index, data1[column], color=colors[i], linewidth=linewidth,
+                    marker=marker, markersize=markersize, label=column)
+    else:
+        sns.lineplot(data=data1, palette=colors, dashes=False, markers=markers,
+                     markersize=markersize, linewidth=linewidth, ax=ax)
 
     # add tredlines
     if trend_line_colors is None:

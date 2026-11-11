@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 import qis
-from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 
 
 def _monthly_prices():
@@ -44,7 +43,7 @@ def test_month_end_opening_allocation_is_available_for_lagged_alpha():
         benchmark_price=benchmark['Benchmark'], freq_beta='ME', factor_beta_span=3,
         time_period=qis.TimePeriod(start=start, end=index[-1]),
     )
-    assert alpha.loc[start, 'TAA'] == 0.0
+    assert pd.isna(alpha.loc[start, 'TAA'])
     assert alpha.loc[index[13], 'TAA'] == pytest.approx(0.0, abs=1e-12)
 
 
@@ -141,19 +140,21 @@ def test_short_history_alpha_stays_unavailable_without_a_beta_prior():
         time_period=qis.TimePeriod(start=prices.index[0], end=prices.index[-1]),
     )['TAA']
 
-    assert alpha.iloc[0] == 0.0
-    assert alpha.iloc[1:].isna().all()
+    assert alpha.isna().all()
 
 
-def test_beta_estimation_title_uses_paired_instrument_history():
+def test_late_benchmark_delays_both_first_estimates():
     prices, benchmark = _monthly_prices()
     benchmark.iloc[:4] = np.nan
-
-    start = _get_instrument_beta_estimation_start(
-        instrument_prices=prices, benchmark_prices=benchmark, freq='ME',
-    )
-
-    assert start == prices.index[5]
+    weights = pd.DataFrame({'High': 1.0, 'Low': 0.0}, index=prices.index)
+    portfolio = qis.PortfolioData(nav=prices['High'].rename('TAA'), prices=prices, weights=weights)
+    multi = qis.MultiPortfolioData(portfolio_datas=[portfolio], benchmark_prices=benchmark)
+    beta = portfolio.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark, freq_beta='ME', factor_beta_span=3)
+    alpha = multi.compute_rolling_benchmark_alpha(
+        benchmark_price=benchmark['Benchmark'], freq_beta='ME', factor_beta_span=3)
+    assert beta.first_valid_index() == prices.index[8]
+    assert alpha.first_valid_index() == prices.index[9]
 
 
 @pytest.mark.parametrize('known_weight, young_weight', [
@@ -210,7 +211,7 @@ def test_quarterly_alpha_starts_with_backtest_despite_a_young_holding():
 
     assert beta.loc[start] == pytest.approx(1.9)
     assert beta.loc[start:].notna().all()
-    assert alpha.loc[start] == 0.0
+    assert pd.isna(alpha.loc[start])
     assert alpha.iloc[1:].notna().all()
     # Independently calculated log residuals and pandas EWMA, on the partial-coverage window.
     dates = index[(index > start) & (index <= '2010-12-31')]
@@ -235,3 +236,40 @@ def test_partial_benchmark_beta_prefix_is_point_in_time():
         )
     np.testing.assert_allclose(prefix.iloc[4:], 1.4, atol=1e-12)
     pd.testing.assert_frame_equal(full.iloc[:23], prefix)
+
+
+@pytest.mark.parametrize('span', [3, 12])
+def test_report_warmup_dates_and_plotted_gaps(span):
+    """A zero residual is observable only after its opening beta is available."""
+    import matplotlib.pyplot as plt
+
+    prices, benchmark = _monthly_prices()
+    prices.loc[prices.index[:16], 'Low'] = np.nan
+    weights = pd.DataFrame({'High': 1.0, 'Low': 0.0}, index=prices.index)
+    weights.loc[prices.index[16]:] = [0.0, 1.0]
+    portfolio = qis.PortfolioData(nav=prices['High'].rename('TAA'), prices=prices, weights=weights)
+    multi = qis.MultiPortfolioData(portfolio_datas=[portfolio], benchmark_prices=benchmark)
+    beta = portfolio.compute_portfolio_benchmark_betas(
+        benchmark_prices=benchmark, freq_beta='ME', factor_beta_span=span)['Benchmark']
+    alpha = multi.compute_rolling_benchmark_alpha(
+        benchmark_price=benchmark['Benchmark'], freq_beta='ME', factor_beta_span=span)['TAA']
+
+    pd.testing.assert_index_equal(alpha.index, prices.index)
+    assert beta.first_valid_index() == prices.index[span + 1]
+    assert alpha.first_valid_index() == prices.index[span + 2]
+    assert alpha.loc[prices.index[span + 2]] == pytest.approx(0.0, abs=1e-12)
+    assert alpha.isna().equals(beta.shift().isna())
+
+    fig, axes = plt.subplots(2, 1)
+    try:
+        multi.plot_factor_betas(benchmark_prices=benchmark, freq_beta='ME',
+                                factor_beta_span=span, axs=[axes[0]])
+        multi.plot_rolling_benchmark_alpha(benchmark_price=benchmark['Benchmark'], freq_beta='ME',
+                                           factor_beta_span=span, ax=axes[1])
+        for ax, expected in zip(axes, (beta, alpha)):
+            line = ax.lines[0]
+            np.testing.assert_array_equal(line.get_xdata(), expected.index.to_numpy())
+            np.testing.assert_allclose(line.get_ydata(), expected.to_numpy(), equal_nan=True)
+            assert f'{expected.first_valid_index():%d%b%Y}' in ax.get_title()
+    finally:
+        plt.close(fig)

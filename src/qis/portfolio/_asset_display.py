@@ -13,6 +13,12 @@ import textwrap
 MAX_GROUPS_FOR_DETAIL_PANELS = 10
 
 
+def first_estimate_label(data: pd.DataFrame) -> str:
+    """Label the earliest available estimate across the displayed series and date range."""
+    start = data.first_valid_index()
+    return f'first shown {start:%d%b%Y}' if start is not None else 'no eligible estimate'
+
+
 def wrap_title(title, ax, fontsize):
     """Keep long metric/date labels inside their factsheet panel."""
     from qis.plots.utils import estimate_axis_width

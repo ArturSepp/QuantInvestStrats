@@ -7,6 +7,21 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.0.4] - 2026-11-11
+
+### Fixed
+
+- Keep unestimated beta and rolling-alpha observations missing, display gaps instead of
+  connecting them, and label the first available estimate. Rolling alpha uses prior-period
+  beta and begins with its first eligible residual rather than artificial zero history.
+- Handle a single benchmark beta panel consistently with multi-factor report panels.
+
+### Added
+
+- Optional `preserve_gaps=True` through `plot_time_series` keyword arguments.
+- A self-contained all-weather versus 60/40 article and replication bundle with frozen
+  inputs, independent verification, archived AI comparisons, figures and factsheet PDFs.
+
 ## [6.0.3] - 2026-11-11
 
 ### Fixed

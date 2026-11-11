@@ -57,9 +57,10 @@ import qis.plots.derived.perf_table as ppt
 import qis.plots.derived.returns_scatter as prs
 import qis.plots.derived.drawdowns as cdr
 from qis.portfolio.portfolio_data import PortfolioData, AttributionMetric
-from qis.portfolio._asset_display import plot_asset_time_series, selection_title, tail_index
+from qis.portfolio._asset_display import (
+    first_estimate_label, plot_asset_time_series, selection_title, tail_index,
+)
 from qis.portfolio.risk.risk_model import RiskModel
-from qis.portfolio.risk.ewm_factor_model import _get_instrument_beta_estimation_start
 from qis.utils.struct_ops import merge_lists_unique
 from qis.perfstats.turnover import TurnoverComputationType
 from qis.portfolio.reports.sharpe_difference import (
@@ -69,11 +70,6 @@ from qis.portfolio.reports.sharpe_difference import (
 
 # default perf params
 PERF_PARAMS = PerfParams(freq='W-WED')
-
-
-def _to_compact_date(date: pd.Timestamp) -> str:
-    """Format a report boundary without spaces, for compact panel titles."""
-    return pd.Timestamp(date).strftime('%d%b%Y')
 
 
 def _get_first_active_return_date(portfolio_nav: pd.Series, freq: str) -> pd.Timestamp:
@@ -888,11 +884,12 @@ class MultiPortfolioData:
             benchmark_price: Benchmark price index used by the adjacent beta panel.
             freq_beta: Return frequency used to estimate beta and realised alpha.
             factor_beta_span: Shared EWMA span for the beta and rolling-alpha estimates.
-            time_period: Performance measurement period. Alpha is zero through its start date;
-                earlier observations are used only to estimate beta.
+            time_period: Performance measurement period. The first eligible return ends after its
+                start and uses the previous period's beta. Earlier prices can warm up beta.
 
         Returns:
-            Annualised rolling alpha for every portfolio in report order.
+            Annualised rolling alpha for every portfolio in report order. Unobserved residuals
+            are missing. The first eligible residual seeds each portfolio's EWMA.
         """
         if benchmark_price.name is None:
             raise ValueError('benchmark_price must have a name')
@@ -929,24 +926,17 @@ class MultiPortfolioData:
             realised_alpha = strategy_returns.subtract(
                 displayed_beta.shift(1).multiply(benchmark_returns)
             )
-            post_start_alpha = realised_alpha.loc[realised_alpha.index > performance_start]
-            first_alpha_date = post_start_alpha.first_valid_index()
-            if first_alpha_date is None:
-                rolling_alpha = pd.Series(np.nan, index=post_start_alpha.index)
-            else:
-                rolling_alpha = qis.compute_ewm(
-                    data=post_start_alpha.loc[first_alpha_date:],
-                    span=factor_beta_span,
-                )
-                rolling_alpha = rolling_alpha.where(
-                    post_start_alpha.loc[first_alpha_date:].notna())
-            zero_index = realised_alpha.index[realised_alpha.index <= performance_start].union(
-                pd.DatetimeIndex([performance_start])
-            )
-            zero_alpha = pd.Series(0.0, index=zero_index)
-            rolling_alphas[portfolio.nav.name] = pd.concat(
-                [zero_alpha, annualisation * rolling_alpha]
-            ).sort_index()
+            # Keep the full grid, including an off-grid report start, without inventing a return.
+            report_index = realised_alpha.index.union(pd.DatetimeIndex([performance_start]))
+            observed = realised_alpha.reindex(report_index).where(report_index > performance_start)
+            rolling_alpha = observed.copy()
+            first = observed.first_valid_index()
+            if first is not None:
+                residuals = observed.loc[first:]
+                rolling_alpha.loc[first:] = qis.compute_ewm(
+                    data=residuals, span=factor_beta_span,
+                ).where(residuals.notna()) * annualisation
+            rolling_alphas[portfolio.nav.name] = rolling_alpha
         rolling_alphas = pd.DataFrame(rolling_alphas)
         if time_period is not None:
             rolling_alphas = time_period.locate(rolling_alphas)
@@ -975,7 +965,7 @@ class MultiPortfolioData:
         title = (
             f'{factor_beta_span}-span rolling annualised Alpha of {freq_beta}-freq returns '
             f'to {benchmark_price.name},\n'
-            f'starting from {_to_compact_date(rolling_alphas.index.min())}'
+            f'prior-period beta, {first_estimate_label(rolling_alphas)}'
         )
         pts.plot_time_series(
             df=rolling_alphas,
@@ -983,7 +973,7 @@ class MultiPortfolioData:
             legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
             title=title,
             ax=ax,
-            **sop.update_kwargs(kwargs, dict(legend_loc='lower left')),
+            **sop.update_kwargs(kwargs, dict(legend_loc='lower left', preserve_gaps=True)),
         )
         if regime_benchmark is not None:
             self.add_regime_shadows(
@@ -1221,13 +1211,7 @@ class MultiPortfolioData:
         plot benchmarks betas by factor exposures
         """
         factor_exposures = {factor: [] for factor in benchmark_prices.columns}
-        estimation_starts = {factor: [] for factor in benchmark_prices.columns}
         for portfolio in self.portfolio_datas:
-            estimation_start = _get_instrument_beta_estimation_start(
-                instrument_prices=portfolio.prices,
-                benchmark_prices=benchmark_prices,
-                freq=freq_beta,
-            )
             factor_exposure = portfolio.compute_portfolio_benchmark_betas(
                 benchmark_prices=benchmark_prices,
                 freq_beta=freq_beta,
@@ -1236,27 +1220,27 @@ class MultiPortfolioData:
             )
             for factor in factor_exposure.columns:
                 factor_exposures[factor].append(factor_exposure[factor].rename(portfolio.nav.name))
-                estimation_starts[factor].append(estimation_start)
 
         if axs is None:
-            fig, axs = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12), tight_layout=True)
+            _, axes = plt.subplots(len(benchmark_prices.columns), 1, figsize=(12, 12),
+                                   tight_layout=True, squeeze=False)
+            axs = axes[:, 0]
 
         for idx, factor in enumerate(benchmark_prices.columns):
             factor_exposure = pd.concat(factor_exposures[factor], axis=1, sort=True)
-            estimation_start = min(estimation_starts[factor])
             if time_period is not None:
                 factor_exposure = time_period.locate(factor_exposure)
             factor_beta_title = (
                 f'{factor_beta_span}-span rolling holdings-weighted Beta to {factor} '
                 f'({freq_beta}-freq),\n'
-                f'instrument beta estimation starting from {_to_compact_date(estimation_start)}'
+                f'{factor_beta_span}-return warm-up, {first_estimate_label(factor_exposure)}'
             )
             pts.plot_time_series(df=factor_exposure,
                                  var_format=var_format,
                                  legend_stats=pts.LegendStats.AVG_NONNAN_LAST,
-                                 title=f"{factor_beta_title}",
+                                 title=factor_beta_title,
                                  ax=axs[idx],
-                                 **kwargs)
+                                 **sop.update_kwargs(kwargs, dict(preserve_gaps=True)))
             if factor_exposure.isna().all().all():
                 axs[idx].text(
                     0.5, 0.5, f'Insufficient history: {factor_beta_span}-return warm-up',

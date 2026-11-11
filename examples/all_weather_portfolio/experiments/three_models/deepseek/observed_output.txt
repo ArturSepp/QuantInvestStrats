@@ -1,0 +1,150 @@
+Downloading data...
+
+==============================================================================
+ETF choices
+==============================================================================
+All-Weather: SPY 25%, TLT 25%, TIP 25%, GLD 25%
+  - TIP sleeve uses VIPSX before TIP inception (4 Dec 2003).
+  - GLD sleeve uses GC=F before GLD inception (18 Nov 2004).
+60/40:       SPY 60%, IEF 40%
+
+==============================================================================
+First investment date and initial holdings
+==============================================================================
+First date: 2002-07-31
+All-Weather: SPY 25.0%, TLT 25.0%, TIP sleeve 25.0% (VIPSX proxy), GLD sleeve 25.0% (GC=F proxy)
+60/40:       SPY 60.0%, IEF 40.0%
+
+==============================================================================
+Q1. Full-period metrics
+==============================================================================
+              CAGR Volatility Sharpe Max Drawdown
+All-Weather  7.85%      8.00%  0.773      -20.90%
+60/40        8.46%     10.46%  0.667      -31.62%
+
+==============================================================================
+Q2. Calendar-year returns
+==============================================================================
+          Year      AW     Type   60_40   Diff_pp
+2002 (partial)   6.73%  Partial   1.57%  +5.16 pp
+          2003  14.42% Complete  18.85%  -4.44 pp
+          2004   8.35% Complete   8.20%  +0.15 pp
+          2005   8.50% Complete   4.00%  +4.50 pp
+          2006   9.83% Complete  10.42%  -0.59 pp
+          2007  14.42% Complete   7.38%  +7.04 pp
+          2008  -1.10% Complete -17.25% +16.15 pp
+          2009   8.54% Complete  12.93%  -4.39 pp
+          2010  15.52% Complete  13.61%  +1.91 pp
+          2011  15.50% Complete   8.16%  +7.34 pp
+          2012   8.32% Complete  11.25%  -2.92 pp
+          2013  -5.94% Complete  15.78% -21.72 pp
+          2014  10.25% Complete  11.70%  -1.45 pp
+          2015  -3.07% Complete   1.55%  -4.62 pp
+          2016   6.86% Complete   7.62%  -0.75 pp
+          2017  11.55% Complete  13.76%  -2.21 pp
+          2018  -1.89% Complete  -1.91%  +0.02 pp
+          2019  17.91% Complete  21.68%  -3.77 pp
+          2020  19.72% Complete  17.06%  +2.66 pp
+          2021   6.04% Complete  15.17%  -9.13 pp
+          2022 -16.01% Complete -16.77%  +0.76 pp
+          2023  11.27% Complete  16.81%  -5.54 pp
+          2024  10.63% Complete  14.23%  -3.59 pp
+          2025  21.81% Complete  13.98%  +7.83 pp
+2026 (partial)   0.14%  Partial   5.74%  -5.60 pp
+
+Complete calendar years in which All-Weather beat 60/40:
+  2004: AW 8.35%, 60/40 8.20%, difference +0.15 pp
+  2005: AW 8.50%, 60/40 4.00%, difference +4.50 pp
+  2007: AW 14.42%, 60/40 7.38%, difference +7.04 pp
+  2008: AW -1.10%, 60/40 -17.25%, difference +16.15 pp
+  2010: AW 15.52%, 60/40 13.61%, difference +1.91 pp
+  2011: AW 15.50%, 60/40 8.16%, difference +7.34 pp
+  2018: AW -1.89%, 60/40 -1.91%, difference +0.02 pp
+  2020: AW 19.72%, 60/40 17.06%, difference +2.66 pp
+  2022: AW -16.01%, 60/40 -16.77%, difference +0.76 pp
+  2025: AW 21.81%, 60/40 13.98%, difference +7.83 pp
+
+Partial years separately:
+  2002 (partial): AW 6.73%, 60/40 1.57%, difference +5.16 pp
+  2026 (partial): AW 0.14%, 60/40 5.74%, difference -5.60 pp
+
+==============================================================================
+Q3. Three complete years with largest absolute return gaps
+==============================================================================
+
+------------------------------------------------------------------------------
+Year 2013: AW -5.94%, 60/40 15.78%, gap -21.72 pp
+
+All-Weather contributions (percentage points):
+asset
+GLD            -7.42
+SPY             7.32
+TIP            -2.17
+TLT            -3.50
+Trading cost   -0.02
+Total          -5.79
+
+60/40 contributions (percentage points):
+asset
+IEF             -2.41
+SPY             17.32
+Trading cost    -0.02
+Total           14.89
+
+Largest AW contributor: SPY (+7.32 pp)
+Largest 60/40 contributor: SPY (+17.32 pp)
+
+------------------------------------------------------------------------------
+Year 2008: AW -1.10%, 60/40 -17.25%, gap +16.15 pp
+
+All-Weather contributions (percentage points):
+asset
+GLD              1.59
+SPY            -10.51
+TIP             -0.02
+TLT              8.58
+Trading cost    -0.02
+Total           -0.39
+
+60/40 contributions (percentage points):
+asset
+IEF              7.46
+SPY            -24.18
+Trading cost    -0.03
+Total          -16.75
+
+Largest AW contributor: TLT (+8.58 pp)
+Largest 60/40 contributor: IEF (+7.46 pp)
+
+------------------------------------------------------------------------------
+Year 2021: AW 6.04%, 60/40 15.17%, gap -9.13 pp
+
+All-Weather contributions (percentage points):
+asset
+GLD            -0.88
+SPY             6.55
+TIP             1.38
+TLT            -0.92
+Trading cost   -0.01
+Total           6.11
+
+60/40 contributions (percentage points):
+asset
+IEF             -1.26
+SPY             15.72
+Trading cost    -0.01
+Total           14.45
+
+Largest AW contributor: SPY (+6.55 pp)
+Largest 60/40 contributor: SPY (+15.72 pp)
+
+==============================================================================
+Notes
+==============================================================================
+- Returns are daily total returns in USD from adjusted close prices.
+- Rebalancing occurs on the last trading day of each calendar quarter.
+- Trading cost is 10 bp of the sum of absolute trade notional and is
+  deducted from portfolio value at each rebalance.
+- Sharpe uses daily excess returns over the 13-week T-bill yield.
+- Contributions are arithmetic daily P&L contributions; they sum
+  approximately, not exactly, to the compounded annual return.

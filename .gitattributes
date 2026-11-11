@@ -45,3 +45,6 @@ examples/* linguist-documentation
 *.parquet binary
 .githooks/* text eol=lf
 *.inv -text
+
+# Frozen replication snapshots carry byte-level SHA-256 provenance.
+examples/all_weather_portfolio/**/*.csv -text

@@ -1,0 +1,21 @@
+Rewrite the script to follow this specification exactly. Use only pandas, numpy and yfinance.
+
+Data
+- Yahoo adjusted closes: yf.download(tickers, start='2002-07-31', end='2026-10-01', auto_adjust=True). The last observation is 30 September 2026.
+- Put the prices on a business-day grid. On a holiday repeat the previous prices. Do not fill prices before an ETF's first quote.
+
+Portfolio accounting
+- Start with 100 on 31 July 2002 and trade on that date.
+- Rebalance to the target weights on the first business day on or after each calendar quarter-end. Between rebalancing dates hold the number of units of each ETF fixed.
+- On a rebalancing date an ETF without a price gets zero weight, and the targets of the ETFs that have a price are scaled up pro rata so that they sum to 100%. An ETF enters at the first rebalancing date on or after its first quote.
+- Size the positions on the portfolio value before trading costs. Trading costs are 10 basis points of the absolute traded notional on every trade, including the first one. They are deducted from the portfolio value as a cash balance that earns no interest.
+
+Statistics
+- Measure all returns from the portfolio value on the first date, after the opening cost.
+- total_return: last value / first value - 1
+- annual_return: (last value / first value) ** (1 / years) - 1, with years = calendar days / 365.25
+- volatility: standard deviation (ddof=1) of month-end log returns, times sqrt(12)
+- sharpe: annual_return / volatility, with a zero risk-free rate
+- max_drawdown: minimum of value / running maximum - 1 on the daily values
+
+Print the same lines as before and save nav.csv.

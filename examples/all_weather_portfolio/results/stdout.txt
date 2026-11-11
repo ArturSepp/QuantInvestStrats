@@ -1,0 +1,237 @@
+python: 3.12.14
+qis: 6.0.1
+yfinance: 1.7.0
+pandas: 3.0.5
+numpy: 2.5.2
+matplotlib: 3.11.1
+
+===== PORTFOLIOS =====
+prices: 2002-07-31 to 2026-09-30, shape=(6306, 5)
+first quote per ETF:
+SPY    2002-07-31
+TLT    2002-07-31
+TIP    2003-12-05
+GLD    2004-11-18
+IEF    2002-07-31
+
+All weather: target weights on the first date and where they change
+               SPY     TLT     TIP   GLD
+date                                    
+2002-07-31  0.5000  0.5000  0.0000  0.00
+2003-12-31  0.3333  0.3333  0.3333  0.00
+2004-12-31  0.2500  0.2500  0.2500  0.25
+
+60/40: target weights on the first date and where they change
+            SPY  IEF
+date                
+2002-07-31  0.6  0.4
+
+===== PERFORMANCE =====
+
+table_performance:
+              Total  P.a. return    Vol  Sharpe (rf=0)  Max DD
+All weather  5.1316       0.0779 0.0824         0.9455 -0.2090
+60/40        6.1389       0.0847 0.0894         0.9479 -0.3160
+SPY         11.9947       0.1120 0.1475         0.7590 -0.5519
+
+table_spy_regression:
+              Beta     R2
+All weather 0.2910 0.2683
+60/40       0.5797 0.9085
+SPY         1.0000 1.0000
+
+table_performance_jul_2002_to_2012:
+             Total  P.a. return    Vol  Sharpe (rf=0)  Max DD
+All weather 1.7586       0.1023 0.0811         1.2606 -0.1776
+60/40       1.0589       0.0718 0.0877         0.8184 -0.3160
+SPY         0.9223       0.0647 0.1548         0.4181 -0.5519
+
+table_performance_2013_to_2021:
+             Total  P.a. return    Vol  Sharpe (rf=0)  Max DD
+All weather 0.7610       0.0649 0.0696         0.9321 -0.1345
+60/40       1.5900       0.1115 0.0751         1.4845 -0.1787
+SPY         2.9516       0.1650 0.1331         1.2390 -0.3372
+
+table_performance_2022_to_sep_2026:
+             Total  P.a. return    Vol  Sharpe (rf=0)  Max DD
+All weather 0.2622       0.0503 0.1051         0.4785 -0.2085
+60/40       0.3387       0.0634 0.1152         0.5502 -0.2100
+SPY         0.7107       0.1197 0.1569         0.7630 -0.2450
+
+===== ANNUAL_RETURNS =====
+
+table_annual_returns:
+      All weather   60/40     SPY  All weather - 60/40
+2002       0.0413  0.0157 -0.0230               0.0256
+2003       0.1447  0.1885  0.2818              -0.0439
+2004       0.0934  0.0820  0.1070               0.0114
+2005       0.0850  0.0400  0.0483               0.0450
+2006       0.0985  0.1043  0.1585              -0.0058
+2007       0.1442  0.0741  0.0515               0.0701
+2008      -0.0110 -0.1725 -0.3679               0.1615
+2009       0.0854  0.1293  0.2635              -0.0439
+2010       0.1552  0.1361  0.1506               0.0191
+2011       0.1550  0.0816  0.0189               0.0734
+2012       0.0837  0.1128  0.1599              -0.0291
+2013      -0.0600  0.1578  0.3231              -0.2178
+2014       0.1025  0.1170  0.1346              -0.0145
+2015      -0.0307  0.0155  0.0123              -0.0462
+2016       0.0687  0.0762  0.1200              -0.0075
+2017       0.1154  0.1375  0.2171              -0.0221
+2018      -0.0179 -0.0185 -0.0457               0.0006
+2019       0.1796  0.2174  0.3122              -0.0379
+2020       0.1972  0.1706  0.1833               0.0266
+2021       0.0604  0.1517  0.2873              -0.0913
+2022      -0.1601 -0.1677 -0.1818               0.0076
+2023       0.1130  0.1681  0.2618              -0.0550
+2024       0.1068  0.1425  0.2489              -0.0357
+2025       0.2181  0.1398  0.1772               0.0783
+2026       0.0014  0.0574  0.1271              -0.0560
+all weather ahead in 11 of 25 calendar periods, the first and the last of them incomplete: ['2002', '2004', '2005', '2007', '2008', '2010', '2011', '2018', '2020', '2022', '2025']
+
+===== REGIMES =====
+
+table_regime_average_quarterly_returns:
+             Bear Average  Normal Average  Bull Average
+All weather       -0.0002          0.0175        0.0478
+60/40             -0.0479          0.0238        0.0810
+SPY               -0.1021          0.0373        0.1315
+
+table_regime_sharpe:
+             Bear-Sharpe  Normal-Sharpe  Bull-Sharpe
+All weather      -0.0057         0.5664       0.3849
+60/40            -0.3573         0.7006       0.6046
+SPY              -0.4627         0.6285       0.5933
+
+table_ahead_by_sign_ME:
+             periods  avg 60/40  avg all weather  share all weather ahead
+60/40 falls       94    -0.0209          -0.0105                   0.7021
+60/40 rises      196     0.0206           0.0147                   0.3367
+
+table_ahead_by_sign_QE:
+             periods  avg 60/40  avg all weather  share all weather ahead
+60/40 falls       26    -0.0340          -0.0080                   0.7308
+60/40 rises       70     0.0428           0.0301                   0.3571
+
+===== ATTRIBUTION =====
+
+table_attribution_daily_sum:
+             2008                2013                2022                2025        Full sample       
+      All weather   60/40 All weather   60/40 All weather   60/40 All weather  60/40 All weather  60/40
+GLD        0.0141     NaN     -0.0728     NaN      0.0025     NaN      0.1324    NaN      0.6119    NaN
+IEF           NaN  0.0765         NaN -0.0263         NaN -0.0642         NaN 0.0297         NaN 0.3447
+SPY       -0.1068 -0.2461      0.0776  0.1834     -0.0472 -0.1088      0.0430 0.1049      0.7945 1.7566
+TIP        0.0015     NaN     -0.0233     NaN     -0.0328     NaN      0.0159    NaN      0.1992    NaN
+TLT        0.0873     NaN     -0.0394     NaN     -0.0885     NaN      0.0088    NaN      0.2935    NaN
+Total     -0.0039 -0.1695     -0.0578  0.1571     -0.1659 -0.1730      0.2002 0.1346      1.8992 2.1013
+
+table_attribution:
+             2008                2013                2022                2025        Full sample       
+      All weather   60/40 All weather   60/40 All weather   60/40 All weather  60/40 All weather  60/40
+GLD        0.0135     NaN     -0.0749     NaN     -0.0004     NaN      0.1424    NaN      1.8969    NaN
+IEF           NaN  0.0647         NaN -0.0266         NaN -0.0597         NaN 0.0321         NaN 0.5406
+SPY       -0.1046 -0.2369      0.0709  0.1846     -0.0460 -0.1080      0.0481 0.1079      2.4706 5.6233
+TIP        0.0006     NaN     -0.0215     NaN     -0.0304     NaN      0.0172    NaN      0.4710    NaN
+TLT        0.0797     NaN     -0.0344     NaN     -0.0832     NaN      0.0107    NaN      0.3239    NaN
+Total     -0.0108 -0.1723     -0.0598  0.1580     -0.1600 -0.1676      0.2183 0.1400      5.1625 6.1639
+
+table_risk_shares:
+     capital share  risk share
+SPY         0.2500      0.2326
+TLT         0.2500      0.2430
+TIP         0.2500      0.1385
+GLD         0.2500      0.3859
+
+===== DRAWDOWNS =====
+
+table_drawdowns_all_weather:
+       start     trough        end  max_dd  days_dd  days_to_trough  days_recovery     peak   bottom  recovery  is_recovered
+0 2021-11-09 2022-10-20 2024-07-05 -0.2090 969.0000        345.0000       624.0000 485.6208 384.1157  486.8315          True
+1 2008-03-14 2008-11-12 2009-09-16 -0.1776 551.0000        243.0000       308.0000 185.1862 152.2989  185.8425          True
+2 2020-03-06 2020-03-18 2020-04-16 -0.1345  41.0000         12.0000        29.0000 412.2801 356.8131  412.5371          True
+3 2012-10-04 2013-07-05 2014-07-10 -0.1063 644.0000        274.0000       370.0000 282.6037 252.5564  282.6183          True
+4 2003-06-16 2003-08-05 2003-12-18 -0.0944 185.0000         50.0000       135.0000 118.0206 106.8753  118.7822          True
+
+table_drawdowns_60_40:
+       start     trough        end  max_dd   days_dd  days_to_trough  days_recovery     peak   bottom  recovery  is_recovered
+0 2007-10-09 2009-03-09 2010-09-28 -0.3160 1085.0000        517.0000       568.0000 163.3246 111.7059  163.8829          True
+1 2021-12-27 2022-10-14 2024-02-29 -0.2134  794.0000        291.0000       503.0000 534.9862 420.8289  535.1534          True
+2 2020-02-19 2020-03-23 2020-06-05 -0.1787  107.0000         33.0000        74.0000 412.1446 338.4975  416.3925          True
+3 2024-12-06 2025-04-08 2025-06-10 -0.1057  186.0000        123.0000        63.0000 610.1550 545.6685  611.4512          True
+4 2018-08-29 2018-12-24 2019-02-26 -0.1030  181.0000        117.0000        64.0000 348.2624 312.3903  348.4396          True
+
+===== SHARPE_DIFFERENCE =====
+
+table_sharpe_difference:
+           Base Sharpe  Portfolio Sharpe  Sharpe difference  HAC SE  HAC z  p-value  Observations  HAC lags
+Portfolio                                                                                                  
+60/40           0.9558            0.9607             0.0049  0.1678 0.0291   0.9768           290         3
+
+===== FACTSHEET =====
+<a href=r"aw6040_factsheet.pdf">link</a>
+created PDF doc: aw6040_factsheet.pdf
+factsheet pages: 3
+
+table_brinson_instruments:
+           All weather\nWeight Ave  60/40\nWeight Ave  All weather\nReturn Total  60/40\nReturn Total  Asset\nAllocation  Instrument\nSelection  Total\nActive
+SPY                         0.2706             0.6035                     2.4706               5.6233            -6.4168                -0.0000        -6.4168
+TLT                         0.2651             0.0000                     0.3239               0.0000             0.0000                 2.4120         2.4120
+TIP                         0.2374             0.0000                     0.4710               0.0000             0.0000                 1.5209         1.5209
+GLD                         0.2270             0.0000                     1.8969               0.0000             0.0000                 4.2564         4.2564
+IEF                         0.0000             0.3966                     0.0000               0.5406            -2.7739                 0.0000        -2.7739
+Total Sum                   1.0001             1.0000                     5.1625               6.1639            -9.1906                 8.1893        -1.0013
+
+table_brinson_asset_classes:
+                             All weather\nWeight Ave  60/40\nWeight Ave  All weather\nReturn Total  60/40\nReturn Total  Asset\nAllocation  Instrument\nSelection  Total\nActive
+Gold                                          0.2270             0.0000                     1.8969               0.0000             0.0000                 4.2564         4.2564
+Inflation-linked Treasuries                   0.2374             0.0000                     0.4710               0.0000             0.0000                 1.5209         1.5209
+Nominal Treasuries                            0.2651             0.3966                     0.3239               0.5406            -0.8231                 0.4612        -0.3618
+US equities                                   0.2706             0.6035                     2.4706               5.6233            -6.4168                -0.0000        -6.4168
+Total Sum                                     1.0001             1.0000                     5.1625               6.1639            -7.2398                 6.2385        -1.0013
+<a href=r"aw6040_grouped_factsheet.pdf">link</a>
+created PDF doc: aw6040_grouped_factsheet.pdf
+
+===== IMPLEMENTATION =====
+
+table_annual_turnover_costs:
+           All weather                  60/40              
+              Turnover Trading costs Turnover Trading costs
+date                                                       
+2005-12-31      0.0776        0.0001   0.0483        0.0000
+2006-12-31      0.1487        0.0001   0.0424        0.0000
+2007-12-31      0.1596        0.0002   0.1327        0.0001
+2008-12-31      0.2426        0.0002   0.3105        0.0003
+2009-12-31      0.2342        0.0002   0.2429        0.0002
+2010-12-31      0.1954        0.0002   0.2126        0.0002
+2011-12-31      0.1443        0.0001   0.1685        0.0002
+2012-12-31      0.2207        0.0002   0.1811        0.0002
+2013-12-31      0.2111        0.0002   0.1629        0.0002
+2014-12-31      0.1112        0.0001   0.0297        0.0000
+2015-12-31      0.1236        0.0001   0.1089        0.0001
+2016-12-31      0.0829        0.0001   0.0382        0.0000
+2017-12-31      0.1343        0.0001   0.0985        0.0001
+2018-12-31      0.1833        0.0002   0.1981        0.0002
+2019-12-31      0.1324        0.0001   0.1152        0.0001
+2020-12-31      0.2473        0.0002   0.3393        0.0003
+2021-12-31      0.1313        0.0001   0.1360        0.0001
+2022-12-31      0.1122        0.0001   0.0759        0.0001
+2023-12-31      0.1393        0.0001   0.1065        0.0001
+2024-12-31      0.1777        0.0002   0.1368        0.0001
+2025-12-31      0.1921        0.0002   0.1185        0.0001
+
+===== CORRELATION_BETA =====
+
+table_spy_tlt_correlation:
+                 Months  Correlation
+2005 to 2012         96      -0.3140
+2013 to 2021        108      -0.2631
+2022 to 2026-09      57       0.5782
+
+===== LEVERAGE =====
+
+table_leverage:
+                P.a. return    Vol  Ex Sharpe  Max DD  2022 return
+All weather          0.0779 0.0824     0.7260 -0.2090      -0.1601
+60/40                0.0847 0.0894     0.7440 -0.3160      -0.1677
+All weather 2x       0.1348 0.1652     0.7011 -0.3958      -0.3245
+SPY                  0.1120 0.1475     0.6326 -0.5519      -0.1818

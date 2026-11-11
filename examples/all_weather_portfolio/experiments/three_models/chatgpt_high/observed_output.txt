@@ -1,0 +1,73 @@
+Downloading adjusted prices: SPY
+Downloading adjusted prices: TLT
+Downloading adjusted prices: TIP
+Downloading adjusted prices: GLD
+Downloading adjusted prices: IEF
+Downloading adjusted prices: VIPSX
+
+PERIOD AND FIRST-DAY HOLDINGS
+Prices: 2002-07-31 to 2026-09-30; 6,081 US ETF market sessions
+2002-07-31 All weather: 25% SPY, 25% TLT, 25% VIPSX (TIPS proxy), 25% bullion price proxy
+2002-07-31 60/40: 60% SPY, 40% IEF
+TIPS proxy exchanged for TIP at 2003-12-31 close; gold proxy exchanged for GLD at 2004-12-31 close
+10 bp charged on buy + sell notional, including initial purchases and proxy exchanges
+
+FULL-PERIOD METRICS
+All weather   CAGR   +7.82%  vol   7.98%  Sharpe  0.763  max drawdown  -20.90%
+              trading fees $0.01391; gross notional $13.912 per $1 initially invested
+60/40         CAGR   +8.46%  vol  10.46%  Sharpe  0.661  max drawdown  -31.62%
+              trading fees $0.01077; gross notional $10.766 per $1 initially invested
+
+ALL CALENDAR-YEAR RETURNS (after costs; difference in pp)
+2002 (PARTIAL) AW   +6.41%  60/40   +1.47%  gap   +4.94 pp
+2003           AW  +14.24%  60/40  +18.85%  gap   -4.61 pp
+2004           AW   +8.05%  60/40   +8.20%  gap   -0.15 pp
+2005           AW   +8.50%  60/40   +4.00%  gap   +4.50 pp
+2006           AW   +9.83%  60/40  +10.42%  gap   -0.59 pp
+2007           AW  +14.42%  60/40   +7.38%  gap   +7.04 pp
+2008           AW   -1.10%  60/40  -17.25%  gap  +16.15 pp
+2009           AW   +8.54%  60/40  +12.93%  gap   -4.39 pp
+2010           AW  +15.52%  60/40  +13.61%  gap   +1.91 pp
+2011           AW  +15.50%  60/40   +8.16%  gap   +7.34 pp
+2012           AW   +8.32%  60/40  +11.25%  gap   -2.92 pp
+2013           AW   -5.94%  60/40  +15.78%  gap  -21.72 pp
+2014           AW  +10.25%  60/40  +11.70%  gap   -1.45 pp
+2015           AW   -3.07%  60/40   +1.55%  gap   -4.62 pp
+2016           AW   +6.86%  60/40   +7.62%  gap   -0.75 pp
+2017           AW  +11.55%  60/40  +13.76%  gap   -2.21 pp
+2018           AW   -1.89%  60/40   -1.91%  gap   +0.02 pp
+2019           AW  +17.91%  60/40  +21.68%  gap   -3.77 pp
+2020           AW  +19.72%  60/40  +17.06%  gap   +2.66 pp
+2021           AW   +6.04%  60/40  +15.17%  gap   -9.13 pp
+2022           AW  -16.01%  60/40  -16.77%  gap   +0.76 pp
+2023           AW  +11.27%  60/40  +16.81%  gap   -5.54 pp
+2024           AW  +10.63%  60/40  +14.23%  gap   -3.59 pp
+2025           AW  +21.81%  60/40  +13.98%  gap   +7.83 pp
+2026 (PARTIAL) AW   +0.14%  60/40   +5.74%  gap   -5.60 pp
+
+COMPLETE YEARS ALL WEATHER WON: 2005, 2007, 2008, 2010, 2011, 2018, 2020, 2022, 2025
+
+THREE LARGEST ABSOLUTE FULL-YEAR RETURN GAPS
+
+2013: AW -5.94%; 60/40 +15.78%; gap -21.72 pp
+Exact contribution to EACH portfolio's yearly return (percentage points):
+  AW: SPY +7.08, TLT -3.44, TIPS -2.15, GOLD -7.41, Trading costs -0.02
+  60/40: SPY +18.46, IEF -2.66, Trading costs -0.02
+  Contribution to AW minus 60/40 (pp): GOLD -7.41, IEF +2.66, SPY -11.38, TIPS -2.15, TLT -3.44, Trading costs -0.00
+  Check: contributions sum to -21.72 pp
+
+2008: AW -1.10%; 60/40 -17.25%; gap +16.15 pp
+Exact contribution to EACH portfolio's yearly return (percentage points):
+  AW: SPY -10.46, TLT +7.97, TIPS +0.06, GOLD +1.35, Trading costs -0.02
+  60/40: SPY -23.69, IEF +6.47, Trading costs -0.03
+  Contribution to AW minus 60/40 (pp): GOLD +1.35, IEF -6.47, SPY +13.23, TIPS +0.06, TLT +7.97, Trading costs +0.00
+  Check: contributions sum to +16.15 pp
+
+2021: AW +6.04%; 60/40 +15.17%; gap -9.13 pp
+Exact contribution to EACH portfolio's yearly return (percentage points):
+  AW: SPY +6.51, TLT -0.92, TIPS +1.37, GOLD -0.92, Trading costs -0.01
+  60/40: SPY +16.44, IEF -1.26, Trading costs -0.01
+  Contribution to AW minus 60/40 (pp): GOLD -0.92, IEF +1.26, SPY -9.93, TIPS +1.37, TLT -0.92, Trading costs +0.00
+  Check: contributions sum to -9.13 pp
+
+Saved: all_weather_vs_6040_annual.csv, all_weather_attribution.csv, 6040_attribution.csv

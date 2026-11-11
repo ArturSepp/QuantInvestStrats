@@ -580,7 +580,7 @@ def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span()
         first_alpha_date = post_start_alpha.first_valid_index()
         expected[portfolio.nav.name] = pd.concat(
             [
-                pd.Series(0.0, index=pd.DatetimeIndex([performance_start])),
+                pd.Series(np.nan, index=pd.DatetimeIndex([performance_start])),
                 post_start_alpha.loc[first_alpha_date:].ewm(span=12, adjust=False).mean() * 4.0,
             ]
         )
@@ -588,7 +588,7 @@ def test_rolling_benchmark_alpha_uses_lagged_displayed_betas_and_matching_span()
     expected = time_period.locate(expected)
 
     pd.testing.assert_frame_equal(actual, expected, check_freq=False)
-    assert (actual.loc[performance_start] == 0.0).all()
+    assert actual.loc[performance_start].isna().all()
 
 
 def test_portfolio_betas_use_point_in_time_ewma_mean_adjustment(monkeypatch) -> None:
@@ -707,15 +707,6 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
     )
     performance_start = pd.Timestamp('2020-12-31')
     time_period = qis.TimePeriod(start=performance_start, end=pd.Timestamp('2025-12-31'))
-    beta_estimation_start = min(
-        qis.to_returns(
-            prices=portfolio.prices,
-            freq='QE',
-            is_log_returns=True,
-        ).dropna(how='all').index[0]
-        for portfolio in multi_portfolio.portfolio_datas
-    )
-    assert beta_estimation_start < performance_start
 
     figs = generate_strategy_benchmark_factsheet_plt(
         multi_portfolio_data=multi_portfolio,
@@ -731,11 +722,11 @@ def test_quarterly_strategy_benchmark_report_uses_monthly_exposures_and_linked_a
         assert 'Portfolio net exposures (ME-freq)' in titles
         assert (
             '12-span rolling annualised Alpha of QE-freq returns to Benchmark,\n'
-            'starting from 31Dec2020'
+            'prior-period beta, first shown 31Mar2021'
         ) in titles
         assert (
             '12-span rolling holdings-weighted Beta to Benchmark (QE-freq),\n'
-            f'instrument beta estimation starting from {beta_estimation_start:%d%b%Y}'
+            '12-return warm-up, first shown 31Dec2020'
         ) in titles
         assert not any(title.startswith('Cumulative p&l diff') for title in titles)
     finally:

@@ -117,19 +117,6 @@ class EwmLinearModel(LinearModel):
         self.loadings = loadings
 
 
-def _get_instrument_beta_estimation_start(instrument_prices: pd.DataFrame,
-                                          benchmark_prices: pd.DataFrame,
-                                          freq: str) -> pd.Timestamp:
-    """Return the first paired instrument/factor return date used for estimation."""
-    benchmark_prices = benchmark_prices.reindex(index=instrument_prices.index, method='ffill')
-    instrument_returns = ret.to_returns(instrument_prices, freq=freq, is_log_returns=True)
-    benchmark_returns = ret.to_returns(benchmark_prices, freq=freq, is_log_returns=True)
-    paired = instrument_returns.notna().any(axis=1) & benchmark_returns.notna().all(axis=1)
-    if not paired.any():
-        raise ValueError('no paired instrument and benchmark returns for beta estimation')
-    return pd.Timestamp(paired.index[paired][0])
-
-
 def _aggregate_available_benchmark_betas(loadings: dict[str, pd.DataFrame],
                                          weights: pd.DataFrame) -> pd.DataFrame:
     """Sum available benchmark loadings at actual holdings, warning on partial coverage.
