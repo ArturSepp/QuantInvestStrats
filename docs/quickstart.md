@@ -44,7 +44,7 @@ text, follow the source link.
 
 ## Complete checked workflow
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
+[Open in Colab](https://colab.research.google.com/github/ArturSepp/QuantInvestStrats/blob/main/notebooks/offline_quickstart_colab.ipynb)
 
 After installation, the calculation needs no network, credentials, optional extras or local
 data files. It builds a target schedule over the instruments priced at each decision date,
