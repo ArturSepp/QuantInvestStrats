@@ -4458,11 +4458,6 @@
   ],
   "non_analytics": [
     {
-      "document": "docs/quickstart.md",
-      "url": "https://colab.research.google.com/assets/colab-badge.svg",
-      "reason": "External Colab launch badge; not an analytics output."
-    },
-    {
       "document": "README.md",
       "url": "https://img.shields.io/pypi/v/qis?style=flat-square",
       "reason": "External status or launch badge; not an analytics output."

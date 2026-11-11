@@ -521,11 +521,6 @@
     "description": "Thirty synthetic previews, eight empirical cash-rate previews, 21 hedged-index previews and 22 unhedged-index previews with explicit provenance and offline aggregate validation.",
     "non_analytics": [
       {
-        "document": "docs/quickstart.md",
-        "reason": "External Colab launch badge; not an analytics output.",
-        "url": "https://colab.research.google.com/assets/colab-badge.svg"
-      },
-      {
         "document": "README.md",
         "reason": "External status or launch badge; not an analytics output.",
         "url": "https://img.shields.io/pypi/v/qis?style=flat-square"

@@ -7,6 +7,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.0.3] - 2026-11-11
+
+### Fixed
+
+- Remove the obsolete quickstart Colab badge from the documentation image manifest,
+  retaining the badge used in the README. This fixes the documentation validation that
+  blocked the 6.0.2 PyPI upload. No analytics or public APIs changed.
+
 ## [6.0.2] - 2026-11-11
 
 ### Documentation
