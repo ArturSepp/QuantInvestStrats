@@ -48,30 +48,17 @@ def convert(source):
 def render(post, output):
     root = post.resolve().parent
     soup = BeautifulSoup(convert(post.read_text(encoding="utf-8")), "html.parser")
-    guide = (root / "README.md").read_text(encoding="utf-8")
-    prompt = guide.split("## Prompt used in the three chats", 1)[1].strip()
-    appendix = soup.new_tag("details", id="prompt-used-in-the-three-chats", open="")
-    heading = soup.new_tag("summary")
-    heading.string = "Prompt used in the three chats"
-    appendix.append(heading)
+    downloads = soup.new_tag("p")
     guide_link = soup.new_tag("a", href="README.md")
     guide_link.string = "Download the reproduction guide and run commands"
-    appendix.append(guide_link)
-    patch_link = soup.new_tag("a", href="qis_factsheet_warmup.patch")
-    patch_link.string = "Download the QIS factsheet warm-up correction"
-    appendix.append(" · ")
-    appendix.append(patch_link)
-    appendix.append(BeautifulSoup(convert(prompt), "html.parser"))
-    soup.append(appendix)
+    downloads.append(guide_link)
+    soup.append(downloads)
 
     for tag, attr in [(a, "href") for a in soup.select("a[href]")] + [
         (image, "src") for image in soup.select("img[src]")
     ]:
         link = urlsplit(tag[attr])
         if link.scheme or link.netloc or not link.path:
-            continue
-        if link.path == "README.md" and link.fragment == "prompt-used-in-the-three-chats":
-            tag[attr] = "#prompt-used-in-the-three-chats"
             continue
         target = (root / unquote(link.path)).resolve()
         target.relative_to(root)

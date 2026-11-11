@@ -414,7 +414,8 @@ def holdings_alpha_beta(params: dict):
         expected_alpha = 12.0 * post_start.ewm(span=span, adjust=False).mean()
         checks.append(np.allclose(alpha[p.nav.name].loc[post_start.index], expected_alpha,
                                   atol=1e-12))
-        checks.append(alpha.loc[cfg['report_start'], p.nav.name] == 0.0)
+        checks.append(pd.isna(alpha.loc[cfg['report_start'], p.nav.name]))
+        checks.append(alpha[p.nav.name].first_valid_index() == post_start.first_valid_index())
     nav_centred = nav_returns - nav_returns.ewm(span=span, adjust=False).mean()
     nav_reference = nav_centred.mul(x, axis=0).ewm(span=span, adjust=False).mean()
     nav_reference = nav_reference.div(variance, axis=0)
@@ -461,7 +462,7 @@ def holdings_alpha_beta(params: dict):
     switch = cfg['switches'][0][0]
     summary = {
         'first_beta_date': str(betas.first_valid_index().date()),
-        'first_alpha_date': str(alpha.index[1].date()),
+        'first_alpha_date': str(alpha.first_valid_index().date()),
         'first_switch_holdings_beta': float(betas.loc[switch, 'Dynamic holdings']),
         'first_switch_nav_beta': float(nav_beta.loc[switch, 'Dynamic holdings']),
         'last_annual_alpha': alpha.iloc[-1].to_dict(),

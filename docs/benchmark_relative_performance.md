@@ -789,7 +789,8 @@ positions and adapts as new returns arrive. Both regressions use
 EWMA mean adjustment and the same span, so the distinction is their input, not a faster
 smoothing parameter. The upper panel is `MultiPortfolioData.compute_rolling_benchmark_alpha`:
 12 times the 12-span EWMA of realised log-return residuals using the previous month's holdings
-beta. It starts at zero on the performance base date. Residual alpha includes the bond return
+beta. The performance base date is unavailable; the first estimate uses the first eligible
+residual on 31 January 2011. Residual alpha includes the bond return
 not explained by US equity exposure; it is not evidence that this predetermined rule has skill.
 
 The canonical producer is
@@ -806,6 +807,7 @@ warm-up and native-date weight alignment described here are changes in the curre
 
 ```python
 import matplotlib.pyplot as plt
+import pandas as pd
 from tools.docs_analytics.handbook import holdings_alpha_beta
 from tools.docs_analytics.run import load_manifest
 
@@ -815,7 +817,8 @@ assert verified
 assert summary['first_beta_date'] == '2006-02-28'
 assert round(summary['first_switch_holdings_beta'], 2) == 0.17
 assert round(summary['first_switch_nav_beta'], 2) == 0.80
-assert table.loc['2010-12-31', 'annual_alpha_Dynamic holdings'] == 0.0
+assert pd.isna(table.loc['2010-12-31', 'annual_alpha_Dynamic holdings'])
+assert summary['first_alpha_date'] == '2011-01-31'
 assert table['holdings_beta_Dynamic holdings'].iloc[:13].isna().all()
 plt.close(figure)
 ```

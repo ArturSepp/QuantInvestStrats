@@ -1,4 +1,4 @@
-qis==6.0.1
+qis @ git+https://github.com/ArturSepp/QuantInvestStrats.git@e805adc3640d0a9ff66d0a43e5f3d808e1b8c6a8
 numpy==2.5.2
 pandas==3.0.5
 numba==0.67.0
@@ -7,6 +7,5 @@ seaborn==0.13.2
 scipy==1.18.0
 statsmodels==0.14.6
 yfinance==1.7.0
-requests==2.34.2
 markdown==3.11
 beautifulsoup4==4.15.0

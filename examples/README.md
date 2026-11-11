@@ -335,16 +335,7 @@ independent checks, figures and downloadable factsheets. Read the [standalone HT
 all_weather_portfolio/post.html) or [Markdown article](all_weather_portfolio/post.md).
 
 - Reference accounting: [qis_reference.py](all_weather_portfolio/qis_reference.py).
+- QIS 6.0.4 article runner: [qis_reference_604.py](all_weather_portfolio/qis_reference_604.py).
 - Independent numerical checks: [verify_replication.py](
   all_weather_portfolio/verify_replication.py).
-- Frozen-input replay and article rendering: [replay_ai.py](all_weather_portfolio/replay_ai.py)
-  and [build_post.py](all_weather_portfolio/build_post.py).
-- Archived model strategies: [chatgpt_high.py](all_weather_portfolio/chatgpt_high.py),
-  [claude_opus_5_5_high.py](all_weather_portfolio/claude_opus_5_5_high.py), and
-  [deepseek.py](all_weather_portfolio/deepseek.py).
-- Earlier prompt comparisons: [ai_1.py](all_weather_portfolio/experiments/four_prompts/ai_1.py),
-  [ai_2.py](all_weather_portfolio/experiments/four_prompts/ai_2.py),
-  [ai_3.py](all_weather_portfolio/experiments/four_prompts/ai_3.py), and
-  [ai_4.py](all_weather_portfolio/experiments/four_prompts/ai_4.py), with
-  [qis_blog_examples.py](all_weather_portfolio/experiments/four_prompts/qis_blog_examples.py)
-  and [run_ai_comparison.py](all_weather_portfolio/experiments/four_prompts/run_ai_comparison.py).
+- Build the standalone article with [build_post.py](all_weather_portfolio/build_post.py).

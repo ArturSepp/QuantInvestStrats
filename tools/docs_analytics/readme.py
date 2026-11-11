@@ -18,14 +18,14 @@ def focus_risk(figure, benchmark_betas):
                  'Rolling 36-span holdings-weighted beta', 'Portfolio EWM']
     selected = [next(ax for ax in figure.axes if ax.get_title().startswith(fragment))
                 for fragment in fragments]
-    # Seaborn omits missing rows and joins an opening cash beta to the first warmed-up beta.
-    # Restore the native gaps while checking that every finite plotted value is unchanged.
+    # The upstream plot retains native dates and missing warm-up observations.
     beta_lines = [line for line in selected[4].lines if len(line.get_ydata())]
     assert len(beta_lines) == len(benchmark_betas.columns)
     for line, column in zip(beta_lines, benchmark_betas):
         values = benchmark_betas[column]
-        np.testing.assert_allclose(line.get_ydata(), values.dropna().to_numpy(), atol=1e-12)
-        line.set_data(values.index, values.to_numpy())
+        np.testing.assert_allclose(line.get_ydata(), values.to_numpy(),
+                                   atol=1e-12, equal_nan=True)
+        np.testing.assert_array_equal(pd.to_datetime(line.get_xdata()), values.index)
         np.testing.assert_array_equal(np.isnan(line.get_ydata()), values.isna().to_numpy())
     selected[4].text(0.08, 0.45, '36-return warm-up', transform=selected[4].transAxes,
                      fontsize=8, color='dimgray')
