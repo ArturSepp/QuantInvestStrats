@@ -1,4 +1,4 @@
-# All weather or 60/40? Exploring two portfolios with qis and AI
+# qis package for performance analytics and portfolio backtesting: Example of Application for All weather or 60/40 Portfolios and qis vs Gen AI
 
 *Artur Sepp · 11 November 2026*
 
@@ -6,7 +6,7 @@ My paper
 [qis: reproducible performance analytics and portfolio backtesting in Python](https://doi.org/10.21105/joss.11400)
 was published in the Journal of Open Source Software on 18 October 2026. `qis` is the Python
 package behind the analytics of my research papers, and it has been downloaded
-244K times from PyPI as of 11 November 2026 (244,297 downloads). [Download history](https://pepy.tech/projects/qis)
+244K times from PyPI as of 11 November 2026. [Download history](https://pepy.tech/projects/qis)
 
 
 Contents:
