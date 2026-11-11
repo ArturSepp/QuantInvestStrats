@@ -58,7 +58,12 @@ transaction costs. The backtester does not generate a strategy's target schedule
 
 **Factsheet reporting.** Four report archetypes — multi-asset, strategy, strategy versus
 benchmark, and multi-strategy parameter sweeps — produce reproducible multi-page factsheets, with
-optional PyBloqs HTML/PDF rendering. See the [factsheet gallery](docs/gallery.md) and
+optional PyBloqs HTML/PDF rendering. Single-strategy factsheets include a
+[Performance confidence and stability page](docs/factsheets_and_reporting.md#implementation-in-qis)
+by default, with 95% confidence intervals for the Sharpe ratio and for holdings-weighted alpha
+relative to the first supplied benchmark. Strategy-versus-benchmark reports show paired Sharpe
+differences and marginal alpha; multi-strategy reports compare each alternative with a base
+portfolio and report Holm-adjusted p-values. See the [factsheet gallery](docs/gallery.md) and
 [offline reporting quickstart](docs/factsheets.md#quick-start).
 
 **Consolidated risk and tracking-error layer.** The point-in-time `qis.RiskModel` covers ex-ante

@@ -77,6 +77,12 @@ pages and the API producer's verified export contract; no second API list is mai
 3. Browse the [factsheet gallery](gallery.md) to choose a report, and read
    [Notation and conventions](notation_and_conventions.md) before interpreting or comparing
    results.
+4. **How reliable is a strategy's performance?** The default
+   [Performance confidence and stability page](factsheets_and_reporting.md#implementation-in-qis)
+   shows 95% confidence intervals for the Sharpe ratio and for holdings-weighted alpha relative to
+   the first supplied benchmark. Strategy-versus-benchmark reports show the paired difference in
+   Sharpe ratios and marginal alpha. Multi-strategy reports compare each alternative with a base
+   portfolio and report Holm-adjusted p-values for those comparisons.
 
 After installation, the quickstart calculations use fixed synthetic data without network access
 or optional extras. The complete portfolio workflow lives in
