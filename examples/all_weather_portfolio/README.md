@@ -14,6 +14,12 @@ The corrected Figures 6 and 8 and both factsheet PDFs were generated with Python
 
 From an environment containing the recorded software, run the following from this folder; choose output paths outside the checkout.
 
+These standalone replication CLIs and archived AI comparisons are retained as an article
+bundle. The QIS reference runner resolves its output directory through `qis.get_output_path`:
+an explicit `--output-dir` takes precedence, otherwise the adjacent QIS YAML configuration
+provides `OUTPUT_PATH`. Its PDF writers receive that directory explicitly. The archived AI
+callers retain their original conventions and run inside the replay's selected output folders.
+
 ```text
 python qis_reference.py --with-leverage --output-dir <local-run>
 python verify_replication.py <local-run>

@@ -143,12 +143,30 @@ def test_fresh_report_protection(paths):
 
 def test_no_duplicate_directory_helpers_or_cwd_exports():
     assert not (ROOT / 'examples/_helpers/output.py').exists()
+    # This standalone article bundle includes archived model scripts and replication CLIs,
+    # not reusable directory helpers. Keep the exceptions exact; ordinary examples still
+    # use the shared resolver. The two archived callers retain their original accounting.
+    article = Path('all_weather_portfolio')
+    standalone_clis = {
+        article / name for name in (
+            'build_post.py', 'claude_opus_5_5_high.py', 'qis_reference.py',
+            'replay_ai.py', 'verify_replication.py')
+    }
+    archived_outputs = {
+        article / 'experiments/four_prompts' / name
+        for name in ('ai_3.py', 'qis_blog_examples.py')
+    }
+    assert all((ROOT / 'examples' / path).is_file()
+               for path in standalone_clis | archived_outputs)
     failures = []
     for source in (ROOT / 'examples').rglob('*.py'):
+        relative = source.relative_to(ROOT / 'examples')
         tree = ast.parse(source.read_text(encoding='utf-8-sig'))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                if any(alias.name in ('argparse', 'tempfile') for alias in node.names):
+                if any(alias.name == 'tempfile' or
+                       alias.name == 'argparse' and relative not in standalone_clis
+                       for alias in node.names):
                     failures.append(f'{source.name}: duplicate directory/CLI infrastructure')
             if isinstance(node, ast.ImportFrom) and node.module == 'examples._helpers.output':
                 failures.append(f'{source.name}: removed helper import')
@@ -156,6 +174,8 @@ def test_no_duplicate_directory_helpers_or_cwd_exports():
                 if node.func.attr in ('save_fig', 'save_figs_to_pdf', 'save_df_to_excel'):
                     keywords = {kw.arg: kw.value for kw in node.keywords}
                     value = keywords.get('local_path')
-                    if value is None or isinstance(value, ast.Constant) and value.value is None:
+                    if (relative not in archived_outputs and
+                            (value is None or isinstance(value, ast.Constant)
+                             and value.value is None)):
                         failures.append(f'{source.name}:{node.lineno}: implicit output path')
     assert not failures, '\n'.join(failures)

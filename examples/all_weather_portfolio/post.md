@@ -19,14 +19,21 @@ Contents:
 ## Why qis
 
 
-I started to develop `qis` and made it open source around 2022, for the reason that many times I faced a simple research problem. I was using public and private packages for exploring and developing quant strategies that generate position weights for me. What I found missing was a simple portfolio backtester that will reconstruct the P&L from the weights and prices I provide. That backtester should work uniformly whether the underlying strategies cover a universe of several hundred stocks with long-short self-financing weights, a universe of a dozen self-financing futures positions, DeFi staking strategies with cash flows, or simple long-only ETFs.
+I started to develop `qis` and made it open source around 2022, for the reason that many times I faced a simple research problem.
+I was using public and private packages for exploring and developing quant strategies that generate position weights for me.
+What I found missing was a simple portfolio backtester that will reconstruct the P&L from the weights and prices I provide.
+That backtester should work uniformly whether the underlying strategies cover a universe of several thousand stocks with long-short self-financing weights,
+a universe of a dozen self-financing futures positions, DeFi staking strategies with cash flows, or simple long-only ETFs.
 
 
-One function serves the four cases because it assumes little. The weights do not have to sum to one, and the cash balance is explicit. Between rebalancings the backtester holds units, not weights, so the realised weights drift with prices and the reported turnover is the traded one. Its accounting is 460 lines of code.
+One function for generating the net asset value or the equty curve of the portfolio serves the four cases because it assumes little. 
+The weights do not have to sum to one, and the cash balance is explicit.
+Between rebalancings the backtester holds units, not weights, so the realised weights drift with prices and the reported turnover is the traded one. 
+Its accounting is 460 lines of code.
 
 For all these cases I wanted to have a simple mechanism:
 
-- My algo produces position weights for the provided universe along with estimated trading costs
+- My algo produces position weights for the provided universe along with estimated trading costs ar reblancing times
 
 - The universe has valid prices accounting for total returns
 
@@ -35,12 +42,12 @@ For all these cases I wanted to have a simple mechanism:
 
 Each requirement is an argument of `qis.backtest_model_portfolio`:
 
-| Requirement | Argument |
-|---|---|
+| Requirement | Argument                                                                                                                                    |
+|---|---------------------------------------------------------------------------------------------------------------------------------------------|
 | Position weights | `weights`: a dict for a static allocation, a dated DataFrame for a strategy; `weight_implementation_lag` delays the trade of a dated weight |
-| Trading costs | `rebalancing_costs`: one number, a series by instrument, or a DataFrame of dates by instruments |
-| Total-return prices | `prices`; `instruments_carry` for a carry that is not in the price, such as a staking yield |
-| Funding | `funding_rate` on positive and negative cash, `management_fee` on the net asset value |
+| Trading costs | `rebalancing_costs`: one number, a series by instrument, or a DataFrame of dates by instruments                                             |
+| Total-return prices | `prices`; `instruments_carry` for a carry that is not in the price, such as a staking yield or borrow costs                                 |
+| Funding | `funding_rate` on positive and negative cash, `management_fee` on the net asset value                                                       |
 
 
 The backtester then provides the net asset value of the trading account along with the different performance measures, turnover and risk analysis, comparison to benchmarks, regime-conditional performance etc.
@@ -55,13 +62,13 @@ The functions are `qis.plot_time_series`, `qis.plot_stack`, `qis.plot_scatter`, 
 
 With time I also developed backtest reporting factsheets focused on core analyses such as:
 
-- strategy factsheet: when I think of presenting the strategy as a stand-alone: its risk, turnover, performance heatmap, diagnostics of the Sharpe ratio and alpha, etc.
+- [strategy factsheet](https://quantinveststrats.readthedocs.io/en/stable/gallery.html#single-strategy): when I think of presenting the strategy as a stand-alone: its risk, turnover, performance heatmap, diagnostics of the Sharpe ratio and alpha, etc.
 
-- strategy-benchmark factsheet: when I analyse a new strategy feature vs the base strategy: what this feature provides marginally, Brinson decomposition, etc.
+- [strategy-benchmark factsheet](https://quantinveststrats.readthedocs.io/en/stable/gallery.html#strategy-vs-benchmark): when I analyse a new strategy feature vs the base strategy: what this feature provides marginally, Brinson decomposition, etc.
 
-- multi-strategy factsheet: when I analyse a block of strategies or the sensitivity to a specific parameter
+- [multi-strategy factsheet](https://quantinveststrats.readthedocs.io/en/stable/gallery.html#multiple-strategies): when I analyse a block of strategies or the sensitivity to a specific parameter
 
-- multi-asset factsheet: a simple report for a multi-asset universe where strategy weights are not analysed and only a cross-sectional measure of performance is requested.
+- [multi-asset factsheet](https://quantinveststrats.readthedocs.io/en/stable/gallery.html#multi-asset-universe): a simple report for a multi-asset universe where strategy weights are not analysed and only a cross-sectional measure of performance is requested.
 
 
 Each report answers one question:
@@ -93,7 +100,8 @@ The boundary is deliberate: `qis` ships no optimiser and no signal library. The 
 ## Example of using qis for all-weather portfolio analysis
 
 
-I do not summarise the paper further. I use the package the way I use it every day: to answer a
+I do not summarise the paper further - [read the paper further](https://doi.org/10.21105/joss.11400) for my motivation, comparison to peer packages and other details.
+I use the package the way I use it every day: to answer a
 question about portfolios. For this post I choose an interesting one: is an all-weather portfolio
 better than the classic 60/40, and if so, when? I will not dwell on the details of how to construct
 an all-weather portfolio - let's pick a proxy using a static weights portfolio. Mine is a

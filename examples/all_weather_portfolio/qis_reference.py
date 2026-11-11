@@ -438,7 +438,7 @@ def run_local_test(local_test: LocalTest) -> None:
                 figs=figs,
                 file_name='aw6040_factsheet',
                 orientation='portrait',
-                local_path=None,
+                local_path=str(Path.cwd()),
                 add_current_date=False,
             )
             figs[0].savefig('aw6040_fig6_factsheet.png', dpi=150)
@@ -463,7 +463,7 @@ def run_local_test(local_test: LocalTest) -> None:
                 figs=[*figs[:-1], grouped_figs[-1]],
                 file_name="aw6040_grouped_factsheet",
                 orientation="portrait",
-                local_path=None,
+                local_path=str(Path.cwd()),
                 add_current_date=False,
             )
             # Read the same paired inference series used on page two of the monthly factsheet.
@@ -576,9 +576,8 @@ if __name__ == '__main__':
         "--output-dir", type=Path, help="write tables and figures in this directory"
     )
     args = parser.parse_args()
-    if args.output_dir:
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-        os.chdir(args.output_dir)
+    output_dir = Path(qis.get_output_path(args.output_dir)).resolve()
+    os.chdir(output_dir)
 
     print(f"python: {sys.version.split()[0]}")
     for package in ['qis', 'yfinance', 'pandas', 'numpy', 'matplotlib']:
