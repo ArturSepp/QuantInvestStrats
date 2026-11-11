@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.0.2] - 2026-11-11
+
+### Documentation
+
+- Explain strategy performance inference under **Start here** and in the README: Sharpe
+  and holdings-alpha confidence intervals, paired comparisons and Holm-adjusted p-values.
+- Restore handbook PDF generation by replacing the quickstart's SVG badge with a plain
+  **Open in Colab** link to the same notebook.
+
+### Tests
+
+- Check sparse integer risk contributions against the weights retained by native pandas
+  alignment on pandas 2 and 3. No production analytics or defaults changed.
+
 ## [6.0.1] - 2026-11-10
 
 ### Fixed
