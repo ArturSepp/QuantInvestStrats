@@ -1,6 +1,6 @@
 {
   "generated_by": "tools/paper_audit.py",
-  "measured_at_commit": "567515e46baadde8eb633ad4eae2773ebff2a845",
+  "measured_at_commit": "060c41685f8cc50ee28c1f108f575f702a0ebbf6",
   "note": "every number paper.md quotes. Regenerate with python tools/paper_audit.py; the package paper-audit test fails when this file and the repository disagree.",
   "metrics": {
     "active_months": {
@@ -46,26 +46,26 @@
       "paper_phrase": "14 capability groups"
     },
     "collected_tests": {
-      "value": 9042,
+      "value": 9113,
       "how": "pytest --collect-only -q, summed over files, core install",
       "live": false,
       "paper_phrase": null
     },
     "commits": {
-      "value": 1140,
+      "value": 1147,
       "how": "git rev-list --count HEAD",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_call_sites": {
       "value": 1219,
-      "how": "tools/audit_consumers.py at 7b865432ef89",
+      "how": "tools/audit_consumers.py at f7ac7f833a28",
       "live": false,
       "paper_phrase": null
     },
     "consumer_optimalportfolios_symbols": {
       "value": 158,
-      "how": "tools/audit_consumers.py at 7b865432ef89",
+      "how": "tools/audit_consumers.py at f7ac7f833a28",
       "live": false,
       "paper_phrase": null
     },
