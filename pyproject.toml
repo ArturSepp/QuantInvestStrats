@@ -117,7 +117,7 @@ test = [
 ]
 lint = [
     "interrogate==1.7.0",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
 ]
 audit = [
     "pip-audit==2.10.1",
