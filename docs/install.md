@@ -18,7 +18,7 @@ provides portfolio analytics and reporting in Python.
 
 ## Core installation
 
-Use Python 3.11 or later and install into your chosen Python environment:
+Use Python 3.11.5 or later and install into your chosen Python environment:
 
 ~~~console
 python -m pip install qis

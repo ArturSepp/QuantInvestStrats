@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Require Python 3.11.5 or later so every supported interpreter can use the patched
+  SoupSieve releases. Python 3.11.0–3.11.4 are no longer supported.
+
+### Security
+
+- Remove the vulnerable SoupSieve 2.10 fallback from the dependency lockfile and use
+  SoupSieve 4.1 throughout, fixing GHSA-mmhr-3c5m-f64f, GHSA-7g44-g9rc-x53w and
+  GHSA-6655-6qjp-jx7x.
+
 ## [6.0.4] - 2026-11-11
 
 ### Fixed
