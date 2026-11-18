@@ -1,1 +1,1 @@
-"""Development runners for ``market_data``."""
+"""Development runners for ``qis.fx``."""

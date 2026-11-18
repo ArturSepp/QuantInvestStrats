@@ -625,6 +625,91 @@ one- or two-dimensional ndarrays; the numba kernel `compute_ewm_long_short` does
 Before this release a finite first row was dropped from both legs, and a one-dimensional ndarray
 failed in numba.
 
+### Linear trend of observed levels
+
+The trend slope answers a different question from a smoothed return: **what is the
+best-fitting straight line through the levels observed up to this row?** Time is measured in
+rows. For monthly log prices the slope is monthly log growth, not a simple return, an
+annualised rate or a risk-adjusted score. For raw yields it is the change in yield units
+per row. Supply a regular observation grid; keep missing months as rows. The estimator does
+not infer elapsed time from timestamps or interpolate a level.
+
+**Finite-history fit.** Give a finite level $y_{t-j}$ at age $j$ the weight $w_j=\lambda^j$
+and give a missing level zero weight. Fit both the current level $a$ and the **forward**
+slope $b$ by minimising
+
+$$
+\sum_{j=0}^{t} w_j \bigl(y_{t-j}-a+bj\bigr)^2
+$$
+
+over finite observations. Define $W=\sum w_j$, $A=\sum w_j j$, $B=\sum w_j j^2$,
+$Y=\sum w_j y_{t-j}$ and $C=\sum w_j j y_{t-j}$. The two normal equations are
+$Wa-Ab=Y$ and $Aa-Bb=C$. Eliminating the intercept gives
+
+$$
+\hat b_t=\frac{AY-WC}{WB-A^2}, \qquad
+\hat a_t=\frac{Y+A\hat b_t}{W}.
+$$
+
+The sign is positive on rising levels because the time regressor is **minus** age.
+Multiplying all weights by a common number has no effect. The denominator is positive
+when the weighted history has at least two distinct ages with representable weight.
+
+**One-pass update.** At the next row each old age becomes $j+1$ and each old
+weight becomes $\lambda w_j$. Let $m=1$ if the incoming level is finite and zero otherwise,
+and $z$ be that level if finite and zero otherwise. Expanding the powers of $j+1$ gives
+
+$$
+\begin{aligned}
+W' &= \lambda W+m, & A' &= \lambda(A+W), & B' &= \lambda(B+2A+W),\\
+Y' &= \lambda Y+z, & C' &= \lambda(C+Y).
+\end{aligned}
+$$
+
+The implementation uses the algebraically equivalent **centred** update. Between finite
+observations a gap of $g$ rows ages the old mean age by $g$ and multiplies its weight and
+centred sums by $\lambda^g$. Merge this history (decayed mass $M$, aged mean age $u$,
+old mean level $\bar y$) with the unit-mass level $y$ at age zero. The between-group terms
+added to the decayed time variance and forward time–level cross-product are respectively
+$M u^2/(M+1)$ and $M u(y-\bar y)/(M+1)$. Their updated ratio is the slope. This avoids
+subtracting large near-equal raw moments; one state per column suffices regardless of the
+length of the history. Missing current levels remain missing in the output.
+
+**Complete-history limit.** On an unbroken, equally spaced grid with infinite past, the
+normalised age weights are $(1-\lambda)\lambda^j$, with mean age
+$\mu=\lambda/(1-\lambda)$ and variance $v=\lambda/(1-\lambda)^2$. The coefficient on
+the level at age $j$ is therefore $c_j=(1-\lambda)\lambda^j(\mu-j)/v$.
+The coefficients sum to zero. Writing each level as the sum of preceding increments
+makes the coefficient on $\Delta y_{t-k}$ the partial sum $\sum_{j=0}^k c_j$.
+Summing the geometric series gives
+
+$$
+\hat b_t=\sum_{k=0}^{\infty}(1-\lambda)^2(k+1)\lambda^k\,\Delta y_{t-k}.
+$$
+
+This is exactly the convolution of two ordinary EW mean kernels on **increments**, not
+two EWMAs of the levels. At span 12, $\lambda=11/13$ and the largest increment weight
+is at lag five. The identity assumes complete infinite history; two initialised EWMAs
+are not a substitute for the finite fit at startup or after gaps.
+
+**Example.** The log levels below grow by 0.01 per calendar month even though month two
+is unobserved. A compressed time axis would give 0.02 at the third row instead.
+
+```python
+import numpy as np
+import pandas as pd
+import qis
+
+levels = pd.Series([4.00, np.nan, 4.02, 4.03])
+slope = qis.compute_ewm_trend_slope(levels, span=12, min_periods=2)
+np.testing.assert_allclose(slope, [np.nan, np.nan, 0.01, 0.01], equal_nan=True)
+```
+
+For an absolute trend, pass log asset levels; for a relative trend, pass the difference
+of aligned log asset and log benchmark levels. Do the subtraction **before** fitting when
+their missing rows differ. Any division by asset volatility belongs to the caller. A value
+dated $t$ includes the level at $t$ and is available for the following period.
+
 ### Newey–West EWM variance
 
 **Definition.** `compute_ewm_newey_west_vol(data, num_lags=q)` corrects the EWM variance of
@@ -1103,6 +1188,7 @@ assert np.isnan(qis.filter_outliers(shocked, qis.OutlierPolicy(std_ewm_ceil=pres
 
 | Quantity | Formula | qis entry point |
 |---|---|---|
+| Finite-history time trend of levels | Intercept and slope with geometric age weights; forward slope per row | `qis.compute_ewm_trend_slope(data, span=12, min_periods=2)` |
 | EWM recursion (numba, ndarray only) | $m_t=\lambda m_{t-1}+(1-\lambda)x_t$, seed before the first observation | `qis.ewm_recursion(a, init_value, span, ewm_lambda, is_unit_vol_scaling, nan_backfill)` |
 | EWM mean | the recursion with `InitType` seed | `qis.compute_ewm(data, span, ewm_lambda=0.94, init_type=InitType.X0)` |
 | Unit-variance EWM | $\sqrt{N}\,m_t$ | `qis.compute_ewm(..., is_unit_vol_scaling=True)` |

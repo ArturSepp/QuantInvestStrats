@@ -52,7 +52,7 @@ the analytics.
 | Sampling grid | Per-asset `freq`; examples use `ME` and `QE`; conversion and hedge reset share that grid |
 | Annualisation | ACT/365 Fixed cash on actual calendar intervals; statistical $\mathrm{af}$ remains 12 for `ME` and 4 for `QE` |
 | Mean adjustment | None in conversion or cash subtraction; the beta example uses equal-weight OLS with an intercept, equivalent to sample demeaning |
-| Timing | Return at $t$ covers $(t-1,t]$; opening hedge and CIP rates are lagged once; `cash_rate_lag=1` |
+| Timing | Return at $t$ covers $(t-1,t]$; opening hedge and CIP rates are lagged once; `FxCashPolicy(quote_lag=1)` |
 | Output units | Decimal periodic reference-currency returns; tables show percent per month; regression betas are dimensionless |
 | qis default | `compute_fx_returns`: explicit kind/coordinate; genuine zeros retained; no automatic NAV |
 
@@ -163,7 +163,7 @@ $$
 r^{f,R}_t=y^R_{t-1}\,\frac{\mathrm{calendar\ days}(t-1,t)}{365}.
 $$
 
-Thus `cash_rate_lag=1` means one month on `ME` and one quarter on `QE`, not always one
+Thus `quote_lag=1` means one month on `ME` and one quarter on `QE`, not always one
 calendar month. Accrual is ACT/365 Fixed at the opening quote, including weekends and leap
 days, with the original reset schedule retained. It is not an observed cash-index return.
 The first cash accrual is zero; asset inception remains missing. Changing the lag affects cash subtraction only; hedge
@@ -370,8 +370,7 @@ reference_total = qfx.compute_fx_returns(
                                    frequency='ME',
                                    cash_policy=qfx.FxCashPolicy(quote_lag=1),
                                    zero_return_to_nan=False))['ME']
-total_navs = reference_total.to_index(qfx.FxIndexNormalization(
-    1.0, 1.0, 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip'))
+total_navs = reference_total.to_index(qfx.FxIndexNormalization.compounded(settlement_frequency='ME'))
 total_simple = reference_total.values
 reference_cash = rates[reference_ccy].shift(1) * rates.index.to_series().diff().dt.days / 365
 np.testing.assert_allclose(

@@ -1,15 +1,15 @@
 """
 Illustrate the FxRatesData FX-hedging analytics on real Yahoo data.
 
-Data-driven companion to the hedging cases in fx_rates_data_test (CHECK_HEDGED_RETURN,
+Data-driven companion to ``src/qis/fx/run_local/fx_rates_data_run.py`` (CHECK_HEDGED_RETURN,
 PLOT_HEDGE_REPORT, MULTI_ASSET_HEDGE, MULTI_ASSET_HEDGE_REPORT): a panel of USD-denominated assets
 is viewed by a CHF investor, and the example exercises the optimal / max-carry / beta hedge ratios,
 the hedged NAVs across hedge ratios, the EWMA FX vol and beta, the single-asset hedging report, and
 the multi-asset hedging metrics and heatmap report.
 
 FX spots are real Yahoo data; domestic rates are USD-real plus stylised differentials (see
-fx_rates_data_yahoo_example), so the carry component is illustrative — production rates come from
-Bloomberg, per the FxRatesData README.
+fx_rates_data_yahoo_example), so the carry component is illustrative — production rates are
+supplied by the consuming data pipeline.
 """
 import pandas as pd
 import matplotlib.pyplot as plt

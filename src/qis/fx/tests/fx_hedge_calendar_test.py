@@ -72,3 +72,39 @@ def test_mixed_currency_plot_keeps_all_foreign_assets():
             assert "US asset" in cells and "EU asset" in cells
     finally:
         plt.close(fig)
+
+
+@pytest.mark.parametrize("end,decision,completed", [
+    ("2026-11-13", "2026-11-30", "2026-10-31"),
+    ("2026-10-30", "2026-10-31", "2026-09-30"),
+])
+def test_final_scheduled_decision_uses_completed_period_risk(end, decision, completed):
+    """Midperiod and weekend-end tails retain the scheduled label without inventing risk data."""
+    dates = pd.bdate_range("2020-01-01", end)
+    t = np.arange(len(dates))
+    prices = pd.Series(100 * np.exp(.0002 * t + .03 * np.sin(t / 17)),
+                       index=dates, name="asset")
+    spots = pd.DataFrame({"USD": 1., "EUR": 1.1 * np.exp(.02 * np.cos(t / 29))},
+                         index=dates)
+    fx = qis.FxRatesData(spots, pd.DataFrame({"USD": .05, "EUR": .03}, index=dates))
+    cross = fx.get_local_to_reference_fx_rate("EUR", "USD")
+    premium = fx.get_forward_rate_for_local_ccy("EUR", "USD", freq="ME")
+    vol, beta = qis.compute_fx_vol_beta(prices, cross, freq="ME")
+    optimal, carry, beta_hedge = qis.compute_fx_optimal_hedge(
+        prices, cross, premium, freq="ME", risk_aversion_lambda=2., min_max_hedge=None)
+    label = pd.Timestamp(decision)
+    assert vol.index[-1] == beta.index[-1] == pd.Timestamp(completed)
+    assert optimal.index[-1] == carry.index[-1] == beta_hedge.index[-1] == label
+    assert label > dates[-1]
+    tau = ((label + pd.offsets.MonthEnd(1)) - label).days / 365
+    delivery = (1 + .05 * tau) / (1 + .03 * tau)
+    expected_carry = 1 - (1 - delivery) / tau / (4 * vol.iloc[-1] ** 2)
+    assert carry.iloc[-1] == pytest.approx(expected_carry, abs=2e-12)
+    assert beta_hedge.iloc[-1] == pytest.approx(1 + beta.iloc[-1])
+    assert optimal.iloc[-1] == pytest.approx(expected_carry + beta.iloc[-1], abs=2e-12)
+    report = qis.compute_multi_asset_fx_hedging(
+        prices.to_frame(), fx, local_ccys="EUR", reference_ccy="USD", freq="ME",
+        risk_aversion_lambda=2., min_max_hedge=None)
+    expected = pd.Series({"Optimal": optimal.iloc[-1], "Max Carry": carry.iloc[-1],
+                          "Beta Hedge": beta_hedge.iloc[-1]}, name="asset")
+    pd.testing.assert_series_equal(report["last_hedges"].loc["asset"], expected)

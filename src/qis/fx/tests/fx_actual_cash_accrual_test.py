@@ -29,7 +29,7 @@ def test_fx_cash_agrees_with_actual_funding(start, end, freq, days):
     """FX subtraction equals independent calendar accrual and native funding."""
     dates = pd.DatetimeIndex([start, end])
     data = _data(dates)
-    cash = data._get_period_cash_returns(dates, "USD", freq, False)
+    cash = data.get_period_cash_returns(dates, "USD")
     expected = 0.06 * days / 365.0
     assert cash.iloc[0] == 0.0
     np.testing.assert_allclose(cash.iloc[-1], expected, rtol=0, atol=1e-15)
@@ -113,23 +113,23 @@ def test_missing_opening_cash_does_not_become_free_funding():
     dates = pd.date_range("2024-01-31", periods=4, freq="ME")
     data = _data(dates)
     data.domestic_rates["USD"] = [np.nan, -0.02, -0.03, -0.04]
-    cash = data._get_period_cash_returns(dates, "USD", "ME", False)
+    cash = data.get_period_cash_returns(dates, "USD")
     assert cash.iloc[0] == 0 and pd.isna(cash.iloc[1])
     np.testing.assert_allclose(cash.iloc[2], -0.02 * 31 / 365)
     nav = data.build_local_cash_nav("USD", freq="ME")
     assert nav.iloc[0] == 1.0 and nav.iloc[1:].isna().all()
     data.domestic_rates.iloc[1, 0] = -20.0
     with pytest.raises(ValueError, match="positive"):
-        data._get_period_cash_returns(dates, "USD", "ME", True)
+        data.get_period_cash_returns(dates, "USD", is_log_returns=True)
 
 
 def test_closing_quote_cannot_change_completed_cash_interval():
     """A closing-date rate update never alters the preceding cash accrual."""
     dates = pd.date_range("2024-01-31", periods=2, freq="ME")
     data = _data(dates)
-    before = data._get_period_cash_returns(dates, "USD", "ME", False)
+    before = data.get_period_cash_returns(dates, "USD")
     data.domestic_rates.iloc[-1, 0] = 9.0
-    after = data._get_period_cash_returns(dates, "USD", "ME", False)
+    after = data.get_period_cash_returns(dates, "USD")
     pd.testing.assert_series_equal(before, after)
 
 

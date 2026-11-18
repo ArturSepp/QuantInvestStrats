@@ -195,10 +195,8 @@ assert np.isclose(log_excess.values.EU_equity.iloc[1],
 spot = qis.compute_fx_returns(fx, qis.FxCurrencyReturnsRequest(
     ('EUR', 'CHF'), reference_ccy='USD'))['ME']
 assert spot.values.columns.tolist() == ['EUR', 'CHF']
-normalization = qis.FxIndexNormalization(
-    initial_value=100., notional_to_capital=1., notional_rule='capital_proportional',
-    settlement_frequency='ME', reinvestment='each_interval',
-    cash_treatment='as_returned', missing_returns='stop')
+normalization = qis.FxIndexNormalization.compounded(
+    'ME', initial_value=100., missing_returns='stop')
 nav = reference.to_index(normalization)
 assert nav.iloc[0].tolist() == [100., 100.]
 assert np.isclose(nav.EU_equity.iloc[1], 100*1.02*(1.12/1.10))
@@ -230,6 +228,10 @@ assert np.isclose(normalized_log.EUR.iloc[1], np.log1p(forward.values.EUR.iloc[1
 
 The normalization above starts at 100, uses one unit of opening notional per unit of
 capital, resets monthly and reinvests each completed payoff. It adds no collateral cash.
+`compounded` returns the same seven-field specification as the explicit constructor; its
+default initial value is one and its default gap policy is `skip`. Settlement frequency is
+required. Use the full `FxIndexNormalization(...)` constructor for fixed notional or a
+nonunit notional-to-capital ratio. Merely creating a specification does not create an index.
 
 The complete public example is also executed by the documentation gate:
 
@@ -288,7 +290,7 @@ resampling a completed ledger only changes its presentation.
 | Cash policy | `FxCashPolicy` | ACT/365F, quote lag, annual-rate provenance |
 | Calculation | `compute_fx_returns` | Mapping from each cadence to the same typed result schema |
 | Result | `FxReturnsData` | Owned copies of values, boundaries, currencies and opening hedges |
-| Optional index | `FxIndexNormalization` | Explicit capital, notional, settlement, reinvestment, cash and gap handling |
+| Optional index | `FxIndexNormalization`; `FxIndexNormalization.compounded(...)` for unit compounding | Explicit capital, notional, settlement, reinvestment, cash and gap handling |
 
 `diagnostics=True` includes currency-level cash, spot and hedge-cost panels without replicating
 all legs for every asset. Original dated currency spells retain off-grid changes. Property reads return copies; modifying them cannot alter a result.

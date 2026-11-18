@@ -43,7 +43,7 @@ def compute_monthly_cash_index(
     if start > dates[-1]:
         return result
     resets = pd.date_range(start, dates[-1], freq="ME")
-    earned = data._get_period_cash_returns(resets, currency, "ME", False, 1)
+    earned = data.get_period_cash_returns(resets, currency, quote_lag=1)
     levels = (1.0 + earned).cumprod(skipna=False)
     opening_quotes = rates.reindex(resets, method="ffill")
     supported = dates[dates >= start]

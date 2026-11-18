@@ -7,8 +7,59 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-11-18
+
+### Fixed
+
+- FX documentation uses the public cash-lag name, a runnable offline quick start and explicit
+  supplied-data/normalization conventions. Source runners and provider examples use current
+  forward-index labels, remove duplicated requests and retain the latest prior observation
+  at weekend quarter-ends. Provider, cash and hedge policies are unchanged.
+- `RiskModel` tracking error treats negative quadratic forms within a dimension-scaled
+  floating-point error bound as zero. Singular PSD cancellation no longer yields NaN;
+  materially negative forms and unavailable held-asset risk remain unavailable.
+- The standalone FX principal-hedge kernel accepts Python and NumPy integer/floating
+  scalars, including the documented `hedge_ratio=0` and `1`. Unsupported types, including
+  booleans, now raise `TypeError` with the offending value rather than `NotImplementedError`.
+- Typed asset and currency FX requests report missing spot/rate columns with their panel
+  names. Validation requires only the inputs read by the selected payoff and diagnostics;
+  local-only requests, unused asset metadata and missing quote observations retain their behavior.
+- Document final scheduled hedge labels and their last completed-period risk estimates;
+  hedge schedules, rates and numerical payoff calculations are unchanged.
+
+### Added
+
+- `FxRatesData.get_period_cash_returns(dates, local_ccy, quote_lag=1,
+  is_log_returns=False)` exposes the existing ACT/365 Fixed period-cash calculation.
+  It preserves quote timing, the stored spot-calendar projection and missing-history behavior.
+- `FxIndexNormalization.compounded(settlement_frequency, initial_value=1.0,
+  missing_returns='skip')` declares the existing unit-notional, reinvested synthetic index.
+  Index construction remains optional and requires an explicit settlement cadence.
+- `compute_ewm_trend_slope` fits a finite-history time trend with an intercept in one
+  pass per series. It preserves elapsed rows across missing observations and reports
+  the slope in level units per row, without implicit logging or volatility scaling.
+
 ### Changed
 
+- FX single-asset companion panels and multi-asset report statistics now use the requested
+  `freq` for volatility, zero-rate Sharpe and benchmark regressions, instead of forcing
+  monthly statistics. Daily drawdowns, monthly skewness, native-endpoint returns, NAVs and
+  hedge schedules are unchanged for the same requested cadence. Reports label their statistics and
+  asset hedge/reset cadence explicitly.
+- The single-asset FX performance table now receives the same explicit `PerfParams` as
+  its companion panels. This separate correction can change monthly table beta/alpha
+  as well as nonmonthly statistics; the table previously inferred its policy from the
+  combined NAV index. Global `PerfParams` defaults are unchanged.
+- `get_aligned_fx_spots` is causal by default (`bfill_fx=False`). Leading FX gaps
+  remain missing, and converted returns need observable quotes at both endpoints.
+  Use `bfill_fx=True` only for explicit descriptive historical replay: it uses a later
+  quote. Consumers must check FX coverage and trading eligibility before adopting this
+  default; previously backfilled input panels are not repaired automatically.
+- Remove the private `_get_period_cash_returns` accessor without a compatibility alias.
+  QIS callers use `get_period_cash_returns`; downstream callers must replace `return_index`
+  with `dates`, remove the unused `freq`, and replace `cash_rate_lag` with `quote_lag`.
+  The new argument order is `(dates, local_ccy, quote_lag=1, is_log_returns=False)`;
+  callers must migrate together with their QIS installation. Cash and payoff values are unchanged.
 - Require Python 3.11.5 or later so every supported interpreter can use the patched
   SoupSieve releases. Python 3.11.0–3.11.4 are no longer supported.
 

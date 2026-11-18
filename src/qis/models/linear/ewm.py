@@ -58,6 +58,89 @@ from qis.utils.annualisation import infer_annualisation_factor_from_df
 import qis.utils.np_ops as npo
 
 
+@njit
+def _ewm_trend_slope_2d(levels: np.ndarray, decay: float, min_periods: int) -> np.ndarray:
+    """Accumulate centred weighted time variance and forward time/level covariance."""
+    out = np.full(levels.shape, np.nan)
+    for j in range(levels.shape[1]):
+        mass = mean_age = mean_y = xx = xy = origin = 0.0
+        count = 0
+        last = 0
+        for t in range(levels.shape[0]):
+            y = levels[t, j]
+            if not np.isfinite(y):
+                continue
+            count += 1
+            if count == 1:
+                origin = y
+            y -= origin  # translation invariance, including large intercepts
+            gap = t - last
+            factor = decay ** gap
+            old_mass = mass * factor
+            mass = old_mass + 1.0
+            old_share = old_mass / mass
+            age = mean_age + gap
+            dy = y - mean_y
+            # Merge the aged history with a unit-weight observation at age zero.
+            # xy is covariance with forward time (minus age), not with age.
+            xx = factor * xx + old_share * age * age
+            xy = factor * xy + old_share * age * dy
+            mean_age = old_share * age
+            mean_y += dy / mass
+            last = t
+            if count >= min_periods and xx > 0.0:
+                out[t, j] = xy / xx
+    return out
+
+
+def compute_ewm_trend_slope(data: Union[pd.Series, pd.DataFrame, np.ndarray],
+                            span: float = 12, min_periods: int = 2
+                            ) -> Union[pd.Series, pd.DataFrame, np.ndarray]:
+    """Fit an exponentially weighted linear trend with an intercept, through each row.
+
+    Ages are row counts, not timestamp differences. Supply an ordered grid with explicit
+    missing rows for elapsed periods. Past nonfinite levels are ignored, but their periods
+    still elapse; the current level must be finite. No log, risk scaling or annualisation
+    is implicit. A log level gives log growth per row. Runs in one pass per column.
+
+    Args:
+        data: Numeric levels as a labelled series/frame or one- or two-dimensional array.
+        span: Finite scalar greater than one; decay equals (span - 1) / (span + 1).
+        min_periods: Minimum number of finite levels per column, including the current row.
+            Defaults to two (the first identifiable slope); use 13 for a 12-span warm-up
+            requiring 13 observed levels.
+
+    Returns:
+        Slope per row, with the input shape and labels. Unavailable slopes are NaN.
+
+    Raises:
+        ValueError: Invalid span, count, input dimensions or non-unique/unordered index.
+    """
+    if (isinstance(span, (bool, np.bool_))
+            or not isinstance(span, (int, float, np.integer, np.floating))
+            or not np.isfinite(span) or span <= 1):
+        raise ValueError("span must be a finite scalar greater than one")
+    if (isinstance(min_periods, (bool, np.bool_))
+            or not isinstance(min_periods, (int, np.integer)) or min_periods < 2):
+        raise ValueError("min_periods must be an integer >= 2")
+    if isinstance(data, (pd.Series, pd.DataFrame)):
+        if not data.index.is_unique or not data.index.is_monotonic_increasing:
+            raise ValueError("data index must be unique and increasing")
+        a = data.to_numpy(dtype=np.float64, na_value=np.nan)
+    else:
+        a = np.asarray(data, dtype=np.float64)
+    if a.ndim not in (1, 2):
+        raise ValueError("data must be one- or two-dimensional")
+    span = float(span)
+    result = _ewm_trend_slope_2d(a[:, None] if a.ndim == 1 else a,
+                                 (span - 1.0) / (span + 1.0), min_periods)
+    if isinstance(data, pd.DataFrame):
+        return pd.DataFrame(result, index=data.index, columns=data.columns)
+    if isinstance(data, pd.Series):
+        return pd.Series(result[:, 0], index=data.index, name=data.name)
+    return result[:, 0] if a.ndim == 1 else result
+
+
 class NanBackfill(Enum):
     """
     how the EWM recursion treats a missing observation.

@@ -134,7 +134,7 @@ measuring the realised unhedged payoff.
 > Both deliberate defects fail all 22 pair checks in this study.
 
 Domestic short-rate values do not enter this total-return calculation. Zeroing the rates
-or changing `cash_rate_lag` from 1 to 0 leaves every result unchanged. This invariance is
+or changing `FxCashPolicy.quote_lag` from 1 to 0 leaves every result unchanged. This invariance is
 not a recommendation to change cash timing in an excess-return or hedge-carry calculation.
 
 ### Different family FX diagnostic

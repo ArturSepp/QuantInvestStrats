@@ -7,17 +7,16 @@ Imports are deferred so the module also imports in an offline/core-only environm
 The consuming pipeline owns ticker selection, benchmark suitability and historical coverage;
 this example builds the container in memory and does not persist or update production data.
 
-Conventions (identical to the container contract): ``fx_spots`` columns are units of USD per 1 unit
+Supplied-panel conventions for this example: ``fx_spots`` columns are units of USD per 1 unit
 of the local currency (FX pairs are quoted local/USD on Bloomberg, e.g. 'EURUSD Curncy'); USD is
 pinned to 1.0; GBp = 0.01 * GBP; XAU = 1.0. ``domestic_rates`` are short rates as decimals — the
 Bloomberg fields are quoted in percent, so they are scaled by 0.01; XAU uses the USD curve as a
 financing-cost proxy and GBp shares the GBP curve.
 """
 
-from qis.fx import fx_returns as qfx
 import pandas as pd
 import matplotlib.pyplot as plt
-import qis as qis
+import qis
 from enum import Enum
 
 from qis.fx import FxRatesData
@@ -88,8 +87,8 @@ def fetch_fx_rates_data_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('
     fx_spots = fetch_field_timeseries_per_tickers(tickers=FX_SPOTS, freq='B', field='PX_LAST',
                                                   start_date=start_date).ffill()
     fx_spots['USD'] = 1.0                       # add USD for consistency (1 USD per USD)
-    fx_spots['GBp'] = 0.01 * fx_spots['GBP']    # pence -> pounds, per the container contract
-    fx_spots['XAU'] = 1.0                       # gold quoted in USD; legacy 1.0 mapping
+    fx_spots['GBp'] = 0.01 * fx_spots['GBP']    # pence -> pounds in this adapter
+    fx_spots['XAU'] = 1.0                       # identity conversion for USD gold prices
 
     # Convert percent to decimals; forward-fill only after the first observed rate.
     domestic_rates = 0.01 * fetch_field_timeseries_per_tickers(tickers=DOMESTIC_RATES, freq='B',
@@ -104,8 +103,8 @@ def fetch_fx_rates_data_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('
 def fetch_usd_assets_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('31Dec1998')) -> pd.DataFrame:
     """Fetch the USD-denominated benchmark price panel (columns renamed to the USD_ASSETS values).
 
-    Used by the translation / hedging cases below; in rosaa this panel is part of
-    ``create_fx_rates_data`` and is persisted alongside the FX data.
+    Used by the translation / hedging cases below. Persisting this price panel alongside
+    the FX panels belongs to the consuming data pipeline; this example keeps it in memory.
     """
     from bbg_fetch import fetch_field_timeseries_per_tickers
     return fetch_field_timeseries_per_tickers(tickers=USD_ASSETS, freq='B', field='PX_LAST',
@@ -115,7 +114,7 @@ def fetch_usd_assets_from_bloomberg(start_date: pd.Timestamp = pd.Timestamp('31D
 class Locals(Enum):
     SHOW_FX_DATA = 1
     CROSS_RATES = 2
-    FX_TOTAL_RETURN_NAVS = 3
+    FX_FORWARD_INDICES = 3
     CARRY_FORWARD_PREMIUM = 4
     CASH_NAVS = 5
     TRANSLATE_ASSET_PANEL = 6
@@ -143,14 +142,11 @@ def run_local(local: Locals):
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(prices=crosses, ax=ax, title='FX cross rates (reference per local)')
 
-    elif local == Locals.FX_TOTAL_RETURN_NAVS:
+    elif local == Locals.FX_FORWARD_INDICES:
         result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
             ('EUR', 'GBP', 'CHF', 'JPY', 'AUD'), 'USD', qis.FxReturnType.FX_FORWARD,
             frequency='B'))['B']
-        navs = result.to_index(qis.FxIndexNormalization(
-            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
-            settlement_frequency='B', reinvestment='each_interval',
-            cash_treatment='as_returned', missing_returns='skip'))
+        navs = result.to_index(qis.FxIndexNormalization.compounded('B'))
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)
         qis.plot_prices(
             prices=navs, ax=ax,
@@ -177,38 +173,36 @@ def run_local(local: Locals):
         # translate the USD benchmark panel into a CHF investor's frame, unhedged vs fully hedged
         assets = fetch_usd_assets_from_bloomberg()
         local_ccys = pd.Series('USD', index=assets.columns)
-        fx_result_179 = qfx.compute_fx_returns(
+        unhedged_result = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=assets,
                 local_ccys=local_ccys,
-                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 reference_ccy=REFERENCE_CCY,
                 hedge_ratios=pd.Series(0.0, index=assets.columns),
                 frequency=FREQ,
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
                 zero_return_to_nan=False,
             ),
         )[FREQ]
-        navs_unhedged = fx_result_179.to_index(qfx.FxIndexNormalization(
-            1.0, 1.0, 'capital_proportional', FREQ, 'each_interval', 'as_returned', 'skip'))
-        fx_result_182 = qfx.compute_fx_returns(
+        navs_unhedged = unhedged_result.to_index(qis.FxIndexNormalization.compounded(FREQ))
+        hedged_result = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=assets,
                 local_ccys=local_ccys,
-                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 reference_ccy=REFERENCE_CCY,
                 hedge_ratios=pd.Series(1.0, index=assets.columns),
                 frequency=FREQ,
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
                 zero_return_to_nan=False,
             ),
         )[FREQ]
-        navs_hedged = fx_result_182.to_index(qfx.FxIndexNormalization(
-            1.0, 1.0, 'capital_proportional', FREQ, 'each_interval', 'as_returned', 'skip'))
+        navs_hedged = hedged_result.to_index(qis.FxIndexNormalization.compounded(FREQ))
         eq = pd.concat([navs_unhedged['Equities'].rename(f'Equities in {REFERENCE_CCY} (unhedged)'),
                         navs_hedged['Equities'].rename(f'Equities in {REFERENCE_CCY} (hedged)')], axis=1)
         fig, ax = plt.subplots(figsize=(10, 6), tight_layout=True)

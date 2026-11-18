@@ -54,8 +54,9 @@ def compute_local_and_fx_return(asset_price_local_ccy: pd.Series,
     to ``freq``, takes returns of both, and returns them separately. The
     reference-currency total return of an unhedged position is recovered as
     ``local_return * (1 + fx_return) + fx_return`` for simple returns, or
-    ``local_return + fx_return`` for log returns, inside
-    ``compute_performance_of_local_ccy_asset_in_reference_ccy``.
+    ``local_return + fx_return`` for log returns.
+    ``compute_performance_of_local_ccy_asset_in_reference_ccy`` requests simple legs and
+    takes ``log1p`` of the completed payoff when log output is requested.
 
     Args:
         asset_price_local_ccy: Asset price quoted in its local currency.
@@ -129,8 +130,8 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
             in simple mode, or its log in log mode, at the same ``freq`` as the
             asset (see ``FxRatesData.get_forward_rate_for_local_ccy``).
         hedge_ratio: Fraction of opening local-currency asset value sold forward:
-            ``0`` is unhedged, ``1`` hedges principal. A constant ``float`` or a
-            time-varying ``pd.Series``; ratios above one may hedge known income.
+            ``0`` is unhedged, ``1`` hedges principal. A Python/NumPy integer or floating
+            scalar, or a time-varying ``pd.Series``; ratios above one may hedge known income.
         freq: Resampling frequency for the returns (e.g. ``'ME'``).
         is_log_returns: If True return log performance and accept a log premium;
             otherwise return simple performance and accept a simple premium.
@@ -140,17 +141,19 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
         per-period reference-currency returns, both sampled at ``freq``.
 
     Raises:
+        TypeError: Hedge ratio is not a supported numeric scalar or Series (bool is excluded).
         ValueError: A supplied simple forward gross factor is nonpositive, or a
             log-output payoff has nonpositive terminal wealth. NaNs remaining
             after the alignment and forward-fill policy stay missing.
     """
-    # Convert hedge_ratio to time series
-    if isinstance(hedge_ratio, float):
-        hedge_ratios = pd.Series(hedge_ratio, index=asset_price_local_ccy.index)
-    elif isinstance(hedge_ratio, pd.Series):
+    # Convert hedge_ratio to time series without changing the existing Series path.
+    if isinstance(hedge_ratio, pd.Series):
         hedge_ratios = hedge_ratio
+    elif (isinstance(hedge_ratio, (int, float, np.integer, np.floating))
+          and not isinstance(hedge_ratio, (bool, np.bool_))):
+        hedge_ratios = pd.Series(float(hedge_ratio), index=asset_price_local_ccy.index)
     else:
-        raise NotImplementedError(f"type={type(hedge_ratio)}")
+        raise TypeError(f"hedge_ratio must be a number or a pd.Series, got {hedge_ratio!r}")
 
     # Calculate local and FX return components
     local_return, fx_return = compute_local_and_fx_return(
@@ -177,11 +180,8 @@ def compute_performance_of_local_ccy_asset_in_reference_ccy(asset_price_local_cc
     hedged_return = _hedged_simple_return(
         local_return, fx_return, h_ratio_1, forward_rate_for_local_ccy.shift(1),
         is_log_premium=is_log_returns)
-    # First period has NaN from the ``h_ratio_1.shift(1)`` lag (no
-    # previous-period hedge to carry forward). Set to 0 for
-    # consistency with ``qis.to_returns(..., is_first_zero=True)``
-    # used elsewhere in this module, so the resulting NAV starts from
-    # 1.0 at the first index rather than from a NaN-propagated head.
+    # The lagged hedge and premium have no value at the first date. Set that return
+    # to zero so the NAV starts at 1.0; typed compute_fx_returns results leave it missing.
     if len(hedged_return) > 0:
         hedged_return.iloc[0] = 0.0
     if is_log_returns:
@@ -215,7 +215,8 @@ def compute_fx_vol_beta(asset_price_local_ccy: pd.Series,
         Tuple ``(fx_vol, fx_beta)`` of Series at ``freq``: annualised FX volatility
         and the EWMA beta of the local return on the FX return. Both are point in time: the
         beta's FX variance is seeded with the first squared FX return (up to qis 5.30.3 with
-        the full-sample mean square) and its cross moment with zero.
+        the full-sample mean square) and its cross moment with zero. The volatility recursion
+        is seeded with ``0.08 ** 2 / af``, an 8% annual volatility at ``freq``.
     """
     local_return, fx_return = compute_local_and_fx_return(
         asset_price_local_ccy=asset_price_local_ccy,
@@ -278,6 +279,12 @@ def compute_fx_optimal_hedge(asset_price_local_ccy: pd.Series,
 
     Returns:
         Tuple ``(optimal_hedge, max_carry, beta_hedged)`` of hedge-ratio Series at ``freq``.
+        With the container's default forward schedule, the last row is labelled at the
+        scheduled reset on or after its final quote date. For a midperiod end or a final
+        business day before a weekend period end, that label is after the observation:
+        its volatility and beta remain those of the last completed return period. It is
+        a scheduled decision label, not a new future observation. Supplied premium indices
+        determine the available schedule when a different forward panel is used.
     """
     fx_vol, fx_beta = compute_fx_vol_beta(asset_price_local_ccy=asset_price_local_ccy,
                                           local_to_reference_fx_rate=local_to_reference_fx_rate,
@@ -316,7 +323,7 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
                          asset_ccy_map: Union[pd.Series, Dict],
                          fx_prices: pd.DataFrame,
                          quote_currency: str = 'USD',
-                         bfill_fx: bool = True
+                         bfill_fx: bool = False
                          ) -> pd.DataFrame:
     """
     The FX spot series belonging to each instrument, on the index of its prices.
@@ -324,16 +331,18 @@ def get_aligned_fx_spots(prices: pd.DataFrame,
     An instrument panel is quoted in mixed currencies, and converting it needs a spot series per
     instrument rather than per currency. This maps each column of ``prices`` through its currency to
     the matching spot column, reindexes onto the price dates, and masks where the price is missing.
-    By default, leading gaps are filled from the first available FX observation to preserve the
-    historical behavior. Set ``bfill_fx=False`` for causal alignment, where a spot remains missing
-    until its first observation is available.
+    By default, a spot remains missing until its first observation is available. Quotes are
+    aligned as-of, retaining off-grid updates and using no future observation. Explicit
+    ``bfill_fx=True`` fills leading gaps from a later aligned quote: this introduces look-ahead
+    and is for descriptive historical replay only, not historical trading decisions.
+    Previously backfilled input values cannot be distinguished from observed quotes here.
 
     Args:
         prices: instrument prices, one column per instrument
         asset_ccy_map: instrument to currency, as a Series indexed by instrument or a dict
         fx_prices: FX spots, one column per currency
         quote_currency: the numeraire, whose spot column is set to one
-        bfill_fx: if True, fill leading gaps from the first available FX observation
+        bfill_fx: default False; True fills leading gaps using a later quote (look-ahead)
 
     Returns:
         spots with the same index, columns, shape, and row order as ``prices``

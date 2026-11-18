@@ -11,6 +11,11 @@ assets already in ``reference_ccy``; ``plot_multi_asset_fx_hedging_report`` rend
 - p.a. returns, vols and Sharpes - as heatmap tables. ``span``, ``risk_aversion_lambda`` and
 ``min_max_hedge`` are passed explicitly.
 
+All report panels share ``PerfParams(freq=freq)``: log-return volatility and simple-return
+benchmark regressions use the requested cadence; skewness stays monthly and drawdowns daily.
+Sharpe is ``SHARPE_RF0`` (sampled compound p.a. return / log volatility), without a cash deduction.
+The separate FX forward index retains its daily resets.
+
 A market-data exhibit: no ``qis.PortfolioData``, weights or costs enter it.
 """
 
@@ -56,7 +61,9 @@ def run_asset_fx_hedging_report(
         local_ccy: Currency the asset is denominated in.
         reference_ccy: Reporting / investor currency.
         time_period: Optional date filter for the plotted series.
-        freq: Resampling frequency (e.g. ``'ME'``).
+        freq: Asset hedge/reset and EWMA estimation cadence, also used for volatility,
+            Sharpe and benchmark regressions (e.g. ``'ME'``, ``'QE'``, ``'W-WED'``).
+            P.a. returns retain native NAV endpoints; drawdowns stay daily and skewness monthly.
         span: EWMA span (periods of ``freq``) for the FX vol/beta estimates.
         risk_aversion_lambda: Mean-variance risk aversion for the carry tilt.
         min_max_hedge: Optional ``(min, max)`` clip on the hedge ratios.
@@ -141,9 +148,10 @@ def run_asset_fx_hedging_report(
     )
 
     # Create visualization
-    perf_params = qis.PerfParams(freq="ME")
+    perf_params = qis.PerfParams(freq=freq)
     kwargs = dict(digits_to_show=1, framealpha=0.9)
     fig, axs = plt.subplots(3, 2, figsize=(18, 10))
+    fig.subplots_adjust(wspace=0.35)
 
     if time_period is not None:
         navs = time_period.locate(navs)
@@ -151,14 +159,21 @@ def run_asset_fx_hedging_report(
         fig,
         title=f"{asset_price_local_ccy.name} local in {local_ccy} reference in {reference_ccy}:"
         f" {qis.get_time_period(navs).to_str()}\n"
+        f"Asset hedge resets/estimation: {freq}; Statistics: {freq} (vol/Sharpe/regression)\n"
+        f"Skewness: {perf_params.freq_skewness}; drawdowns: D; Sharpe: rf=0\n"
         "FX forward index: unit notional/capital, "
         "daily resets, no added cash",
     )
     qis.plot_ra_perf_table_benchmark(
         prices=navs,
         benchmark=str(asset_price_local_ccy.name),
+        perf_params=perf_params,
         heatmap_columns=[1, 3],
         rows_edge_lines=[1, 2, 3, 6],
+        fontsize=8,
+        first_column_width=5.5,
+        short=False,
+        short_n=True,
         ax=axs[0, 0],
         **kwargs,
     )
@@ -223,14 +238,18 @@ def compute_multi_asset_fx_hedging(
         time_period: Optional date filter applied to each asset's NAV panel.
         local_ccys: One currency for all assets (str) or per-asset currencies (Series).
         reference_ccy: Reporting / investor currency.
-        freq: Resampling frequency (e.g. ``'ME'``).
+        freq: Asset hedge/reset and EWMA estimation cadence, also used for volatility,
+            Sharpe and benchmark regressions (e.g. ``'ME'``, ``'QE'``, ``'W-WED'``).
+            P.a. returns retain native NAV endpoints; drawdowns stay daily and skewness monthly.
         span: EWMA span (periods of ``freq``) for the FX vol/beta estimates.
         risk_aversion_lambda: Mean-variance risk aversion for the carry tilt.
         min_max_hedge: Optional ``(min, max)`` clip on the hedge ratios.
 
     Returns:
         Dict of DataFrames ``pas``, ``sharpes``, ``betas``, ``vols`` (asset x strategy)
-        and ``last_hedges`` (asset x {Optimal, Max Carry, Beta Hedge}).
+        and ``last_hedges`` (asset x {Optimal, Max Carry, Beta Hedge}). ``last_hedges``
+        reads the final scheduled row of each hedge series; see ``compute_fx_optimal_hedge``
+        for its label and the last completed return period used by its risk estimates.
     """
     # Initialize FX universe if common currency
     if isinstance(local_ccys, str):
@@ -241,7 +260,7 @@ def compute_multi_asset_fx_hedging(
             local_ccy=local_ccys, reference_ccy=reference_ccy, freq=freq
         )
 
-    perf_params = qis.PerfParams(freq="ME")
+    perf_params = qis.PerfParams(freq=freq)
 
     # Iterate through assets and calculate metrics
     pas, sharpes, betas, last_hedges, vols = {}, {}, {}, {}, {}
@@ -360,7 +379,9 @@ def plot_multi_asset_fx_hedging_report(
         local_ccy: Common currency ID, or an asset-indexed currency Series for a
             mixed-currency panel, as accepted by ``compute_multi_asset_fx_hedging``.
         reference_ccy: Reporting / investor currency.
-        freq: Resampling frequency (e.g. ``'ME'``).
+        freq: Asset hedge/reset and EWMA estimation cadence, also used for volatility,
+            Sharpe and benchmark regressions (e.g. ``'ME'``, ``'QE'``, ``'W-WED'``).
+            P.a. returns retain native NAV endpoints; drawdowns stay daily and skewness monthly.
         span: EWMA span (periods of ``freq``) for the FX vol/beta estimates.
         risk_aversion_lambda: Mean-variance risk aversion for the carry tilt.
         min_max_hedge: Optional ``(min, max)`` clip on the hedge ratios.
@@ -388,6 +409,7 @@ def plot_multi_asset_fx_hedging_report(
         title = f"FX hedging report: {time_period.to_str()}"
     else:
         title = "FX hedging report"
+    title += f"\nAsset hedge resets/estimation: {freq}; Statistics: {freq}; Sharpe: rf=0"
     qis.set_suptitle(fig, title=title)
     heatmap_rows = [n for n in np.arange(len(pas.index))]
     kwargs = dict(heatmap_rows=heatmap_rows)
@@ -399,7 +421,7 @@ def plot_multi_asset_fx_hedging_report(
     )
     qis.plot_df_table(
         df=qis.df_to_str(df=sharpes, var_format="{:.2f}"),
-        title="Sharpe ratios",
+        title="Sharpe ratios (rf=0)",
         ax=axs[2],
         **kwargs,
     )

@@ -34,36 +34,51 @@ Existing root object imports such as `from qis import FxRatesData` remain availa
 
 A dataclass holding two aligned panels:
 
-```python
+```python +SKIP
 @dataclass
 class FxRatesData:
     fx_spots: pd.DataFrame        # FX spot levels
     domestic_rates: pd.DataFrame  # domestic short rates
 ```
 
-* **`fx_spots`** — every column is **USD per 1 unit of that currency**. `USD` is pinned to `1.0`.
-  Columns are 3-letter currency codes (`USD`, `EUR`, `GBP`, `CHF`, `JPY`, `AUD`, `CAD`, `NZD`, …)
-  plus two special columns: `GBp` (pence) = `0.01 * GBP`, and `XAU` (gold) = `1.0`. A cross rate is
-  formed by dividing two columns, so the quoting convention cancels and you get reference-per-local.
-* **`domestic_rates`** — same columns as `fx_spots`; values are **annualised short rates as decimals**
-  (e.g. `0.045` for 4.5%). `XAU` carries the USD rate as a financing-cost proxy; `GBp` shares the
-  `GBP` sovereign curve.
+* **`fx_spots`** — every column is **USD per 1 unit of that currency**. The supplied panel
+  must carry `USD = 1.0`; the class does not set it. Use stable currency IDs such as USD,
+  EUR and CHF. A cross rate divides two columns to obtain reference currency per local unit.
+  Optional `GBp` means pence and uses `0.01 * GBP`. An example adapter may use `XAU = 1.0`
+  with the USD rate for identity conversion of a gold price already quoted in USD; this
+  is not a gold-price series or an XAU/USD spot quote. The class creates neither column.
+* **`domestic_rates`** — **annualised short rates as decimals** (e.g. `0.045` for 4.5%),
+  keyed by currency. Supply the rate columns required by the requested payoff; spot-only
+  analytics do not require an unused currency rate. Example adapters give `GBp` the GBP
+  rate and the special identity `XAU` column the USD rate.
 
 `__post_init__` sorts and forward-fills `fx_spots`, then forward-fills `domestic_rates` on the union
 of the rate and spot calendars before selecting the spot dates. Leading unknown observations
 remain missing; callers must verify coverage for their requested currencies and dates. Alignment
-never carries future observations backward or discards off-grid rate updates.
+never carries future observations backward or discards off-grid rate updates. A rate
+quote dated between two spot dates becomes available at the later spot date. A weekend
+boundary before that spot observation retains the previous stored quote. This describes
+QIS alignment: values already backfilled upstream retain that backfill.
+
+The standalone `get_aligned_fx_spots` helper also uses causal as-of alignment by default
+(`bfill_fx=False`), preserving off-grid observations and the input price axes. Cash and futures
+return conversion need an observable spot at both endpoints. `bfill_fx=True` explicitly uses
+later quotes to fill leading gaps and is only for descriptive historical replay. Consumers
+must gate trading eligibility on FX coverage; changing alignment does not change their
+eligibility rules. Input data already backfilled upstream retain those values.
 
 ### Construction
 
-```python
-# 1. Directly from two DataFrames you already have (the convention above must hold):
-fx = FxRatesData(fx_spots=spots_df, domestic_rates=rates_df)
+These alternatives require your supplied panels or CSV directory. The quick start below
+runs without either. Vendor acquisition belongs to the consuming data pipeline.
 
-# 2. From the persisted CSVs (file_name 'fx_hedging_data'):
-fx = FxRatesData.load(local_path=qis.local_path.get_resource_path(), time_period=qis.TimePeriod('31Dec2005', None))
+```python +SKIP
+# Supply spots_df and rates_df under the convention above.
+fx = qis.FxRatesData(fx_spots=spots_df, domestic_rates=rates_df)
 
-# 3. Production: built from Bloomberg by `create_fx_rates_data` — which lives in rosaa, not qis.
+# Or supply a directory containing the saved fx_hedging_data CSV pair.
+fx = qis.FxRatesData.load(local_path=input_dir, time_period=qis.TimePeriod('31Dec2005', None))
+# The consuming data pipeline builds and saves the panels; QIS loads them.
 ```
 
 `load_fx_rates_data(local_path, file_name='fx_hedging_data')` is the standalone CSV reader; it returns
@@ -78,7 +93,7 @@ fx = FxRatesData.load(local_path=qis.local_path.get_resource_path(), time_period
 |---|---|
 | `get_local_to_reference_fx_rate(local_ccy, reference_ccy)` | Cross rate = reference per 1 local (`fx_spots[local] / fx_spots[reference]`). |
 | `get_local_rate(freq, local_ccy, annualise=False)` | Opening annual quote times actual calendar days/365 (`annualise=False`); unscaled annual quotes otherwise. |
-| `get_forward_rate_for_local_ccy(local_ccy, reference_ccy, freq, is_log_returns=False)` | Per-period CIP forward premium (see below). |
+| `get_forward_rate_for_local_ccy(local_ccy, reference_ccy, freq, is_log_returns=False, period_dates=None)` | Per-period CIP forward premium; `period_dates` supplies explicit interval boundaries (see below). |
 | `compute_fx_returns(data, FxCurrencyReturnsRequest(...))` | Typed spot returns or exact forward P&L; no automatic NAV. |
 
 **CIP and exact settlement.** Opening annual quotes accrue over actual calendar days / 365.
@@ -98,12 +113,20 @@ capital index. Current report panels use a daily-reset, unit-notional-to-capital
 
 | Method | Purpose |
 |---|---|
+| `get_period_cash_returns(dates, local_ccy, quote_lag=1, is_log_returns=False)` | ACT/365 Fixed cash on supplied boundaries; opening quotes by default, first chronological accrual zero. |
 | `build_local_cash_nav(local_ccy, freq='B')` | Money-market NAV compounding the local short rate (rate lagged one period — no look-ahead). |
 | `build_cross_fx_cash_nav(local_ccy, reference_ccy, freq='B', output_freq='ME')` | Foreign cash held unhedged by a reference-ccy investor; the synthetic series used to isolate Fx β ≈ +1 for a foreign cash leg. Returns an empty series when `local_ccy == reference_ccy`. |
 
 ---
 
 ## Common monthly cash measurement
+
+`get_period_cash_returns` accrues on its supplied boundaries. It reads the already
+spot-aligned stored rates: off-grid updates become available at the next spot observation,
+so a weekend boundary before that observation retains the previous stored quote. Unsorted
+unique nonmissing boundaries are evaluated chronologically and returned in the supplied
+order; missing earned intervals remain missing. See the
+[executed public cash example](../../../docs/cash_rate_timing_and_fx_adjustments.md#implementation-in-qis).
 
 `compute_monthly_cash_index(data, currency, dates)` samples one ACT/365 Fixed account:
 opening quotes reset at calendar month-ends, interest is simple within each month and
@@ -120,7 +143,7 @@ checks daily/monthly/quarterly LOG excess against independent monthly deposits.
 
 The current entry point consumed by covariance estimation and alpha aggregation is typed:
 
-```python
+```python +SKIP
 results = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
     prices=prices, local_ccys=local_ccys,
     return_type=qis.FxReturnType.REFERENCE_EXCESS,
@@ -135,6 +158,12 @@ log asset growth minus log cash growth, distinct from arithmetic excess. `LOCAL_
 uses arithmetic local excess times spot growth; `FX_FORWARD` is a currency request. Both notional
 payoffs require `SIMPLE`, even if an optional normalized synthetic index is requested. Funded
 reference excess subtracts reference cash once; local financing is a different economic object.
+
+For an explicitly requested unit-notional, reinvested index, use
+`result.to_index(qis.FxIndexNormalization.compounded(result.frequency))`.
+The constructor defaults to initial value one and `missing_returns='skip'`; specify
+`initial_value` and `missing_returns='stop'` when required. It returns the same seven-field
+specification and adds no cash. Use the full constructor for fixed or nonunit notional.
 
 See the [executed convention and migration guide](../../../docs/return_conventions_and_fx_adjustments.md)
 for all supported kinds, exact identities, optional normalization and removed methods.
@@ -160,9 +189,13 @@ synthetic indices require explicit normalization.
 **Hedge strategies** (from EWMA vol/beta and annualised short-forward cost):
 `annualised_cost = kappa / tau`, where `tau` is the ACT/365F year fraction from the
 opening decision to the next reset and `kappa = f/(1+f)`. Statistical volatility
-uses periods per year and an 8% annual variance prior at the requested frequency;
+uses periods per year and an 8% annual volatility prior, with variance seed `0.08**2 / af`;
 `carry_ratio = (annualised_cost / fx_var) / (2*risk_aversion_lambda)`; `Max Carry = 1 - carry_ratio`;
 `Beta Hedge = 1 + fx_beta`; `Optimal = 1 - carry_ratio + fx_beta`. All optionally clipped to `min_max_hedge`.
+
+The final hedge row may carry the scheduled reset label after the last available quote.
+Its risk estimates use the last completed return period; the label does not represent a
+new future observation. The supplied forward-premium index determines the decision schedule.
 
 ---
 
@@ -174,10 +207,21 @@ uses periods per year and an 8% annual variance prior at the requested frequency
 | `compute_multi_asset_fx_hedging(asset_prices, fx_rates_data, time_period, local_ccys, reference_ccy, freq, span, risk_aversion_lambda, min_max_hedge)` | Dict of `pas` / `sharpes` / `betas` / `vols` (asset × strategy) and `last_hedges`. |
 | `plot_multi_asset_fx_hedging_report(asset_prices, fx_rates_data, ..., span, risk_aversion_lambda, min_max_hedge)` | Heatmap-table `Figure`. |
 
-`local_ccys` may be a single string (all assets share a currency — the cross rate/forward are
-computed once) or a per-asset `pd.Series` (resolved inside the loop). The optimizer knobs
+The currency argument is `local_ccys` in `compute_multi_asset_fx_hedging` and `local_ccy`
+in `plot_multi_asset_fx_hedging_report`. Either accepts a string (one currency, computing
+the cross rate/forward once) or a per-asset `pd.Series` (resolved inside the loop). The optimizer knobs
 (`span`, `risk_aversion_lambda`, `min_max_hedge`) are passed through explicitly rather than relying
 on `compute_fx_optimal_hedge`'s defaults.
+
+All report statistics use `PerfParams(freq=freq)`: log-return volatility, zero-rate Sharpe
+(`SHARPE_RF0`) and simple-return benchmark regressions use the requested `ME`, `QE` or
+`W-WED` boundaries. Sharpe divides compound p.a. return on those boundaries by log-return
+volatility, with no risk-free deduction. Visible p.a. returns retain native NAV endpoints;
+drawdowns retain the daily grid and table skewness retains its monthly grid. The single-asset
+table and companion panels share the same policy, independent of the combined NAV index. Reports label asset hedge/reset and
+estimation cadence separately from statistics cadence. The forward-index comparison keeps
+daily resets. Choosing a different `freq` still changes the existing hedge model cadence;
+this reporting correction leaves NAVs and hedge schedules unchanged at any given `freq`.
 
 ---
 
@@ -214,7 +258,7 @@ shared `FactorsData` price container belongs to `qis.portfolio.risk`.
 
 ## Fixed constants (do not rename)
 
-Local/Ramen CSVs depend on these file names:
+Saved CSVs of existing consumers depend on these file names:
 
 * `FactorsData` CSV → `futures_risk_factors` (`factors_data.FILE_NAME`).
 * FX CSVs → `fx_hedging_data` (`fx_rates_data` `load_fx_rates_data` default).
@@ -223,26 +267,36 @@ Local/Ramen CSVs depend on these file names:
 
 ## Quick start
 
+This example needs only pandas and QIS: no private settings, CSVs, API key or network.
+It translates EUR and CHF equities into USD with full opening-principal hedges and reports
+log excess returns over USD cash. Annual rates are decimal quotes; cash uses ACT/365 Fixed.
+
 ```python
-import qis as qis
-from qis.fx import FxRatesData
+import pandas as pd
+import qis
 
-# Load the FX universe (or build from Bloomberg in rosaa).
-fx = FxRatesData.load(local_path=qis.local_path.get_resource_path())
-
-# Convert a USD-asset price panel into CHF, fully hedged, as excess returns.
+dates = pd.to_datetime(['2024-01-31', '2024-02-29', '2024-03-31'])
+fx = qis.FxRatesData(
+    fx_spots=pd.DataFrame({'USD': 1.0, 'EUR': [1.10, 1.12, 1.09],
+                          'CHF': [1.15, 1.16, 1.14]}, index=dates),
+    domestic_rates=pd.DataFrame({'USD': 0.05, 'EUR': 0.03, 'CHF': 0.01}, index=dates),
+)
+prices = pd.DataFrame({'EU_equity': [100.0, 102.0, 101.0],
+                       'CH_equity': [100.0, 101.0, 103.0]}, index=dates)
+local_ccys = pd.Series({'EU_equity': 'EUR', 'CH_equity': 'CHF'})
 results = qis.compute_fx_returns(fx, qis.FxAssetReturnsRequest(
-    prices=prices, hedge_ratios=hedge_ratios, local_ccys=local_ccys,
-    reference_ccy='CHF', frequency='ME',
+    prices=prices, local_ccys=local_ccys, reference_ccy='USD',
+    hedge_ratios=1.0, frequency='ME',
     return_type=qis.FxReturnType.REFERENCE_EXCESS,
-    coordinate=qis.FxReturnCoordinate.LOG))
-returns = {frequency: result.values for frequency, result in results.items()}
-
-
-# Hedge-overlay study for a panel:
-from qis.fx.reports.fx_hedging_report import compute_multi_asset_fx_hedging
-out = compute_multi_asset_fx_hedging(asset_prices=prices, fx_rates_data=fx,
-                                     local_ccys='USD', reference_ccy='CHF', freq='ME')
-out['sharpes']      # Sharpe table, asset × strategy
-out['last_hedges']  # current-snapshot hedge ratios per strategy
+    coordinate=qis.FxReturnCoordinate.LOG,
+    cash_policy=qis.FxCashPolicy(quote_lag=1),
+))
+returns = results['ME'].values  # First row is missing; no synthetic NAV is built.
+assert returns.iloc[0].isna().all()
+assert abs(returns.loc['2024-02-29', 'EU_equity'] - 0.017746756654550708) < 1e-12
 ```
+
+The February EUR log-excess return is about 1.774676%. A principal hedge leaves the local
+investment gain exposed to terminal FX. For a hedge-overlay study with enough estimation
+history, use [the Yahoo hedging example](../../../examples/fx/fx_hedging_yahoo_example.py);
+its provider requirements and illustrative non-USD rates are described above.

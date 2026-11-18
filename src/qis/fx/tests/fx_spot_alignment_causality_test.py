@@ -49,7 +49,7 @@ def test_fx_spot_alignment_uses_only_current_and_prior_observations(nullable: bo
     original_prices = prices.copy(deep=True)
     original_fx_prices = fx_prices.copy(deep=True)
 
-    actual = get_aligned_fx_spots(prices, asset_ccy_map, fx_prices, bfill_fx=False)
+    actual = get_aligned_fx_spots(prices, asset_ccy_map, fx_prices)
 
     # This explicit table is an as-of oracle independent of the production fill operations.
     expected = pd.DataFrame(
@@ -97,7 +97,7 @@ def test_fx_spot_alignment_is_independent_of_input_row_order(
         {"ASSET": [price_values[position] for position in target_order]}, index=target_dates
     )
 
-    actual = get_aligned_fx_spots(prices, {"ASSET": "EUR"}, fx_prices, bfill_fx=False)
+    actual = get_aligned_fx_spots(prices, {"ASSET": "EUR"}, fx_prices)
 
     expected = pd.DataFrame(
         {"ASSET": [expected_values[position] for position in target_order]}, index=target_dates
@@ -110,10 +110,10 @@ def test_fx_spot_alignment_is_independent_of_input_row_order(
     [(0, 1, 2, 3), (3, 2, 1, 0), (2, 0, 3, 1)],
     ids=["ascending-target", "descending-target", "unsorted-target"],
 )
-def test_fx_spot_alignment_backfills_by_default_in_price_order(
+def test_fx_spot_alignment_backfill_is_opt_in_in_price_order(
     target_order: tuple[int, ...],
 ) -> None:
-    """Default alignment preserves historical backfill and the exact price axes."""
+    """Default alignment is causal; explicit descriptive backfill preserves the price axes."""
     dates = pd.date_range("2024-01-01", periods=4, freq="D")
     target_dates = pd.DatetimeIndex([dates[position] for position in target_order])
     prices = pd.DataFrame(
@@ -138,8 +138,13 @@ def test_fx_spot_alignment_backfills_by_default_in_price_order(
         },
         index=target_dates,
     )
-    pd.testing.assert_frame_equal(actual_default, expected)
     pd.testing.assert_frame_equal(actual_explicit, expected)
+    expected.loc[dates[0], "EUR_ASSET"] = np.nan
+    pd.testing.assert_frame_equal(actual_default, expected)
+    pd.testing.assert_frame_equal(
+        actual_default,
+        get_aligned_fx_spots(prices, asset_ccy_map, fx_prices, bfill_fx=False),
+    )
 
 
 FxReturnConverter = Callable[[pd.DataFrame, pd.DataFrame, int, bool], pd.DataFrame]
@@ -163,7 +168,7 @@ def test_fx_adjusted_returns_require_two_causally_available_spots(
     dates = pd.date_range("2024-01-01", periods=4, freq="D")
     prices = pd.DataFrame({"ASSET": [100.0, 101.0, 102.0, 103.0]}, index=dates)
     fx_prices = pd.DataFrame({"EUR": [1.10, 1.20]}, index=dates[[1, 3]])
-    aligned_spots = get_aligned_fx_spots(prices, {"ASSET": "EUR"}, fx_prices, bfill_fx=False)
+    aligned_spots = get_aligned_fx_spots(prices, {"ASSET": "EUR"}, fx_prices)
 
     actual = converter(prices, aligned_spots, 1, is_log_returns)
 
@@ -180,3 +185,36 @@ def test_fx_adjusted_returns_require_two_causally_available_spots(
         expected_values = [np.nan, np.nan, expected_d2, expected_d3]
     expected = pd.DataFrame({"ASSET": expected_values}, index=dates)
     pd.testing.assert_frame_equal(actual, expected)
+
+
+@pytest.mark.parametrize("quote_currency", ["USD", "CHF"])
+@pytest.mark.parametrize("shuffled", [False, True])
+def test_default_spot_alignment_retains_off_grid_updates_without_future_quotes(
+    quote_currency: str, shuffled: bool,
+) -> None:
+    """An independent timestamp oracle preserves off-grid quotes and unknown history."""
+    dates = pd.to_datetime(["2024-01-01", "2024-01-03", "2024-01-05", "2024-01-09"])
+    prices = pd.DataFrame({"foreign": [100., 101., 102., 103.], "home": 10.}, index=dates)
+    quotes = pd.DataFrame({"EUR": [1.1, 1.2, np.nan, 1.3]},
+                          index=pd.to_datetime(["2024-01-02", "2024-01-04",
+                                                "2024-01-06", "2024-01-08"]))
+    original_quotes = quotes.copy(deep=True)
+    if shuffled:
+        prices = prices.iloc[[2, 0, 3, 1], ::-1]
+        quotes = quotes.iloc[[2, 0, 3, 1]]
+    expected = pd.DataFrame(index=prices.index, columns=prices.columns, dtype=float)
+    for date in prices.index:
+        available = original_quotes.loc[original_quotes.index <= date, "EUR"].dropna()
+        expected.loc[date, "foreign"] = available.iloc[-1] if len(available) else np.nan
+        expected.loc[date, "home"] = 1.
+    mapping = {"home": quote_currency, "foreign": "EUR"}
+    actual = get_aligned_fx_spots(prices, mapping, quotes, quote_currency=quote_currency)
+    pd.testing.assert_frame_equal(actual, expected)
+    # Editing or removing later quotes cannot revise results up to the cut-off.
+    cutoff = dates[1]
+    revised = quotes.copy(deep=True)
+    revised.loc[revised.index > cutoff, "EUR"] = 99.
+    earlier = prices.loc[prices.index <= cutoff]
+    for supplied in (revised, quotes.loc[quotes.index <= cutoff]):
+        result = get_aligned_fx_spots(earlier, mapping, supplied, quote_currency=quote_currency)
+        pd.testing.assert_frame_equal(result, actual.loc[earlier.index])

@@ -115,6 +115,8 @@ class FxIndexNormalization:
         initial_value: Positive index/capital at the boundary before the first payoff.
         notional_to_capital: Opening payoff notional divided by capital, strictly positive.
         notional_rule: Capital-proportional compounds; fixed accumulates initial-capital P&L.
+            ``capital_proportional`` is the capital-based rule called ``current_nav`` in
+            ``FxAccountSpec``; an index normalization does not create its financing ledger.
         settlement_frequency: Must equal the result cadence; no implicit daily settlement.
         reinvestment: Reinvest each interval for capital-proportional; none for fixed.
         cash_treatment: As represented in the return object; no cash is added a second time.
@@ -128,6 +130,34 @@ class FxIndexNormalization:
     reinvestment: Literal["each_interval", "none"]
     cash_treatment: Literal["as_returned"]
     missing_returns: Literal["skip", "stop"]
+
+    @classmethod
+    def compounded(
+        cls, settlement_frequency: str, initial_value: float = 1.0,
+        missing_returns: Literal["skip", "stop"] = "skip",
+    ) -> FxIndexNormalization:
+        """Declare a unit-notional synthetic index reinvested at each settlement.
+
+        Args:
+            settlement_frequency: Explicit cadence, required to match the return result.
+            initial_value: Finite positive capital/index level before the first payoff.
+            missing_returns: Skip missing payoffs or stop after the first post-inception gap.
+
+        Returns:
+            Existing seven-field specification with capital-proportional notional,
+            notional_to_capital=1, each-interval reinvestment and cash as returned.
+            Use the full constructor for fixed notional or nonunit notional-to-capital.
+            The specification adds no funding or collateral and constructs no index itself.
+
+        Raises:
+            ValueError: The initial value, cadence or missing-return policy is invalid.
+        """
+        return cls(
+            initial_value=initial_value, notional_to_capital=1.0,
+            notional_rule="capital_proportional", settlement_frequency=settlement_frequency,
+            reinvestment="each_interval", cash_treatment="as_returned",
+            missing_returns=missing_returns,
+        )
 
     def __post_init__(self):
         """Reject unspecified or contradictory sizing and settlement policies."""
@@ -423,7 +453,7 @@ def _metadata(value, columns, dates, name: str) -> pd.DataFrame:
 def _excess_cash(data, dates, currency, frequency, policy):
     """Sample the measurement account without changing any contracted hedge cash."""
     if policy.accrual is FxCashAccrual.PERIOD_OPENING:
-        return data._get_period_cash_returns(dates, currency, frequency, False, policy.quote_lag)
+        return data.get_period_cash_returns(dates, currency, quote_lag=policy.quote_lag)
     index = compute_monthly_cash_index(data, currency, dates)
     cash = index / index.shift(1) - 1.0
     # Direct one-month accrual avoids cancellation and retains exact monthly parity.
@@ -431,7 +461,7 @@ def _excess_cash(data, dates, currency, frequency, policy):
         opening = dates[:-1]
         closing = dates[1:]
         single_month = opening.is_month_end & (closing == opening + pd.offsets.MonthEnd(1))
-        native = data._get_period_cash_returns(dates, currency, frequency, False, 1)
+        native = data.get_period_cash_returns(dates, currency, quote_lag=1)
         selected = closing[single_month]
         cash.loc[selected] = native.loc[selected].where(index.loc[selected].notna())
     if len(cash):
@@ -461,6 +491,19 @@ def _coordinate(
     return total
 
 
+def _validate_currency_coverage(
+    data: FxRatesData, spot_currencies: set[str], rate_currencies: set[str]
+) -> None:
+    """Name missing columns in only the panels this calculation actually reads."""
+    missing_spots = sorted(spot_currencies - set(data.fx_spots.columns))
+    missing_rates = sorted(rate_currencies - set(data.domestic_rates.columns))
+    if missing_spots or missing_rates:
+        raise ValueError(
+            "FxRatesData does not cover the requested currencies: "
+            f"fx_spots lacks {missing_spots!r}, domestic_rates lacks {missing_rates!r}"
+        )
+
+
 def _asset_result(
     data: FxRatesData, request: FxAssetReturnsRequest, frequency: str, assets: list
 ) -> FxReturnsData:
@@ -488,6 +531,17 @@ def _asset_result(
                 request.return_type in _REFERENCE
                 or request.return_type is FxReturnType.LOCAL_EXCESS_TRANSLATED
             ) and local != request.reference_ccy
+            required_spots = {local, request.reference_ccy} if foreign else set()
+            if request.return_type in (FxReturnType.LOCAL_EXCESS,
+                                       FxReturnType.LOCAL_EXCESS_TRANSLATED):
+                required_rates = {local}
+            elif foreign:
+                required_rates = {local, request.reference_ccy}
+            elif request.return_type is FxReturnType.REFERENCE_EXCESS:
+                required_rates = {request.reference_ccy}
+            else:
+                required_rates = set()
+            _validate_currency_coverage(data, required_spots, required_rates)
             if foreign:
                 cross = data.get_local_to_reference_fx_rate(local, request.reference_ccy)
                 total, spot = compute_local_and_fx_return(prices[asset], cross, frequency, False)
@@ -502,15 +556,15 @@ def _asset_result(
             if request.return_type is FxReturnType.LOCAL_EXCESS_TRANSLATED:
                 # compute_futures_fx_adjusted_returns consumes price gains. Reconstructing
                 # cash-relative excess NAVs for that kernel would replace arithmetic R-c by q.
-                cash = data._get_period_cash_returns(dates, local, frequency, False, 1)
+                cash = data.get_period_cash_returns(dates, local, quote_lag=1)
                 result = (total - cash) * (1.0 + spot)
                 h = pd.Series(0.0, index=dates)
             else:
                 if foreign:
                     # CIP always uses opening quotes, independently of descriptive excess lag.
-                    lc = data._get_period_cash_returns(dates, local, frequency, False, 1)
-                    rc = data._get_period_cash_returns(
-                        dates, request.reference_ccy, frequency, False, 1
+                    lc = data.get_period_cash_returns(dates, local, quote_lag=1)
+                    rc = data.get_period_cash_returns(
+                        dates, request.reference_ccy, quote_lag=1
                     )
                     premium = (1.0 + lc) / (1.0 + rc) - 1.0
                     # Preserve the validated log-premium evaluation order. Algebraically identical
@@ -556,6 +610,10 @@ def _asset_result(
         ids = [ccy for ccy in ids if pd.notna(ccy)]
         if request.reference_ccy is not None:
             ids = list(dict.fromkeys([*ids, request.reference_ccy]))
+        # Diagnostics read sampled currencies, which can omit intraperiod local-only spells.
+        _validate_currency_coverage(
+            data, set(ids) if request.reference_ccy is not None else set(), set(ids)
+        )
         diagnostics["cash"] = pd.DataFrame(
             {
                 ccy: _excess_cash(data, values.index, ccy, frequency, request.cash_policy)
@@ -573,14 +631,14 @@ def _asset_result(
                     for ccy in ids
                 }
             )
-            ref = data._get_period_cash_returns(
-                values.index, request.reference_ccy, frequency, False, 1
+            ref = data.get_period_cash_returns(
+                values.index, request.reference_ccy, quote_lag=1
             )
             diagnostics["hedge_cost"] = pd.DataFrame(
                 {
                     ccy: 1
                     - (1 + ref)
-                    / (1 + data._get_period_cash_returns(values.index, ccy, frequency, False, 1))
+                    / (1 + data.get_period_cash_returns(values.index, ccy, quote_lag=1))
                     for ccy in ids
                 }
             )
@@ -604,6 +662,8 @@ def _asset_result(
 def _currency_result(data: FxRatesData, request: FxCurrencyReturnsRequest) -> FxReturnsData:
     """Settle currency spot or exact long-local forward P&L on the requested reset grid."""
     is_forward = request.return_type is FxReturnType.FX_FORWARD
+    required = set(request.currencies) | {request.reference_ccy}
+    _validate_currency_coverage(data, required, required if is_forward else set())
     spot = pd.DataFrame(
         {
             ccy: to_returns(
@@ -620,7 +680,7 @@ def _currency_result(data: FxRatesData, request: FxCurrencyReturnsRequest) -> Fx
         ids = list(dict.fromkeys((*request.currencies, request.reference_ccy)))
         cash = pd.DataFrame(
             {
-                ccy: data._get_period_cash_returns(spot.index, ccy, request.frequency, False, 1)
+                ccy: data.get_period_cash_returns(spot.index, ccy, quote_lag=1)
                 for ccy in ids
             }
         )
@@ -668,7 +728,8 @@ def compute_fx_returns(
         Cadence-to-result mapping; every result owns its values and metadata.
 
     Raises:
-        ValueError: Invalid kind/coordinate, dates, labels, currency or index policy.
+        ValueError: Invalid kind/coordinate, dates, labels, currency or index policy;
+            required currency columns missing from the named spot/rate panels.
         TypeError: Request or enum arguments are not the declared types.
     """
     if not isinstance(request, (FxAssetReturnsRequest, FxCurrencyReturnsRequest)):
@@ -705,8 +766,8 @@ def compute_fx_returns(
             or any(not isinstance(ccy, str) or not ccy.strip() for ccy in request.currencies)
         ):
             raise ValueError("currencies must be nonempty unique currency IDs")
-        if not request.reference_ccy:
-            raise ValueError("reference_ccy is required for currency requests")
+        if not isinstance(request.reference_ccy, str) or not request.reference_ccy.strip():
+            raise ValueError("reference_ccy is required and must be a nonblank currency ID")
         return {request.frequency: _currency_result(data, request)}
     if request.return_type in _CURRENCY_KINDS:
         raise ValueError("Use a currency request for FX_SPOT or FX_FORWARD")
@@ -716,6 +777,10 @@ def compute_fx_returns(
     )
     if needs_reference != bool(request.reference_ccy):
         raise ValueError("reference_ccy is required only for reference returns or translated P&L")
+    if needs_reference and (
+        not isinstance(request.reference_ccy, str) or not request.reference_ccy.strip()
+    ):
+        raise ValueError("reference_ccy must be a nonblank currency ID")
     if request.currency_changes not in ("reject", "mask_boundary"):
         raise ValueError("currency_changes must be reject or mask_boundary")
     if request.embedded_hedge_policy != "prices_include_existing_hedges; ratios_are_additional":

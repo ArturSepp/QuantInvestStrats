@@ -469,9 +469,23 @@ class RiskModel:
     def _compute_tracking_error(active_weights: pd.Series,
                                 covar: pd.DataFrame,
                                 ) -> float:
-        """Compute the square root of the active-weight covariance quadratic form."""
+        """Compute tracking error, treating bounded negative cancellation as zero.
+
+        Two length-n dot products have a conservative forward-error bound
+        gamma_(2n+1) * abs(d)' abs(Sigma) abs(d), where gamma_k = k*eps/(1-k*eps).
+        Using machine epsilon (twice unit roundoff) also leaves room for rounding
+        the nonnegative scale sum. This is a local arithmetic guard, not a PSD
+        repair: larger negative forms and unavailable held risk remain NaN.
+        """
         covar = fill_unavailable_unheld(covar, active_weights)
         variance = float(active_weights @ covar @ active_weights)
+        if variance < 0.0:
+            magnitude = float(active_weights.abs() @ covar.abs() @ active_weights.abs())
+            error_factor = (2 * len(active_weights) + 1) * np.finfo(float).eps
+            if np.isfinite(magnitude) and error_factor < 1.0:
+                tolerance = error_factor / (1.0 - error_factor) * magnitude
+                if variance >= -tolerance:
+                    variance = 0.0
         return float(np.sqrt(variance))
 
     def compute_tre_at_date(

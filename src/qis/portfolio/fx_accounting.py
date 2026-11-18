@@ -31,6 +31,8 @@ class FxAccountSpec:
         initial_capital: Positive initial collateral/capital, not exposure notional.
         financing: Local matched borrowing/deposits, or reference-cash asset funding.
         notional_rule: Size targets on fixed initial capital or current marked NAV.
+            ``current_nav`` uses the capital-based rule called ``capital_proportional`` in
+            ``FxIndexNormalization``; account funding and settlement remain separate choices.
         cash_rate_policy: Reference benchmark on signed cash, or explicitly no interest.
         missing_quotes: Reject missing marks, or carry valuation only without trading.
         cash_policy: PERIOD_OPENING with ACT/365F on the valuation grid; no

@@ -43,6 +43,7 @@ from qis.models.linear.ewm import (
     compute_ewm_sharpe,
     compute_ewm_sharpe_from_prices,
     compute_ewm_std1_norm,
+    compute_ewm_trend_slope,
     compute_ewm_vol,
     compute_ewm_newey_west_vol,
     compute_ewm_xy_beta_tensor,

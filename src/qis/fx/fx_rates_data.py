@@ -7,7 +7,8 @@ calendars, forward fills them causally, and retains off-grid rate updates before
 spot dates, so the two stored panels never drift apart.
 
 The quote convention is the thing to get right, because it is what makes every downstream sign
-correct. Each spot column is USD per 1 unit of that currency, so USD is identically one and a
+correct. Each spot column is USD per 1 unit of that currency; the supplied USD column must
+be identically one (the class does not create or overwrite it). A
 cross rate is a ratio of two columns: ``get_local_to_reference_fx_rate('EUR', 'CHF')`` returns
 CHF per EUR - units of the *reference* currency per one unit of the *local* one.
 
@@ -29,7 +30,8 @@ quantities, ``compute_fx_returns`` with an ``FxCurrencyReturnsRequest`` for spot
 into a reference currency. The typed result does not construct a NAV unless requested.
 
 Loading is from the CSV pair written by the data layer, through ``FxRatesData.load`` or
-``load_fx_rates_data``; building that data from a vendor is ``bbg-fetch``, not this module.
+``load_fx_rates_data``; vendor acquisition belongs to the consuming data pipeline
+(``bbg-fetch`` for Bloomberg), not this module.
 Choosing the hedge ratio rather than applying it is ``qis/fx/fx_hedging.py``.
 """
 from __future__ import annotations
@@ -48,9 +50,11 @@ class FxRatesData:
     FX spot rates and domestic short rates, aligned on a common index.
 
     Spots are quoted as USD per one unit of the local currency, so a cross rate is a ratio of two
-    columns and the quote currency's own column is identically one. Construction sorts each source
+    columns; callers supply USD identically one. Construction sorts each source
     calendar before time-directed filling and retains off-grid rate updates before reindexing rates
-    onto the spot dates, so the two stored panels are causally aligned.
+    onto the spot dates. A rate quote between two spot dates becomes available on the later
+    spot date. A weekend boundary uses the last stored spot-date quote; it does not expose
+    intervening rate updates early. Upstream backfill is not undone.
 
     Attributes:
         fx_spots: USD per 1 unit of each currency, one column per currency
@@ -122,7 +126,7 @@ class FxRatesData:
         rates = self.domestic_rates[local_ccy].asfreq(freq, method='ffill')
         if annualise:
             return rates
-        return self._get_period_cash_returns(rates.index, local_ccy, freq, False)
+        return self.get_period_cash_returns(rates.index, local_ccy)
 
     def get_forward_rate_for_local_ccy(
             self, local_ccy: str = 'USD', reference_ccy: str = 'CHF',
@@ -166,10 +170,10 @@ class FxRatesData:
         if (not isinstance(period_dates, pd.DatetimeIndex) or period_dates.hasnans
                 or not period_dates.is_unique or not period_dates.is_monotonic_increasing):
             raise ValueError('period_dates must be ordered unique nonmissing timestamps')
-        local_cash = self._get_period_cash_returns(
-            period_dates, local_ccy, freq, False, cash_rate_lag=1)
-        reference_cash = self._get_period_cash_returns(
-            period_dates, reference_ccy, freq, False, cash_rate_lag=1)
+        local_cash = self.get_period_cash_returns(
+            period_dates, local_ccy, quote_lag=1)
+        reference_cash = self.get_period_cash_returns(
+            period_dates, reference_ccy, quote_lag=1)
         premium = (1.0 + local_cash) / (1.0 + reference_cash) - 1.0
         if is_log_returns:
             premium = np.log1p(premium)
@@ -258,29 +262,48 @@ class FxRatesData:
             reference_ccy=reference_ccy, return_type=FxReturnType.REFERENCE_TOTAL,
             coordinate=FxReturnCoordinate.SIMPLE, hedge_ratios=0.0,
             frequency=output_freq))[output_freq]
-        nav_ref = result.to_index(FxIndexNormalization(
-            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
-            settlement_frequency=output_freq, reinvestment='each_interval',
-            cash_treatment='as_returned', missing_returns='skip')).iloc[:, 0]
+        nav_ref = result.to_index(FxIndexNormalization.compounded(output_freq)).iloc[:, 0]
         nav_ref.name = f'cash_{local_ccy}_in_{reference_ccy}'
         return nav_ref
 
-    def _get_period_cash_returns(self, return_index: pd.DatetimeIndex, local_ccy: str,
-                                 freq: str, is_log_returns: bool,
-                                 cash_rate_lag: int = 1) -> pd.Series:
-        """Accrue ACT/365F cash on actual boundaries, sharing QIS funding's primitive.
+    def get_period_cash_returns(
+            self, dates: pd.DatetimeIndex, local_ccy: str, quote_lag: int = 1,
+            is_log_returns: bool = False) -> pd.Series:
+        """Accrue ACT/365 Fixed cash on supplied boundaries using QIS funding's primitive.
 
-        ``freq`` is retained for signature stability with existing callers; only
-        ``return_index`` determines elapsed days and quote/reset boundaries.
+        Quotes are sampled as-of from ``domestic_rates``, already projected onto the
+        spot calendar by construction. An off-grid rate update is retained at the next
+        spot observation; a boundary before that observation (for example a weekend
+        month-end) still sees the previous stored quote. No raw rate calendar is restored.
+        This is accrual on the supplied reset grid, not a sampled monthly cash index.
+
+        Args:
+            dates: Unique nonmissing timestamp boundaries, interpreted chronologically.
+                Unsorted boundaries are supported; output retains the supplied order.
+                Elapsed calendar days, not a frequency label, determine each accrual.
+            local_ccy: Existing currency ID in the stored annual decimal rate panel.
+            quote_lag: Nonnegative integer lag in target-grid observations, applied after
+                as-of alignment. One uses opening quotes; zero uses closing quotes and
+                is descriptive. Larger lags retain missing unsupported intervals.
+            is_log_returns: Return log1p of cash accrual instead of simple cash returns.
+
+        Returns:
+            Currency-named Series on ``dates``. The first chronological boundary earns
+            zero, including before rate inception; subsequent unknown cash stays missing.
+            Empty boundaries return an empty Series. Inputs are not modified.
+
+        Raises:
+            ValueError: The quote lag is invalid or a cash gross factor is nonpositive.
+            KeyError: The currency is absent from ``domestic_rates``.
         """
-        if isinstance(cash_rate_lag, bool) or not isinstance(cash_rate_lag, (int, np.integer)) \
-                or cash_rate_lag < 0:
-            raise ValueError("cash_rate_lag must be a nonnegative integer")
-        if return_index.empty:
-            return self.domestic_rates[local_ccy].reindex(return_index)
+        if isinstance(quote_lag, bool) or not isinstance(quote_lag, (int, np.integer)) \
+                or quote_lag < 0:
+            raise ValueError("quote_lag must be a nonnegative integer")
+        if dates.empty:
+            return self.domestic_rates[local_ccy].reindex(dates)
         cash = multiply_df_by_dt(
-            df=self.domestic_rates[local_ccy], dates=return_index,
-            lag=int(cash_rate_lag), is_actual_calendar_dt=True,
+            df=self.domestic_rates[local_ccy], dates=dates,
+            lag=int(quote_lag), is_actual_calendar_dt=True,
             annualization_factor=365.0)
         if (cash <= -1.0).any():
             raise ValueError("Cash gross factors must be strictly positive")
@@ -326,8 +349,8 @@ def load_fx_rates_data(local_path: str,
 
     Applies one in-memory correction: historical files stored ``GBp`` as a copy of ``GBP``, where
     the correct relationship is ``GBp = 0.01 * GBP``. A file carrying the stale mapping is healed on
-    load, so callers always see the corrected series; rerunning ``create_fx_rates_data`` persists
-    the fix.
+    load, so callers see the corrected series; regenerating the CSV in the consuming data
+    pipeline persists the fix.
 
     Args:
         local_path: directory holding the CSV files

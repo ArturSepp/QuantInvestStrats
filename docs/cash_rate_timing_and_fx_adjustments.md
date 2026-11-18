@@ -43,7 +43,7 @@ days / 365, including leap days. The study did not compare that day-count change
 | Mean adjustment | None for cash accrual; full-sample OLS with intercept is descriptive only |
 | Timing | Spot uses both endpoints; hedge carry uses the starting quote; cash subtraction defaults to lag 1 |
 | Output units | Decimal returns; scatter axes in percent; errors in monthly basis points |
-| qis default | `cash_rate_lag=1`; midpoint is a diagnostic, not an API lag setting |
+| qis default | `FxCashPolicy(quote_lag=1)`; midpoint is a diagnostic, not an API lag setting |
 
 | Symbol or input | Meaning | Units and convention |
 |---|---|---|
@@ -308,6 +308,7 @@ NZD, JPCANZ3M Index: 69 paired months. Lag 1 has $R^2=0.966$ and MAE 2.51 bp. Th
 
 | Requirement | Verified entry point | Contract |
 |---|---|---|
+| Period cash on supplied boundaries | `FxRatesData.get_period_cash_returns(dates, local_ccy, quote_lag=1, is_log_returns=False)` | ACT/365 Fixed; as-of alignment followed by a lag in boundary observations |
 | Native-currency total and excess returns | `compute_fx_returns` with LOCAL_TOTAL / LOCAL_EXCESS | Separate typed results; annual quotes stay on the data container |
 | Reference-currency total and excess returns | `compute_fx_returns` with REFERENCE_TOTAL / REFERENCE_EXCESS | Cash subtraction follows the declared kind and coordinate |
 | Mixed frequencies | `FxAssetReturnsRequest.frequency` | Typed result per cadence; lag on each group's actual return grid |
@@ -315,10 +316,39 @@ NZD, JPCANZ3M Index: 69 paired months. Lag 1 has $R^2=0.966$ and MAE 2.51 bp. Th
 | FX payoff | `qis.compute_performance_of_local_ccy_asset_in_reference_ccy` | Prior hedge ratio/carry; realised FX move over the asset period |
 | Scatter regression | `qis.plot_scatter` | `order=1`, `fit_intercept=True`, method as `hue`, `add_45line=True` |
 
+The public period-cash accessor uses the stored rate panel, which `FxRatesData` has already
+projected onto the spot calendar. An intervening rate update reaches the stored panel at the
+next spot date. A weekend-labelled boundary before that date therefore uses the preceding
+stored quote. It does not recover a separate raw rate calendar or add a reset date.
+Unique nonmissing boundaries are interpreted chronologically and returned in their supplied
+order. The first chronological boundary earns zero; subsequent unknown cash remains missing.
+`quote_lag=0` uses closing quotes for descriptive work; the default `quote_lag=1` uses opening
+quotes. This getter accrues on the requested boundaries. To sample a common account with
+monthly resets, use `compute_monthly_cash_index` instead.
+
+```python
+import numpy as np
+import pandas as pd
+import qis
+
+cash_dates = pd.to_datetime(['2024-01-31', '2024-02-29', '2024-03-31'])
+cash_data = qis.FxRatesData(
+    fx_spots=pd.DataFrame({'USD': 1.0}, index=cash_dates),
+    domestic_rates=pd.DataFrame({'USD': 0.05}, index=cash_dates))
+earned_cash = cash_data.get_period_cash_returns(cash_dates, 'USD')
+np.testing.assert_allclose(earned_cash, [0.0, 0.05*29/365, 0.05*31/365], rtol=0, atol=1e-15)
+np.testing.assert_allclose(
+    cash_data.get_period_cash_returns(cash_dates, 'USD', is_log_returns=True),
+    np.log1p(earned_cash), rtol=0, atol=1e-15)
+```
+
 Canonical sources are
 [fx_rates_data.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_rates_data.py)
 and [fx_hedging.py](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/fx/fx_hedging.py).
-There is no midpoint value of `cash_rate_lag`: midpoint is an external diagnostic, not a
+The public QIS setting is `FxCashPolicy.quote_lag`. A consuming Rosaa configuration may
+serialize it as `ReturnsSpec.cash_rate_lag`; that stored field is not a QIS keyword.
+
+There is no midpoint value of `quote_lag`: midpoint is an external diagnostic, not a
 production API extension. Core QIS does not fetch these cash benchmarks.
 
 ### Reproduction and provenance

@@ -66,11 +66,11 @@ class FactorsData:
                  factors: Optional[Type[Enum]] = None,
                  time_period: Optional[qis.TimePeriod] = None
                  ) -> FactorsData:
-        """Load factor prices from a SQL/Ramen source.
+        """Load factor prices from a SQL source.
 
         Forward hook for database-backed instantiation using ``qis.sql_engine``.
         Wire the project connection here so cohorts can be sourced from the
-        Ramen database without changing any consumer. Not yet implemented.
+        database without changing any consumer. Not yet implemented.
         """
         raise NotImplementedError("from_sql: wire to qis.sql_engine with the project connection")
 

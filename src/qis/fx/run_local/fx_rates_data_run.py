@@ -1,11 +1,10 @@
 """
-implementation tests for fx_rates_data object
+Development diagnostics for FX data and analytics using supplied CSVs or Bloomberg.
 """
 
-from qis.fx import fx_returns as qfx
 import pandas as pd
 import matplotlib.pyplot as plt
-import qis as qis
+import qis
 import qis.local_path as lp
 from enum import Enum
 
@@ -69,10 +68,7 @@ def run_local(local: Locals):
             local_ccy=local_ccy, reference_ccy=reference_ccy, freq=freq)
         forward_result = qis.compute_fx_returns(fx_rates_data, qis.FxCurrencyReturnsRequest(
             (local_ccy,), reference_ccy, qis.FxReturnType.FX_FORWARD, frequency='B'))['B']
-        forward_fx_nav = forward_result.to_index(qis.FxIndexNormalization(
-            initial_value=1.0, notional_to_capital=1.0, notional_rule='capital_proportional',
-            settlement_frequency='B', reinvestment='each_interval',
-            cash_treatment='as_returned', missing_returns='skip')).iloc[:, 0]
+        forward_fx_nav = forward_result.to_index(qis.FxIndexNormalization.compounded('B')).iloc[:, 0]
         forward_fx_nav = qis.df_asfreq(forward_fx_nav, freq=freq).rename(f'{local_ccy}-{reference_ccy}')
 
         kwargs = dict(asset_price_local_ccy=asset_price_local_ccy,
@@ -118,24 +114,24 @@ def run_local(local: Locals):
             tickers=assets, freq='B', field='PX_LAST',
             start_date=pd.Timestamp('31Dec2001')).ffill()
 
-        fx_result_116 = qfx.compute_fx_returns(
+        hedged_result = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=prices.iloc[:, 0].to_frame(),
                 local_ccys='USD',
                 reference_ccy='CHF',
-                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 hedge_ratios=1.0,
                 frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
             ),
         )['ME']
-        nav_hedged = fx_result_116.to_index(qfx.FxIndexNormalization(
-            1., 1., 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip')).iloc[:, 0]
+        nav_hedged = hedged_result.to_index(qis.FxIndexNormalization.compounded('ME')).iloc[:, 0]
 
-        prices: pd.DataFrame = pd.concat([prices, nav_hedged.rename('CHF-hedge replica')], axis=1)
-        prices = prices.asfreq('QE').ffill()
+        prices: pd.DataFrame = pd.concat(
+            [prices, nav_hedged.rename('CHF-hedge replica')], axis=1, sort=True)
+        prices = qis.df_asfreq(df=prices, freq='QE')
         qis.plot_prices_with_dd(
             prices=prices, perf_params=qis.PerfParams(freq='ME'), title='Hedged')
 
@@ -143,24 +139,24 @@ def run_local(local: Locals):
         prices = fetch_field_timeseries_per_tickers(
             tickers=assets, freq='B', field='PX_LAST',
             start_date=pd.Timestamp('31Dec2013')).ffill()
-        fx_result_131 = qfx.compute_fx_returns(
+        unhedged_result = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=prices.iloc[:, 0].to_frame(),
                 local_ccys='USD',
                 reference_ccy='CHF',
-                return_type=qfx.FxReturnType.REFERENCE_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.REFERENCE_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 hedge_ratios=0.0,
                 frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
             ),
         )['ME']
-        nav_hedged = fx_result_131.to_index(qfx.FxIndexNormalization(
-            1., 1., 'capital_proportional', 'ME', 'each_interval', 'as_returned', 'skip')).iloc[:, 0]
+        nav_unhedged = unhedged_result.to_index(qis.FxIndexNormalization.compounded('ME')).iloc[:, 0]
 
-        prices = (pd.concat([prices, nav_hedged.rename('CHF-local replica')], axis=1)
-                  .asfreq('QE').ffill().loc['31Dec2013':, :])
+        prices = pd.concat(
+            [prices, nav_unhedged.rename('CHF-local replica')], axis=1, sort=True)
+        prices = qis.df_asfreq(df=prices, freq='QE').loc['31Dec2013':, :]
         qis.plot_prices_with_dd(
             prices=prices, perf_params=qis.PerfParams(freq='ME'), title='Unhedged')
 
@@ -202,60 +198,31 @@ def run_local(local: Locals):
         fx_rates_data = FxRatesData(fx_spots=fx_spots, domestic_rates=domestic_rates)
         local_ccys = pd.Series('USD', index=usd_assets.columns)
         usd_assets.loc[:'31Dec2004', 'HY Bonds'] = pd.NA
-        local_returns = qfx.compute_fx_returns(
+        local_returns = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=usd_assets,
                 local_ccys=local_ccys,
-                return_type=qfx.FxReturnType.LOCAL_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.LOCAL_TOTAL,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
                 zero_return_to_nan=False,
             ),
         )['ME'].values
-        excess_returns = qfx.compute_fx_returns(
+        excess_returns = qis.compute_fx_returns(
             fx_rates_data,
-            qfx.FxAssetReturnsRequest(
+            qis.FxAssetReturnsRequest(
                 prices=usd_assets,
                 local_ccys=local_ccys,
-                return_type=qfx.FxReturnType.LOCAL_EXCESS,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
+                return_type=qis.FxReturnType.LOCAL_EXCESS,
+                coordinate=qis.FxReturnCoordinate.SIMPLE,
                 frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
+                cash_policy=qis.FxCashPolicy(quote_lag=1),
                 zero_return_to_nan=False,
             ),
         )['ME'].values
         local_rates_df = fx_rates_data.fetch_local_rates(local_ccys=local_ccys, freq='ME', annualise=True)
-        print(local_returns)
-        print(excess_returns)
-        print(local_rates_df)
-        local_returns = qfx.compute_fx_returns(
-            fx_rates_data,
-            qfx.FxAssetReturnsRequest(
-                prices=usd_assets,
-                local_ccys=pd.Series('USD', index=usd_assets.columns),
-                return_type=qfx.FxReturnType.LOCAL_TOTAL,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
-                frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
-                zero_return_to_nan=False,
-            ),
-        )['ME'].values
-        excess_returns = qfx.compute_fx_returns(
-            fx_rates_data,
-            qfx.FxAssetReturnsRequest(
-                prices=usd_assets,
-                local_ccys=pd.Series('USD', index=usd_assets.columns),
-                return_type=qfx.FxReturnType.LOCAL_EXCESS,
-                coordinate=qfx.FxReturnCoordinate.SIMPLE,
-                frequency='ME',
-                cash_policy=qfx.FxCashPolicy(quote_lag=1),
-                zero_return_to_nan=False,
-            ),
-        )['ME'].values
-        local_rates_df = fx_rates_data.fetch_local_rates(
-            local_ccys=pd.Series('USD', index=usd_assets.columns), freq='ME', annualise=True)
         print(local_returns)
         print(excess_returns)
         print(local_rates_df)
