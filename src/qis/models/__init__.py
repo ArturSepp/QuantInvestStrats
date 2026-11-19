@@ -119,6 +119,8 @@ from qis.models.unsmoothing.factor_lag import adjust_returns_with_factor_lag
 
 from qis.models.unsmoothing.joint_lag import adjust_returns_with_joint_unsmoothing
 
+from qis.models.unsmoothing.price_panel import UnsmoothingMethod, compute_unsmoothed_price_panel
+
 
 
 

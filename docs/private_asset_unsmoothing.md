@@ -269,9 +269,43 @@ fit diagnostic, clipped to [0, 1], not an out-of-sample score. Warm-up, observat
 valid histories differ by sleeve.
 
 The price wrapper uses `to_returns` with its default forward-fill policy. To retain explicit gaps,
-prepare a return panel with that policy stated and call `adjust_returns_with_ar` directly.
+prepare a return panel with that policy stated and call `adjust_returns_with_ar` directly,
+or use the explicit native-panel operation below.
 Inspect return availability when interpreting reconstructed NAVs: NAV initialization and missing
 return handling do not certify that every displayed level came from an identified AR correction.
+
+### Native marks and per-cadence reconstruction
+
+`compute_unsmoothed_price_panel` supports both AR and joint own-lag/factor-lag engines.
+It takes explicit horizon mappings, samples asset returns without filling missing marks,
+and requires a native mark in the ending calendar month. It reconstructs log or simple
+NAVs with the corresponding QIS conversion and aligns them back to the original price
+grid by backward as-of lookup. Thus a Saturday quarter-end observation is available on
+Monday without being copied into Friday. It does not select private assets, infer their
+cadence or supply an application's production configuration.
+
+```python
+panel = generate_synthetic_prices(start='2005-01-03', end='2025-12-31', seed=20260725)
+native_navs, native_diagnostics = qis.compute_unsmoothed_price_panel(
+    prices=panel[['SAL_HF', 'SAL_PE']],
+    frequency=pd.Series({'SAL_HF': 'ME', 'SAL_PE': 'QE'}),
+    method=qis.UnsmoothingMethod.JOINT, factor_prices=panel['SEQ_US'],
+    span={'ME': 120, 'QE': 40}, warmup_period={'ME': 12, 'QE': 4},
+    is_log_returns=True, return_diagnostics=True,
+)
+```
+
+Horizon counts are in observations of each cadence; the numbers above are explicit
+example settings. An empty warmup mapping disables that mask. A requested warmup
+must leave at least one observed return per asset, although that alone does not ensure
+an identified fit. Long-form diagnostics distinguish fitted from one-observation-lagged
+applied coefficients. For AR(q), the reported own-lag quantity is the coefficient sum.
+NAV initialization/gap handling remains the existing QIS behavior; use the diagnostic
+availability flag to distinguish fitted adjustments from displayed levels.
+
+This operation has a different sampling and alignment contract from
+`compute_ar_unsmoothed_prices`; the existing helper's contract is unchanged. The owner
+is [native-price reconstruction](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/unsmoothing/price_panel.py).
 
 Implementation owners are [AR unsmoothing](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/models/unsmoothing/ar_lag.py)
 and [financing transforms](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/perfstats/returns.py).

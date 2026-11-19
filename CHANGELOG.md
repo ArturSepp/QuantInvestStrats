@@ -5,7 +5,14 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [6.1.1] - 2026-11-19
+
+### Added
+
+- `compute_unsmoothed_price_panel` and `UnsmoothingMethod` compose the existing AR/joint
+  return engines with explicit per-cadence horizons, native-mark support, original-grid
+  NAV reconstruction and optional applied-coefficient diagnostics. Existing AR price
+  helpers and regression defaults retain their contracts.
 
 ## [6.1.0] - 2026-11-18
 
