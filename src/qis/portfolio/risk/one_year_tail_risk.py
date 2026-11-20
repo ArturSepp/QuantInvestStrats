@@ -88,7 +88,7 @@ def compute_one_year_tail_risk(
     for exposure in (portfolio_weights, benchmark_weights):
         if not exposure.index.is_unique or not np.isfinite(exposure.to_numpy(dtype=float)).all():
             raise ValueError('Target weights must be finite and uniquely labelled')
-    weights = pd.concat([portfolio_weights, benchmark_weights], axis=1).fillna(0.0)
+    weights = pd.concat([portfolio_weights, benchmark_weights], axis=1, sort=False).fillna(0.0)
     weights.columns = ['strategy', 'benchmark']
     methods = ['Gaussian analytic', 'Gaussian Monte Carlo', 'Historical bootstrap']
     columns = ['strategy_var', 'strategy_es', 'benchmark_var', 'benchmark_es']

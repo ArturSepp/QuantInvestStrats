@@ -291,8 +291,9 @@ To produce the Appendix, pass `add_one_year_tail_risk=True`,
 `tail_risk_currency='USD'` (or the currency of the inputs), and optionally
 `tail_risk_monthly_returns` to `qis.weights_tracking_error_report_by_ac_subac`.
 Read the figure and full-precision frame from `figs['one_year_tail_risk']` and
-`dfs['one_year_tail_risk']`. The offline example accepts `--appendix-dir <directory>` to save that figure as a PDF
-and the same frame as a CSV. The as-of date is the supplied report end, or the
+`dfs['one_year_tail_risk']`. Pass an output directory to the offline example's
+`save_tail_appendix(directory)` to save that figure as a PDF and the same frame
+as a CSV. The as-of date is the supplied report end, or the
 earlier of the two portfolios' latest observed NAVs. The Appendix selects the
 latest available covariance and each portfolio's latest target at or before
 that cut-off. The frame records their dates; a static target has no vintage.

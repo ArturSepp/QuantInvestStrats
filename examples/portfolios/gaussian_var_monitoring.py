@@ -6,7 +6,6 @@ EWMA covariances are sampled monthly after a three-span burn-in. The allocations
 are fixed illustrations, not optimised portfolios or realised strategy histories.
 """
 
-import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -122,7 +121,7 @@ def save_tail_appendix(directory: Path) -> None:
             add_one_year_tail_risk=True, tail_risk_currency='USD',
             tail_risk_monthly_returns=monthly)
     try:
-        directory.mkdir(parents=True, exist_ok=True)
+        directory = Path(qis.get_output_path(directory))
         figs['one_year_tail_risk'].savefig(directory / 'one_year_tail_risk.pdf')
         dfs['one_year_tail_risk'].to_csv(directory / 'one_year_tail_risk.csv')
     finally:
@@ -131,9 +130,4 @@ def save_tail_appendix(directory: Path) -> None:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--appendix-dir', type=Path, help='Save the report Appendix PDF and CSV.')
-    args = parser.parse_args()
     run_example()
-    if args.appendix_dir is not None:
-        save_tail_appendix(args.appendix_dir)
