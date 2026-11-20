@@ -12,6 +12,7 @@ from qis.perfstats.config import (
     SharpeConvention
 )
 
+from qis.perfstats.drawdown_events import compute_benchmark_drawdown_events
 from qis.perfstats.desc_table import DescTableType, compute_desc_table
 
 from qis.perfstats.perf_stats import (

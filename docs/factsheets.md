@@ -65,6 +65,22 @@ The generator's `strategy_idx` and `benchmark_idx` keywords select other positio
 Store the reference price panel on `MultiPortfolioData` for market regimes and beta
 calculations. This reference series is distinct from the portfolio used for active comparison.
 
+Single-strategy reports end with **Drawdown analysis**. It shows the strategy’s own
+loss episodes and its returns across the selected benchmark’s peak, trough and recovery
+dates. Pass `add_drawdown_analysis_sheet=False` to omit it. [Worked example and window options](drawdowns.md#strategy-returns-during-benchmark-drawdowns).
+
+For a strategy–benchmark pair, the Brinson page explains how allocation and selection
+contributed to the realised active return. The [worked reconciliation](brinson_attribution.md#why-the-factsheet-shows-positive-selection)
+shows the effect of including interaction in selection and how to read a one-period chart.
+
+For a one-year 99% VaR and expected shortfall comparison, call
+`qis.weights_tracking_error_report_by_ac_subac` directly. Pass `add_one_year_tail_risk=True`
+and set `tail_risk_currency` to the currency of the inputs. Supply annualised covariance
+for the Gaussian estimates and matched monthly simple asset returns in
+`tail_risk_monthly_returns` for the optional historical bootstrap. The returned
+`figs['one_year_tail_risk']` and `dfs['one_year_tail_risk']` contain the Appendix
+figure and full-precision table. [Worked comparison and export example](gaussian_var.md#one-year-tail-risk-for-the-strategy-and-benchmark).
+
 ## Facade arguments and output
 
 | Argument | Meaning |

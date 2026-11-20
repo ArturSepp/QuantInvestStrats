@@ -20,6 +20,7 @@ from qis.portfolio.reports.strategy_benchmark_tre_factsheet import (
     weights_tracking_error_report_by_ac_subac,
 )
 from qis.portfolio.risk.risk_model import RiskModel
+from qis.portfolio.reports._one_year_tail_risk import get_one_year_tail_risk_table
 from qis.utils.df_to_weights import generate_static_weights_schedule
 
 
@@ -115,7 +116,7 @@ def report_inputs():
     return universe, with_covar, without_covar, covar_model, factor_model
 
 
-def _run_report(multi_portfolio_data, universe, covar_risk_model=None):
+def _run_report(multi_portfolio_data, universe, covar_risk_model=None, **kwargs):
     return weights_tracking_error_report_by_ac_subac(
         multi_portfolio_data=multi_portfolio_data,
         ac_group_data=universe.group_data,
@@ -127,7 +128,7 @@ def _run_report(multi_portfolio_data, universe, covar_risk_model=None):
         covar_risk_model=covar_risk_model,
         add_benchmarks_to_navs=False,
         add_titles=False,
-        figsize=(4.0, 3.0))
+        figsize=(4.0, 3.0), **kwargs)
 
 
 def _close_figures(figures) -> None:
@@ -157,6 +158,70 @@ def test_ex_ante_beta_applies_report_period_before_history_calculation() -> None
     expected = pd.Series(
         [1.0, 1.0], index=dates[1:], name='Benchmark beta')
     pd.testing.assert_series_equal(actual, expected)
+
+
+@pytest.mark.parametrize('supply_history', [True, False])
+def test_one_year_tail_appendix_matches_export(report_inputs, supply_history):
+    """Read every displayed cell back from the opted-in public report at a past date."""
+    universe, pair, _, _, _ = report_inputs
+    prices = universe.prices
+    end = prices.index[-30]
+    monthly = prices.resample('ME').last().pct_change(fill_method=None) if supply_history else None
+    figs, dfs = _run_report(pair, universe, add_one_year_tail_risk=True, tail_risk_currency='USD',
+                            tail_risk_monthly_returns=monthly, time_period=qis.TimePeriod(end=end))
+    try:
+        frame = dfs['one_year_tail_risk']
+        assert list(figs)[-1] == list(dfs)[-1] == 'one_year_tail_risk'
+        assert frame.as_of.eq(end).all()
+        vintage = max(d for d in pair.covar_dict if d <= end)
+        assert frame.iloc[0].covariance_date == vintage
+        target = pair.portfolio_datas[0].input_weights.loc[:end].iloc[-1]
+        assert frame.iloc[0].strategy_target_date == target.name
+        expected_var = 2.32634787404084 * np.sqrt(target @ pair.covar_dict[vintage] @ target)
+        np.testing.assert_allclose(frame.iloc[0].strategy_var, expected_var)
+        ax = figs['one_year_tail_risk'].axes[0]
+        grid = ax.tables[0]
+        for i, (method, row) in enumerate(frame.iterrows(), 1):
+            assert grid[i, 0].get_text().get_text() == method
+            columns = ['strategy_var', 'strategy_es', 'benchmark_var', 'benchmark_es']
+            for j, col in enumerate(columns, 1):
+                value = row[col]
+                expected_text = '—' if pd.isna(value) else f'{value:.2%}'
+                assert grid[i, j].get_text().get_text() == expected_text
+        notes = ' '.join(t.get_text() for t in ax.texts)
+        assert ('not supplied' in notes) == (not supply_history)
+        assert pd.notna(frame.iloc[-1].benchmark_var) == supply_history
+        if supply_history:
+            assert frame.iloc[-1].sample_end <= end
+    finally:
+        _close_figures(figs)
+
+
+def test_tail_snapshot_excludes_future_targets_and_covariance(report_inputs):
+    """Use date-specific targets and accept a static input when the benchmark has drifted."""
+    from dataclasses import replace
+
+    _, pair, _, _, _ = report_inputs
+    original, reference = pair.portfolio_datas
+    dates = original.prices.index[[100, 101, 102]]
+    assets = original.prices.columns
+    targets = pd.DataFrame(0., index=dates[[0, 2]], columns=assets)
+    targets.loc[dates[0], assets[0]] = 1.
+    targets.loc[dates[2], assets[-1]] = 1.
+    strategy = replace(original, input_weights=targets)
+    benchmark = replace(reference, input_weights={assets[-1]: 1.})
+    cov = pd.DataFrame(np.diag(np.linspace(.01, .09, len(assets))), index=assets, columns=assets)
+    history = {dates[0]: cov, dates[2]: 4 * cov}
+    table = get_one_year_tail_risk_table(strategy, benchmark, history, dates[1], None, 'CHF')
+    analytic = table.iloc[0]
+    np.testing.assert_allclose([analytic.strategy_var, analytic.benchmark_var],
+                               [0.1 * 2.32634787404084, 0.3 * 2.32634787404084])
+    assert analytic.strategy_target_date == analytic.covariance_date == dates[0]
+    assert pd.isna(analytic.benchmark_target_date) and analytic.currency == 'CHF'
+    assert table.iloc[-1].paths == 0 and pd.isna(table.iloc[-1].seed)
+    with pytest.raises(ValueError, match='no target weights'):
+        get_one_year_tail_risk_table(strategy, benchmark, history, dates[0] - pd.Timedelta(days=1),
+                                     None, 'CHF')
 
 
 def test_ra_performance_table_is_rendered_once(report_inputs) -> None:

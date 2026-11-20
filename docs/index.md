@@ -115,7 +115,7 @@ the [bibliography](bibliography.md).
 - [Sharpe ratios: conventions and inference](performance_analytics_and_sharpe.md):
   the Sharpe conventions of qis, the volatility drag between them and their sampling error.
 - [Drawdowns and time under water](drawdowns.md): running and maximum drawdowns, episodes,
-  Calmar ratios and their dependence on the grid and the horizon.
+  Calmar ratios and the [strategy’s return during benchmark drawdowns](drawdowns.md#strategy-returns-during-benchmark-drawdowns).
 - [Alpha, beta and benchmark-relative performance](benchmark_relative_performance.md):
   the single-index regression, alpha inference, EWMA betas and beta attribution.
 - [Regime-conditional performance](regime_conditional_performance.md): benchmark regimes and
@@ -145,7 +145,7 @@ the [bibliography](bibliography.md).
 ### Part IV: Portfolios
 
 - [Self-financed FX accounting](self_financed_fx_accounting.md): local debt, collateral cash,
-  hedge rolls, fixing, settlement and exact monetary reconciliation.
+  hedge rolls, fixing, settlement and exact monetary reconciliation. The [liquidity example](self_financed_fx_accounting.md#cash-available-at-a-hedge-payment-cutoff) follows free cash through a margin call and a delayed asset sale.
 - [Portfolio backtesting](portfolio_backtesting.md):
   decisions, execution timing, held units and portfolio histories.
 - [Turnover conventions](turnover_conventions.md):
@@ -163,7 +163,7 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 - [Portfolio risk and Euler contributions](risk_contributions.md): marginal, total and relative
   risk contributions and their grouping.
 - [Gaussian Monte Carlo VaR and benchmark risk](gaussian_var.md): supplied-covariance
-  loss quantiles, VaR ratios, beta and tracking error, with offline monitoring examples.
+  loss quantiles, VaR ratios, beta and tracking error, including the [one-year tail-risk Appendix](gaussian_var.md#one-year-tail-risk-for-the-strategy-and-benchmark).
 - [Factor risk models](factor_risk_models.md): EWMA factor models, betas, residual risk and the
   model covariance.
 - [Tracking error and benchmark-relative risk](tracking_error_and_risk.md):
@@ -202,7 +202,7 @@ chapters below and computes a point-in-time risk snapshot of one portfolio.
 ### Part VII: Attribution
 
 - [Brinson attribution](brinson_attribution.md):
-  allocation, selection and interaction effects against a benchmark.
+  allocation, selection and interaction effects against a benchmark. The [factsheet reconciliation](brinson_attribution.md#why-the-factsheet-shows-positive-selection) shows how merging interaction into selection preserves the total active return.
 - [Model-layer attribution](model_layer_attribution.md):
   risk, signal and integration layers, with factor and feature contribution methods.
 

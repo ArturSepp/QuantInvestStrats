@@ -31,6 +31,7 @@ page. Remove the mark once it has.
 - Bailey, D. H., and López de Prado, M. (2012). The Sharpe Ratio Efficient Frontier. *Journal of Risk*, 15(2), 3–44. [pending publisher check]
 - Bailey, D. H., and López de Prado, M. (2014). The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality. *The Journal of Portfolio Management*, 40(5), 94–107. [DOI: 10.3905/jpm.2014.40.5.094](https://doi.org/10.3905/jpm.2014.40.5.094). [pending publisher check]
 - Campbell, J. Y., Lo, A. W., and MacKinlay, A. C. (1997). *The Econometrics of Financial Markets*. Princeton University Press. [pending publisher check]
+- Elkamhi, R., and Lee, J. S. H. (2027). *Total Portfolio Management*, Chapter 13, Tables 13.1–13.3. Springer. [DOI: 10.1007/978-3-032-36706-8_13](https://doi.org/10.1007/978-3-032-36706-8_13).
 - Chekhlov, A., Uryasev, S., and Zabarankin, M. (2005). Drawdown Measure in Portfolio Optimization. *International Journal of Theoretical and Applied Finance*, 8(1), 13–58. [DOI: 10.1142/S0219024905002767](https://doi.org/10.1142/S0219024905002767). [pending publisher check]
 - Getmansky, M., Lo, A. W., and Makarov, I. (2004). An econometric model of serial correlation and illiquidity in hedge fund returns. *Journal of Financial Economics*, 74(3), 529–609. [DOI: 10.1016/j.jfineco.2004.04.001](https://doi.org/10.1016/j.jfineco.2004.04.001).
 - Goodwin, T. H. (1998). The Information Ratio. *Financial Analysts Journal*, 54(4), 34–43. [DOI: 10.2469/faj.v54.n4.2196](https://doi.org/10.2469/faj.v54.n4.2196). [pending publisher check]
@@ -94,6 +95,7 @@ page. Remove the mark once it has.
 ## Portfolios, risk and breadth
 
 - Choueifaty, Y., and Coignard, Y. (2008). Toward Maximum Diversification. *The Journal of Portfolio Management*, 35(1), 40–51. [DOI: 10.3905/JPM.2008.35.1.40](https://doi.org/10.3905/JPM.2008.35.1.40). [pending publisher check]
+- Elkamhi, R., and Lee, J. S. H. (2027). *Total Portfolio Management*, Chapter 10, Table 10.2. Springer. [DOI: 10.1007/978-3-032-36706-8_10](https://doi.org/10.1007/978-3-032-36706-8_10).
 - Grinold, R. C. (1989). The Fundamental Law of Active Management. *The Journal of Portfolio Management*, 15(3), 30–37. [DOI: 10.3905/jpm.1989.409211](https://doi.org/10.3905/jpm.1989.409211). [pending publisher check]
 - Grinold, R. C., and Kahn, R. N. (2000). *Active Portfolio Management*, 2nd edition. McGraw-Hill. [pending publisher check]
 - Harvey, C. R., Hoyle, E., Korgaonkar, R., Rattray, S., Sargaison, M., and Van Hemert, O. (2018). The Impact of Volatility Targeting. *The Journal of Portfolio Management*, 45(1), 14–33. [DOI: 10.3905/jpm.2018.45.1.014](https://doi.org/10.3905/jpm.2018.45.1.014). [pending publisher check]
@@ -111,6 +113,7 @@ page. Remove the mark once it has.
 ## Attribution
 
 - Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). Determinants of Portfolio Performance. *Financial Analysts Journal*, 42(4), 39–44. [DOI: 10.2469/faj.v42.n4.39](https://doi.org/10.2469/faj.v42.n4.39).
+- Elkamhi, R., and Lee, J. S. H. (2027). Active Risk Management. In *Total Portfolio Management*, Chapter 11. Springer. [DOI: 10.1007/978-3-032-36706-8_11](https://doi.org/10.1007/978-3-032-36706-8_11).
 - Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10–22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
 - Shapley, L. S. (1952). *A Value for N-Person Games*. RAND, P-295. [Original report](https://www.rand.org/pubs/papers/P295.html). Published in *Contributions to the Theory of Games II* (1953); [publisher's reprint record](https://doi.org/10.1515/9781400829156-012).
 
@@ -124,6 +127,7 @@ page. Remove the mark once it has.
 - Borio, C., McCauley, R., McGuire, P., and Sushko, V. (2016). Covered interest parity lost: understanding the cross-currency basis. *BIS Quarterly Review*, September. [Publisher page](https://www.bis.org/publications/qr-201609/covered-interest-parity-lost-understanding-cross-currency-basis).
 - Boyer, B. H., Gibson, M. S., and Loretan, M. (1999). Pitfalls in tests for changes in correlations. Federal Reserve Board, International Finance Discussion Papers 597. [PDF](https://www.federalreserve.gov/pubs/ifdp/1997/597/ifdp597.pdf).
 - Breuer, T., Jandačka, M., Rheinberger, K., and Summer, M. (2009). How to find plausible, severe and useful stress scenarios. *International Journal of Central Banking*, 5(3), 205–224. [PDF](https://www.ijcb.org/journal/ijcb09q3a7.pdf).
+- Elkamhi, R., and Lee, J. S. H. (2027). Foreign Exchange (FX) Hedging. In *Total Portfolio Management*, Chapter 12, 681–702. Springer. [DOI: 10.1007/978-3-032-36706-8_12](https://doi.org/10.1007/978-3-032-36706-8_12).
 - Glasserman, P., Kang, C., and Kang, W. (2015). Stress scenario selection by empirical likelihood. *Quantitative Finance*, 15(1), 25–41. [DOI: 10.1080/14697688.2014.926019](https://doi.org/10.1080/14697688.2014.926019).
 - Kim, J., and Finger, C. C. (2000). A stress test to incorporate correlation breakdown. *Journal of Risk*, 2(3). [Publisher page](https://www.risk.net/journal-risk/2161074/stress-test-incorporate-correlation-breakdown).
 - Kupiec, P. H. (1998). Stress testing in a value at risk framework. *Journal of Derivatives*, 6(1), 7–24. [DOI: 10.3905/jod.1998.408008](https://doi.org/10.3905/jod.1998.408008).

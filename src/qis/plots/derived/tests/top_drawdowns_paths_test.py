@@ -62,7 +62,7 @@ def test_native_grid_counts_observations() -> None:
     assert ax.get_xlabel() == 'Observations in drawdown'
     texts = _legend_texts(fig)
     # 2 Jan to 8 Jan is four observations (calendar days would give six)
-    assert any(text.startswith('02Jan2024-08Jan2024') and text.endswith('days_dd=4')
+    assert any(text.startswith('02Jan2024-08Jan2024') and text.endswith('observations=4')
                for text in texts)
     # the drawn paths are the lines with data; legend proxies carry none
     lengths = sorted(np.count_nonzero(~np.isnan(np.asarray(line.get_ydata(), dtype=float)))

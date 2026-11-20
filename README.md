@@ -376,7 +376,8 @@ a backtested or actual strategy passed as a `PortfolioData` object. Run
 [`examples/factsheets/strategy.py`](examples/factsheets/strategy.py). The portfolio targets use a
 63-observation volatility estimator; the risk appendix labels the sampling grid and window of
 each risk measure. Report statistics use the monthly preset; portfolio NAVs include trading costs
-and Sharpe statistics have no cash-rate adjustment.
+and Sharpe statistics have no cash-rate adjustment. The default final [Drawdown analysis page](docs/drawdowns.md#strategy-returns-during-benchmark-drawdowns)
+shows the strategy’s own episodes and how it performed between the benchmark’s peaks, troughs and recoveries.
 
 ![Current strategy factsheet with synthetic cumulative performance and drawdowns](docs/images/readme_strategy.png)
 ![Current volatility-parity risk appendix: 99% value-at-risk, attribution and rolling beta](docs/images/readme_strategy_risk.png)
@@ -385,10 +386,10 @@ and Sharpe statistics have no cash-rate adjustment.
 **4. Strategy benchmark factsheet** <a name="strategybenchmark"></a> — performance and marginal
 comparison of a strategy against a benchmark strategy, each passed as a `PortfolioData` object.
 Run [`examples/factsheets/strategy_benchmark.py`](examples/factsheets/strategy_benchmark.py).
-[Brinson–Hood–Beebower attribution](docs/brinson_attribution.md) uses native-period effects
-linked with Frongello's method; interaction is folded into selection, background colours show
-benchmark return regimes, and the attribution is gross of realised trading costs while the
-comparison NAVs are net of them.
+The Brinson page folds interaction into selection. For one return interval it plots the observed
+effects and opening active weights. Across multiple intervals it links effects with Frongello’s
+method and shows benchmark return regimes. Attribution is gross of realised trading costs and
+the comparison NAVs are net of them. [Worked Brinson reconciliation](docs/brinson_attribution.md#why-the-factsheet-shows-positive-selection).
 
 ![Current volatility-parity portfolio compared with an equal-weight synthetic benchmark](docs/images/readme_strategy_benchmark.png)
 ![Current Brinson allocation and selection effects with benchmark-regime background colours](docs/images/readme_brinson.png)
@@ -475,7 +476,7 @@ To identify the current software version alongside the paper, use:
   title={qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python},
   author={Sepp, Artur},
   year={2026},
-  version={6.1.1},
+  version={6.1.2},
   url={https://github.com/ArturSepp/QuantInvestStrats}
 }
 ```

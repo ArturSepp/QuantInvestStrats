@@ -151,13 +151,24 @@ def plot_top_drawdowns_paths(price: pd.Series,
         price = price.asfreq(freq, method='ffill')  # it will have nans
     # the episode table uses the plotted grid, so its dates and durations match the paths
     df = pt.compute_drawdowns_stats_table(price=price, max_num=max_num, freq=freq)
+    return _plot_ranked_drawdown_paths(
+        price, df, freq=freq, date_format=date_format, title=title, var_format=var_format,
+        legend_loc=legend_loc, highlight_ongoing=highlight_ongoing, x_limits=x_limits,
+        y_limits=y_limits, ax=ax, **kwargs)
+
+
+def _plot_ranked_drawdown_paths(price, df, *, freq, date_format='%d%b%Y', title=None,
+                                var_format='{:.0%}', legend_loc='lower left',
+                                highlight_ongoing=False, x_limits=(0.0, None),
+                                y_limits=(None, 0.0), ax=None, **kwargs):
+    """Draw ranked episodes already computed on the supplied price grid."""
     price_slices = {}
-    points = {}
-    for start, trough, end, max_dd, peak, days_dd in zip(df['start'], df['trough'], df['end'], df['max_dd'], df['peak'],
-                                                         df['days_dd']):
-        name = f"{start:{date_format}}-{end:{date_format}}: max_dd={max_dd:0.0%}, days_dd={days_dd:0.0f}"
-        price_slices[name] = (price.loc[start:end] / peak - 1.0).reset_index(drop=True)
-        points[name] = {trough: max_dd}
+    duration_unit = 'observations' if freq is None else 'days_dd'
+    for episode in df.itertuples():
+        name = (f"{episode.start:{date_format}}-{episode.end:{date_format}}: "
+                f"max_dd={episode.max_dd:0.0%}, {duration_unit}={episode.days_dd:0.0f}")
+        path = price.loc[episode.start:episode.end] / episode.peak - 1.0
+        price_slices[name] = path.reset_index(drop=True)
     price_slices = pd.DataFrame.from_dict(price_slices, orient='columns')
 
     n = len(price_slices.columns)

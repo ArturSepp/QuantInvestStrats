@@ -28,6 +28,9 @@ from qis.portfolio.multi_portfolio_data import MultiPortfolioData
 from qis.portfolio.risk.factor_model import LinearModel
 from qis.portfolio.risk.risk_model import RiskModel
 from qis.portfolio.reports.config import PERF_PARAMS
+from qis.portfolio.reports._one_year_tail_risk import (
+    get_one_year_tail_risk_table, plot_one_year_tail_risk,
+)
 from qis.plots.derived.perf_table import get_ra_perf_benchmark_columns
 from qis.plots.utils import get_n_sns_colors
 from qis.utils.df_str import idx_to_alphabet
@@ -193,6 +196,9 @@ def weights_tracking_error_report_by_ac_subac(
     lookthrough_matrix: Optional[pd.DataFrame] = None,
     sub_ac_lookthrough_matrix: Optional[pd.DataFrame] = None,
     turnover_lookthrough_matrix: Optional[pd.DataFrame] = None,
+    add_one_year_tail_risk: bool = False,
+    tail_risk_currency: Optional[str] = None,
+    tail_risk_monthly_returns: Optional[pd.DataFrame] = None,
     **kwargs,
 ) -> Tuple[Dict[str, plt.Figure], Dict[str, pd.DataFrame]]:
     """Build weights and tracking-error panels for a strategy and benchmark.
@@ -229,6 +235,10 @@ def weights_tracking_error_report_by_ac_subac(
         figsize: Figure size for each panel.
         var_format: Weight and contribution formatting string.
         add_titles: Whether to draw panel titles.
+        add_one_year_tail_risk: Append a 99% one-year comparison under 'one_year_tail_risk'.
+        tail_risk_currency: Reference currency of all risk inputs, required for the Appendix.
+        tail_risk_monthly_returns: Optional matched monthly simple asset returns in that currency.
+            Each row is a completed month, dated when observable. Covariance is annualised.
         **kwargs: Additional plotting arguments.
 
     Returns:
@@ -248,6 +258,21 @@ def weights_tracking_error_report_by_ac_subac(
     report_covar_dict = multi_portfolio_data.covar_dict
     if report_covar_dict is None and covar_risk_model is not None:
         report_covar_dict = covar_risk_model.covar
+
+    tail_table = None
+    if add_one_year_tail_risk:
+        tail_table = get_one_year_tail_risk_table(
+            multi_portfolio_data.portfolio_datas[strategy_idx],
+            multi_portfolio_data.portfolio_datas[benchmark_idx], report_covar_dict,
+            time_period.end if time_period is not None else None,
+            tail_risk_monthly_returns, tail_risk_currency)
+
+    def finish_report():
+        """Append the optional comparison last on either report path."""
+        if tail_table is not None:
+            figs['one_year_tail_risk'] = plot_one_year_tail_risk(tail_table, figsize)
+            dfs['one_year_tail_risk'] = tail_table
+        return figs, dfs
 
     with (sns.axes_style('darkgrid')):
         # navs + ra table
@@ -389,7 +414,7 @@ def weights_tracking_error_report_by_ac_subac(
                 add_titles=add_titles,
                 **kwargs,
             )
-            return figs, dfs
+            return finish_report()
 
         # portfolio vol
         strategy_ex_anti_vol = strategy_data.compute_ex_anti_portfolio_vol_implied_by_covar(
@@ -932,7 +957,7 @@ def weights_tracking_error_report_by_ac_subac(
                 multi_portfolio_data.add_regime_shadows(ax=ax, regime_benchmark=regime_benchmark,
                                                         index=benchmark_portfolio_var.index, regime_classifier=regime_classifier)
 
-    return figs, dfs
+    return finish_report()
 
 
 def plot_exposures_strategy_vs_benchmark_stack(strategy_exposures: pd.DataFrame,

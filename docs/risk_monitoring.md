@@ -150,6 +150,14 @@ date's known weights with that date's point-in-time covariance.
 
 ## Reporting
 
+The **One-year tail risk** Appendix belongs to the weights and tracking-error
+report. Enable it with `add_one_year_tail_risk=True` and supply
+`tail_risk_currency`. Add `tail_risk_monthly_returns` to compare compounded
+historical losses with annual Gaussian VaR and ES for the as-of strategy and
+benchmark targets. The `one_year_tail_risk` key in each returned dictionary
+contains the figure or the corresponding full-precision frame, including input
+dates and coverage. [Worked comparison and input conventions](gaussian_var.md#one-year-tail-risk-for-the-strategy-and-benchmark).
+
 The single-strategy factsheet collects most of these measures on one or more pages: NAV and
 drawdowns, rolling volatility and Sharpe ratio, weights, turnover and benchmark betas. Its
 `add_current_position_var_risk_sheet=True` option adds a page of current position value at risk.

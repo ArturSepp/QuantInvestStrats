@@ -238,7 +238,11 @@ for its generic price-panel and optional factor-enum contract. Its CSV basename 
 The offline `fx_returns_and_accounting_example.py` covers typed SIMPLE/LOG returns,
 cash-relative returns, exact notional payoffs, explicit synthetic index normalisation,
 monthly cash measurement, zero/nonzero-net local financing, hedge resets and settlement.
-Each runnable file uses a `Locals` dispatcher.
+To check whether a hedge cash call can be paid on time, run
+`python -m examples.fx.fx_collateral_liquidity` from the repository root. The example
+uses `qis.portfolio.fx_liquidity.compute_fx_liquidity` with a self-financed account
+and supplied cash-flow schedules. It shows when sale proceeds become spendable and
+reports the shortfall by currency and agreement. [Payment-cutoff walkthrough](../../../docs/self_financed_fx_accounting.md#cash-available-at-a-hedge-payment-cutoff).
 
 * **`fx_rates_data_bloomberg_example.py`** uses a provider-specific basket of term rates
   and overnight CAD/SGD benchmarks (`CAONREPO Index` and `SIBCSORA Index`). It requires a

@@ -227,6 +227,69 @@ cannot detect that bug.
 The complete offline example below checks both the native-period calculation and
 its aggregation to monthly and quarterly reports.
 
+### Why the factsheet shows positive selection
+
+In Elkamhi and Lee’s one-period example, the strategy earned **13.00%** and its
+benchmark **11.60%**. Extra weight in equities helped the strategy. Within-class
+selection at benchmark weights cost 35 basis points (bp), driven by the bond
+portfolio earning 6% against its benchmark’s 8%. The strategy held only 25%
+in bonds against the benchmark’s 45%. That underweight reduced the effect of the
+bond shortfall and contributed **+40 bp** of interaction. [Chapter 11, Table 11.3](https://doi.org/10.1007/978-3-032-36706-8_11).
+
+| Asset class | Allocation (bp) | Selection (bp) | Interaction (bp) | Factsheet selection incl. interaction (bp) | Active return (bp) |
+|---|---:|---:|---:|---:|---:|
+| Equities | +225 | +50 | +15 | +65 | +290 |
+| Bonds | −160 | −90 | +40 | −50 | −210 |
+| Commodities | +50 | +5 | +5 | +10 | +60 |
+| **Total** | **+115** | **−35** | **+60** | **+25** | **+140** |
+
+The strategy–benchmark factsheet assigns all interaction to selection. Its two
+effects therefore read **+115 bp allocation and +25 bp selection**, which add
+to the same 140 bp active return. To reproduce the book’s three columns, supply
+each portfolio’s weighted simple-return contributions and opening weights.
+
+```python
+import numpy as np
+import pandas as pd
+import qis
+
+groups = ['Equities', 'Bonds', 'Commodities']
+date = [pd.Timestamp('2024-12-31')]  # illustrative period-end label
+strategy_w = pd.DataFrame([[0.65, 0.25, 0.10]], index=date, columns=groups)
+benchmark_w = pd.DataFrame([[0.50, 0.45, 0.05]], index=date, columns=groups)
+strategy_pnl = strategy_w * [0.16, 0.06, 0.11]
+benchmark_pnl = benchmark_w * [0.15, 0.08, 0.10]
+np.testing.assert_allclose([strategy_pnl.sum(axis=1).iat[0],
+                            benchmark_pnl.sum(axis=1).iat[0]], [0.13, 0.116])
+
+inputs = dict(strategy_pnl=strategy_pnl, benchmark_pnl=benchmark_pnl,
+              strategy_weights=strategy_w, benchmark_weights=benchmark_w,
+              group_data=pd.Series(groups, index=groups))
+split, *_ = qis.compute_brinson_attribution_table(
+    **inputs, is_linked=False, is_exclude_interaction_term=False)
+merged, *_ = qis.compute_brinson_attribution_table(**inputs)
+rows = groups + ['Total Sum']
+cols = ['Asset\nAllocation', 'Instrument\nSelection', 'Interaction', 'Total\nActive']
+np.testing.assert_allclose(10_000 * split.loc[rows, cols], [
+    [225, 50, 15, 290], [-160, -90, 40, -210],
+    [50, 5, 5, 60], [115, -35, 60, 140],
+])
+np.testing.assert_allclose(10_000 * merged.loc[rows, 'Instrument\nSelection'],
+                           [65, -50, 10, 25])
+np.testing.assert_allclose(merged.loc[rows, 'Total\nActive'], split.loc[rows, 'Total\nActive'])
+```
+
+In `qis.factsheet(kind='strategy_benchmark', ...)`, `brinson_time_period`
+sets the NAV baseline and end date for this page. Pass `var_format='{:.2%}'`
+to display each basis point. With one return, the point markers show the
+period-end effects. The bars show opening strategy weight minus opening benchmark weight.
+A class held by the strategy alone has a positive bar, and one held by the benchmark
+alone has a negative bar for the long-only portfolios in this example. Regime shading
+is omitted for a single interval. The gross trading-cost basis matches the zero-cost illustration. For longer windows the report links the
+native-period effects before displaying them. For a separate example of the
+risk of holding different securities from the benchmark, see
+[large caps against a small-cap benchmark](tracking_error_and_risk.md#large-caps-against-a-small-cap-benchmark).
+
 ## Implementation in qis
 
 ### Portfolio wrapper, reporting periods and costs
@@ -352,3 +415,4 @@ are the numerical contract; the example is the reader-facing reproduction path.
 2. Frongello, A. S. B. (2002). Linking Single Period Attribution Results. *Journal of Performance Measurement*, 6(3), 10–22. [PDF](https://frongello.com/support/Works/JPMSpring2002.pdf).
 3. R-Finance contributors. PortfolioAttribution. Software. [Frongello linking implementation](https://github.com/R-Finance/PortfolioAttribution/blob/master/R/Frongello.R). Supplemental implementation reference.
 4. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+5. Elkamhi, R., and Lee, J. S. H. (2027). Active Risk Management. In *Total Portfolio Management*, Chapter 11. Springer. [DOI: 10.1007/978-3-032-36706-8_11](https://doi.org/10.1007/978-3-032-36706-8_11).
