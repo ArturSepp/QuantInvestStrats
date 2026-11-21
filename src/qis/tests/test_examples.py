@@ -265,7 +265,18 @@ def test_offline_example_runs(path: Path,
     environment['PYTHONPATH'] = (str(REPO_ROOT) if python_path is None
                                  else os.pathsep.join((str(REPO_ROOT), python_path)))
     module = '.'.join(('examples', *path.relative_to(EXAMPLES_DIR).with_suffix('').parts))
-    completed = subprocess.run([sys.executable, '-m', module],
+    command = [sys.executable, '-m', module]
+    # The all-weather article builder writes post.html beside its script, so changing cwd
+    # does not redirect it. Consequently, its test can pass while modifying the tracked
+    # article, and that unrelated change could accidentally enter a later commit.
+    # Use the builder's existing --output option to keep the rebuild in tmp_path.
+    is_article_builder = path == EXAMPLES_DIR / 'all_weather_portfolio' / 'build_post.py'
+    if is_article_builder:
+        article = path.with_name('post.html')
+        article_before = article.read_bytes()
+        output = tmp_path / 'post.html'
+        command.extend(['--output', str(output)])
+    completed = subprocess.run(command,
                                cwd=str(tmp_path),
                                env=environment,
                                capture_output=True,
@@ -277,3 +288,6 @@ def test_offline_example_runs(path: Path,
             pytest.skip(f"{path.name} needs an optional dependency: {missing}")
         tail = '\n'.join(completed.stderr.strip().splitlines()[-15:])
         pytest.fail(f"{path.name} failed with exit code {completed.returncode}:\n{tail}")
+    if is_article_builder:
+        assert output.read_bytes(), "Temporary article HTML is empty"
+        assert article.read_bytes() == article_before, "Tracked article HTML was modified"
