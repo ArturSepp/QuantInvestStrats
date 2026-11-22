@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- `to_finite_np` avoids JIT startup for ordinary one- and two-dimensional float64
+  arrays with Python float fill values, including converted pandas inputs.
+  First grouped long/short exposure reads can use that Python path; direct compiled
+  mapping and other input paths retain native behavior.
+
 ### Fixed
 
 - Instrument periodic returns retain the opening price baseline on unique increasing dates.
