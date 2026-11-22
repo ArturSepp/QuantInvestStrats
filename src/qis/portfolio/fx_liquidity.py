@@ -274,8 +274,14 @@ def compute_fx_liquidity(
         )
     )
     fields = ["at", *_KEYS, "kind", "amount"]
-    payments = pd.DataFrame(payments, columns=fields)
-    records = pd.concat([events[fields], payments], ignore_index=True)
+    records = events[fields]
+    if payments:
+        payment_records = pd.DataFrame(payments, columns=fields)
+        # Empty frames can change dtype inference across pandas versions.
+        if records.empty:
+            records = payment_records
+        else:
+            records = pd.concat([records, payment_records], ignore_index=True)
     buckets = dict.fromkeys(
         [
             *balances,

@@ -16,6 +16,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- `compute_fx_liquidity` avoids a pandas 2.2 concatenation warning when a cash event
+  schedule or ledger payment table is empty.
 - Instrument periodic returns retain the opening price baseline on unique increasing dates.
   When that baseline lies on the reporting grid, realised instrument attribution and
   `MultiPortfolioData.compute_tracking_error_table` now include the first period's contribution.
