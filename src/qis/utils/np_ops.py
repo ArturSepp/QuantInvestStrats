@@ -227,7 +227,14 @@ def to_finite_np(data: Union[pd.Series, pd.DataFrame, np.ndarray],
     else:
         raise TypeError(f"unsuported {type(data)}")
 
-    data_np = to_finite(data_np, fill_value)
+    # The Python path needs no JIT for this expression. Other dtypes, scalars and array
+    # subclasses can have different NumPy/Numba promotion or dispatch behavior, so keep
+    # those inputs on the native compiled path, including its existing diagnostics.
+    if (type(data_np) is np.ndarray and data_np.dtype == np.float64
+            and data_np.ndim in (1, 2) and type(fill_value) is float):
+        data_np = np.where(np.isfinite(data_np), data_np, fill_value)
+    else:
+        data_np = to_finite(data_np, fill_value)
 
     if a_min is not None or a_max is not None:
         if is_min_max_clip_fill:

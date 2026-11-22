@@ -5,6 +5,15 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `to_finite_np` avoids JIT startup for ordinary one- and two-dimensional float64
+  arrays with Python float fill values, including converted pandas inputs.
+  First grouped long/short exposure reads can use that Python path; direct compiled
+  mapping and other input paths retain native behavior.
+
 ## [6.1.2] - 2026-11-20
 
 ### Added
