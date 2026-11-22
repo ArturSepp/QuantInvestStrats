@@ -469,8 +469,9 @@ def save_df_to_csv(df: pd.DataFrame,
         file_name: base file name without extension
         folder_name: subdirectory under ``local_path``
         key: suffix appended to ``file_name``, for one file per key
-        add_current_date: append the current date to the file name, so successive runs do not
-            overwrite each other
+        add_current_date: append a minute-resolution timestamp (YYYYMMDD_HHMM) to the file name.
+            Repeated writes to the same path within a minute overwrite the existing file.
+            Use a distinct file_name or key for each export when all versions must be retained
         local_path: directory to write to. None writes to the working directory
         file_type: CSV or CSV_GZ
 

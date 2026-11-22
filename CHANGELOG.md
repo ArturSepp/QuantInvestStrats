@@ -14,6 +14,14 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   First grouped long/short exposure reads can use that Python path; direct compiled
   mapping and other input paths retain native behavior.
 
+### Fixed
+
+- Instrument periodic returns retain the opening price baseline on unique increasing dates.
+  When that baseline lies on the reporting grid, realised instrument attribution and
+  `MultiPortfolioData.compute_tracking_error_table` now include the first period's contribution.
+  Native frequency sampling, gap handling, target-weight attribution and irregular-date
+  behavior are preserved.
+
 ## [6.1.2] - 2026-11-20
 
 ### Added

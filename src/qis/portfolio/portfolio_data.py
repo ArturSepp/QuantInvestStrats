@@ -956,8 +956,27 @@ class PortfolioData:
                                          time_period: TimePeriod = None,
                                          freq: str = 'ME'
                                          ) -> pd.DataFrame:
+        """Return simple instrument returns on the native reporting grid.
+
+        Args:
+            time_period: Optional interval; its first observed price is the starting baseline.
+            freq: Reporting frequency, or None for the native observation grid.
+
+        Returns:
+            Instrument returns with an undefined first reported row. On unique increasing
+            dates, retain the opening price before native frequency sampling, which still
+            determines the reported dates and first return. Ragged histories retain native
+            gap reconstruction; other date axes retain native results and diagnostics.
+        """
         returns = self.get_instruments_returns(time_period=time_period)
-        prices = ret.returns_to_nav(returns=returns, init_period=None)
+        # Without an opening NAV, the first gain becomes the initial level and is lost on
+        # conversion back to returns. Reuse native baseline initialization, keeping the NAV
+        # round trip's gap behavior. Its dated lookups require unique, increasing dates;
+        # leave other axes and zero/one-row inputs on their existing conversion path.
+        has_chronology = (isinstance(returns.index, pd.DatetimeIndex)
+                          and returns.index.is_unique and returns.index.is_monotonic_increasing)
+        init_period = 0 if has_chronology and len(returns.index) > 1 else None
+        prices = ret.returns_to_nav(returns=returns, init_period=init_period)
         returns_f = ret.to_returns(prices=prices, freq=freq)
         return returns_f
 
