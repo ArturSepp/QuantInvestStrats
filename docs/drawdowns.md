@@ -668,6 +668,52 @@ weekly_max_dd = np.max(np.maximum.accumulate(weekly, axis=0) - weekly, axis=0)
 assert np.all(weekly_max_dd <= log_max_dd + 1e-15)
 ```
 
+### Strategy returns during benchmark drawdowns
+
+A strategy can make money during a benchmark drawdown. To measure that outcome, fix the
+dates from the benchmark and compare both NAVs at the same endpoints. Chapter 13 of
+*Total Portfolio Management* uses historical equity sell-offs for this purpose. The
+following six synthetic month-ends illustrate the calculation. [Chapter 13, Tables 13.1–13.3](https://doi.org/10.1007/978-3-032-36706-8_13).
+
+```python
+import numpy as np
+import pandas as pd
+import qis
+
+months = pd.date_range('2024-01-31', periods=6, freq='ME')
+market = pd.Series([100, 96, 89, 85, 94, 101], index=months, name='Market')
+strategy = pd.Series([100, 101, 103, 105, 103, 104], index=months, name='Strategy')
+events = qis.compute_benchmark_drawdown_events(strategy, market, min_depth=0.10)
+event = events.iloc[0]
+assert (event.peak, event.trough, event.recovery) == (months[0], months[3], months[5])
+np.testing.assert_allclose([event.benchmark_trough_return, event.strategy_trough_return],
+                           [-0.15, 0.05])
+np.testing.assert_allclose([event.benchmark_recovery_return, event.strategy_recovery_return],
+                           [0.01, 0.04])
+```
+
+From the January peak to the April trough the **benchmark lost 15% and the strategy gained
+5%**. By the June recovery their returns from January were **+1% and +4%**. Recovery is
+the first observed benchmark level back at or above its peak, so its return can be positive.
+
+The strategy factsheet’s **Drawdown analysis** page shows up to four deepest strategy
+episodes and four qualifying benchmark declines in the report window. The strategy episode
+table and paths use its own observed NAV grid. Durations count observation intervals.
+Benchmark events use the selected benchmark’s observed grid, including when the strategy
+has a different frequency. For each event both bars measure simple returns from the
+benchmark peak, one pair to the trough and the other to recovery. The path for the deepest
+event starts at 100. A missing strategy endpoint leaves that bar unavailable. An open
+benchmark event shows its worst loss so far and a path through the last observation.
+Its recovery date and recovery returns remain missing.
+
+Pass `regime_benchmark` to select a benchmark column. The default is the first column.
+Use `benchmark_drawdown_min_depth` to set the strict loss cutoff (default 0.10), or
+`add_drawdown_analysis_sheet=False` to omit the page. For a named sell-off inside a
+longer drawdown, supply `benchmark_drawdown_windows={'Sell-off': qis.TimePeriod(peak, trough)}`
+with observed dates in the reporting span. The numeric function accepts the same mapping
+as `named_windows`. Named windows replace automatic detection and use the same cutoff.
+The comparisons are retrospective. [Strategy factsheets](factsheets.md).
+
 ## Implementation in qis
 
 | Quantity | Formula | qis entry point |
@@ -777,3 +823,4 @@ Contract details:
 3. Young, T. W. (1991). Calmar Ratio: A Smoother Tool. *Futures*, 20(1), 40. The 36-month Calmar ratio.
 4. Bacon, C. R. (2008). *Practical Portfolio Performance Measurement and Attribution*, 2nd edition. Wiley. Drawdown-based risk-adjusted ratios, including the Calmar ratio, in performance measurement practice.
 5. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+6. Elkamhi, R., and Lee, J. S. H. (2027). *Total Portfolio Management*, Chapter 13, Tables 13.1–13.3. Springer. [DOI: 10.1007/978-3-032-36706-8_13](https://doi.org/10.1007/978-3-032-36706-8_13).

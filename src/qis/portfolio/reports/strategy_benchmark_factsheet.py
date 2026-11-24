@@ -433,6 +433,10 @@ def generate_strategy_benchmark_factsheet_plt(
         shared = brinson_period.locate(shared)
         if len(shared) < 2:
             raise ValueError('Brinson requires at least two shared NAV observations')
+        single_interval = len(shared) == 2
+        if single_interval:
+            brinson_kwargs.setdefault('markers', True)
+            brinson_kwargs['markersize'] = max(4, brinson_kwargs['markersize'] or 0)
         period_label = f'{shared.index[0]:%d%b%Y} - {shared.index[-1]:%d%b%Y}'
         with sns.axes_style("darkgrid"):
             fig1 = plt.figure(figsize=figsize, constrained_layout=True)
@@ -468,18 +472,17 @@ def generate_strategy_benchmark_factsheet_plt(
                 **brinson_kwargs,
                 lookthrough_matrix=lookthrough_matrix,
             )
-            brinson_index = shared.index
-            for ax in axs[1:]:
-                multi_portfolio_data.add_regime_shadows(
-                    ax=ax,
-                    regime_benchmark=regime_benchmark,
-                    index=brinson_index,
-                    regime_classifier=regime_classifier)
+            # A single attribution return has no time path for regime shading.
+            if not single_interval:
+                for ax in axs[1:]:
+                    multi_portfolio_data.add_regime_shadows(
+                        ax=ax, regime_benchmark=regime_benchmark,
+                        index=shared.index, regime_classifier=regime_classifier)
         # Exposure comparison uses the same attribution period and classification.
         exposure_ax = None if large_partition else fig1.add_subplot(gs[2, 0])
         if large_partition:
             pass  # The separate look-through factsheet carries the exposure bars.
-        elif brinson_group_data is not None or lookthrough_matrix is not None:
+        elif single_interval or brinson_group_data is not None or lookthrough_matrix is not None:
             from qis.portfolio.reports.lookthrough_exposures import _exposure_tables
             pair = MultiPortfolioData([
                 multi_portfolio_data.portfolio_datas[strategy_idx],
@@ -490,11 +493,13 @@ def generate_strategy_benchmark_factsheet_plt(
                 group_data=group_data,
                 lookthrough_matrix=lookthrough_matrix,
             )
-            difference = average.iloc[:, 0] - average.iloc[:, 1]
+            # A group held on only one side has zero exposure on the other side.
+            difference = average.iloc[:, 0].sub(average.iloc[:, 1], fill_value=0.0)
             qis.plot_bars(difference, stacked=False, is_horizontal=True,
                           annotate_totals=False, is_sns=False, fontsize=fontsize,
                           xvar_format='{:.0%}', yvar_format='{:.0%}',
-                          title='Average look-through active weights',
+                          title=('Opening active weights' if single_interval
+                                 else 'Average look-through active weights'),
                           legend_loc=None, ax=exposure_ax)
         else:
             multi_portfolio_data.plot_exposures_diff(

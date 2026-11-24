@@ -349,7 +349,7 @@ def test_long_history_warns_limits_summary_and_appends_full_heatmap() -> None:
             fontsize=7,
         )
     try:
-        assert len(figs) == 3
+        assert len(figs) == 4
         summary_ax = next(ax for ax in figs[0].axes
                           if ax.get_title() == 'Monthly Returns - Last 3 Calendar Years')
         appendix_ax = next(ax for ax in figs[1].axes

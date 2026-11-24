@@ -12,7 +12,7 @@ and time under water, exposures, turnover and costs. Each ``add_*`` flag appends
 - current positions and VaR, grouped weights, the current signal state, weight changes,
 performance and risk attribution, per-instrument history. The performance-inference appendix
 is on by default, after the full-history monthly-returns page when one is needed; other
-optional risk/holdings pages remain off by default.
+optional risk/holdings pages remain off by default. Drawdown analysis is the final default page.
 
 The panels do not share one sampling grid, which is why the signature carries a frequency and a
 window per panel rather than a single ``freq``. Drawdowns are read on the nav's native path
@@ -63,6 +63,7 @@ from qis.portfolio.reports.config import (
     validate_reporting_frequency,
 )
 from qis.perfstats.significance import InterceptInference
+from qis.portfolio.reports._drawdown_analysis import plot_drawdown_analysis
 from qis.portfolio.reports.alpha_coverage import HoldingsAlphaCoverage, validate_alpha_coverage
 from qis.portfolio.reports._alpha_coverage_report import plot_alpha_coverage
 from qis.portfolio.reports._performance_inference import (
@@ -188,6 +189,9 @@ def generate_strategy_factsheet(
     turnover_computation_type: Optional[qis.TurnoverComputationType] = None,
     turnover_vols: Optional[pd.DataFrame] = None,
     *,
+    add_drawdown_analysis_sheet: bool = True,
+    benchmark_drawdown_min_depth: float = 0.10,
+    benchmark_drawdown_windows: Optional[dict[str, TimePeriod]] = None,
     add_performance_inference_sheet: bool = True,
     alpha_inference: InterceptInference = InterceptInference.BARTLETT_HAC,
     alpha_coverage: Optional[HoldingsAlphaCoverage] = None,
@@ -201,8 +205,8 @@ def generate_strategy_factsheet(
     The strategy archetype behind :func:`qis.factsheet`. Page one always renders: cumulative
     performance with regime shading, risk-adjusted performance tables, rolling volatility,
     Sharpe and beta, drawdowns, exposures, turnover and costs. The ``add_*`` flags each append
-    a further page. The inference appendix is on by default; set
-    add_performance_inference_sheet=False for the previous page set. Page one is unchanged.
+    a further page. The inference appendix and the final drawdown analysis page are on
+    by default. Each has its own opt-out.
 
     The parameters group as: data; reporting windows; statistics configuration; per-panel
     frequencies and rolling windows; optional extra sheets; layout; naming. The per-panel
@@ -217,6 +221,10 @@ def generate_strategy_factsheet(
         alpha_inference: Primary alpha uncertainty method. Bartlett HAC remains the default;
             PREWHITENED_AR1 is opt-in. Both use the same eligible sample and lag count, with the
             alternate shown as unadjusted sensitivity only. Does not change Sharpe or page one.
+        add_drawdown_analysis_sheet: Append the strategy and benchmark drawdown page last.
+        benchmark_drawdown_min_depth: Absolute benchmark loss cutoff; default strictly over 10%.
+        benchmark_drawdown_windows: Optional named observed benchmark peak/trough date pairs
+            expressed as TimePeriod objects within the report span.
         add_performance_inference_sheet: Append two-column arithmetic-Sharpe and holdings-alpha
             diagnostics after the monthly full-history appendix, if present. Defaults to True.
             Sharpe uses perf_params.freq_vol; alpha uses freq_beta/factor_beta_span and only
@@ -1414,4 +1422,8 @@ def generate_strategy_factsheet(
         fig.suptitle(history_title, fontweight="bold", fontsize=8, color="blue")
         figs.append(fig)
 
+    if add_drawdown_analysis_sheet:
+        figs.append(plot_drawdown_analysis(
+            portfolio_nav, time_period.locate(inference_benchmarks[regime_benchmark]),
+            benchmark_drawdown_min_depth, benchmark_drawdown_windows, figsize))
     return figs

@@ -205,6 +205,42 @@ assert isclose(ir.iloc[0], 0.06 / sqrt(0.002), abs_tol=1e-12)
 
 The Euler sum checks attribution arithmetic. It does not test covariance forecasting accuracy.
 
+### Large caps against a small-cap benchmark
+
+A manager moves the entire equity portfolio into large caps while the mandate
+benchmark stays in small caps. Large caps have 15% annual volatility, small
+caps have 18%, and their correlation is 0.90. The manager has reduced absolute
+volatility by 3 percentage points. The active position, long large caps and short
+small caps in equal amounts, still has **7.94% annual tracking error**.
+[Chapter 11, Eq. 11.17 and Table 11.4](https://doi.org/10.1007/978-3-032-36706-8_11).
+
+```python
+from math import isclose, sqrt
+
+import pandas as pd
+import qis
+
+assets = ['Large caps', 'Small caps']
+sigma_large, sigma_small, correlation = 0.15, 0.18, 0.90
+cross_cov = correlation * sigma_large * sigma_small
+annual_cov = pd.DataFrame([[sigma_large**2, cross_cov], [cross_cov, sigma_small**2]],
+                          index=assets, columns=assets)
+as_of = pd.Timestamp('2024-12-31')  # illustrative covariance date
+model = qis.RiskModel(covar={as_of: annual_cov})
+tracking_error = model.compute_tre_at_date(
+    benchmark_weights=pd.Series([0.0, 1.0], index=assets),
+    portfolio_weights=pd.Series([1.0, 0.0], index=assets),
+    date=as_of,
+)
+spread_vol = sqrt(sigma_large**2 + sigma_small**2 - 2 * correlation * sigma_large * sigma_small)
+assert isclose(tracking_error, spread_vol, rel_tol=0.0, abs_tol=1e-12)
+assert f'{tracking_error:.2%}' == '7.94%'
+```
+
+This is prospective risk from an annual covariance matrix. The [Brinson factsheet
+example](brinson_attribution.md#why-the-factsheet-shows-positive-selection)
+explains one realised active return for a separate three-asset-class portfolio.
+
 ## Implementation in qis
 
 [RiskModel](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/risk/risk_model.py)
@@ -266,3 +302,4 @@ for readers using a Markdown viewer without Sphinx roles.
 
 1. Roll, R. (1992). A Mean/Variance Analysis of Tracking Error. *The Journal of Portfolio Management*, 18(4), 13–22. [DOI: 10.3905/jpm.1992.701922](https://doi.org/10.3905/jpm.1992.701922). [Author's copy](https://www.anderson.ucla.edu/documents/areas/fac/finance/1992-2.pdf).
 2. Sepp, A. qis: Performance analytics, portfolio backtesting, risk analysis, and factsheet reporting in Python. [Software citation metadata](https://github.com/ArturSepp/QuantInvestStrats/blob/main/CITATION.cff).
+3. Elkamhi, R., and Lee, J. S. H. (2027). Active Risk Management. In *Total Portfolio Management*, Chapter 11. Springer. [DOI: 10.1007/978-3-032-36706-8_11](https://doi.org/10.1007/978-3-032-36706-8_11).

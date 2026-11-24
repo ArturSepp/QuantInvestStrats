@@ -233,6 +233,80 @@ NAV. A one-month horizon gives 13.43%, under the same frozen Gaussian covariance
 This changes the risk horizon; it does not refit covariance on monthly rather
 than daily observations.
 
+### One-year tail risk for the strategy and benchmark
+
+The **One-year tail risk** Appendix in the weights and tracking-error report compares
+99% loss quantiles (VaR) and the mean loss in the worst 1% of outcomes (ES). All
+values are fractions of NAV in the supplied reference currency. The Gaussian rows
+measure zero-drift linear loss from the same annual covariance. For annual
+volatility $\sigma$, normal ES is $\sigma\,\phi(z)/(1-c)$, where $c=0.99$ and
+$z=\Phi^{-1}(c)$. The Monte Carlo engine returns the two VaRs. Its ES cells are blank.
+
+For the historical row, form each month's strategy and benchmark simple returns
+using the respective as-of target weights. Apply those weights anew every month.
+Draw four three-month blocks with replacement, using the same draws for both
+portfolios. Each starting month is equally likely and a block can wrap from the
+last sample month to the first. Compound all twelve months in each path, then
+subtract each portfolio's mean simulated annual return. Take the linearly
+interpolated 99th percentile of the resulting losses for VaR. For ES,
+`qis.compute_cvar` averages exactly the worst 1% probability mass, using a
+fraction of the boundary observation when necessary. Unallocated cash earns
+zero unless supplied as a separate asset with its own return.
+
+The offline example uses the Active and benchmark allocations above, synthetic
+USD returns through 31 December 2025, and 100,000 paths per simulated method
+with seed 0. The Gaussian covariance uses the monitoring example's 36-month
+EWMA of monthly log returns. The bootstrap uses monthly simple asset returns.
+
+| Method | Strategy VaR | Strategy ES | Benchmark VaR | Benchmark ES |
+|---|---:|---:|---:|---:|
+| Gaussian analytic | 19.91% | 22.81% | 19.62% | 22.48% |
+| Gaussian Monte Carlo | 19.95% | — | 19.78% | — |
+| Three-month circular blocks | 21.85% | 24.33% | 21.48% | 23.79% |
+
+```python
+from examples.portfolios.gaussian_var_monitoring import compute_tail_comparison
+
+comparison = compute_tail_comparison()
+cols = ['strategy_var', 'strategy_es', 'benchmark_var', 'benchmark_es']
+np.testing.assert_allclose(
+    comparison[cols].to_numpy(dtype=float) * 100,
+    [[19.91, 22.81, 19.62, 22.48], [19.95, np.nan, 19.78, np.nan],
+     [21.85, 24.33, 21.48, 23.79]], atol=.005, rtol=0, equal_nan=True)
+```
+
+With the same seed and horizon, one-month blocks give strategy VaR/ES of
+22.19%/24.78%. Six-month blocks give 19.81%/21.70%. Block length changes the
+sequences of gains and losses preserved in a simulated year. The analytical
+and simulated Gaussian VaRs agree within 1.5% relative error for both portfolios
+in this fixed example. The bootstrap uses a different return distribution.
+
+Elkamhi and Lee's Table 10.2 reports 17.8% VaR and 20.4% ES analytically,
+and 21.8% VaR and 25.8% ES historically, for their monthly rebalanced
+sample portfolio. The table illustrates the same horizon and annual centring.
+Its estimates depend on the authors' asset history and calibration.
+[Chapter 10, Table 10.2](https://doi.org/10.1007/978-3-032-36706-8_10).
+
+To produce the Appendix, pass `add_one_year_tail_risk=True`,
+`tail_risk_currency='USD'` (or the currency of the inputs), and optionally
+`tail_risk_monthly_returns` to `qis.weights_tracking_error_report_by_ac_subac`.
+Read the figure and full-precision frame from `figs['one_year_tail_risk']` and
+`dfs['one_year_tail_risk']`. Pass an output directory to the offline example's
+`save_tail_appendix(directory)` to save that figure as a PDF and the same frame
+as a CSV. The as-of date is the supplied report end, or the
+earlier of the two portfolios' latest observed NAVs. The Appendix selects the
+latest available covariance and each portfolio's latest target at or before
+that cut-off. The frame records their dates; a static target has no vintage.
+All exposures and returns must already use the stated reference currency.
+
+Supply one dated row per completed month, with simple asset returns in decimal
+units. The historical row uses the latest consecutive run of months with
+observations for all assets held by either portfolio; its dates and length
+are exported. At least twelve consecutive matched months are required. A
+gap starts a new run. If coverage is insufficient, the historical cells are
+blank and the reason appears alongside the Gaussian estimates.
+[Risk monitoring and report options](risk_monitoring.md#reporting).
+
 ## Implementation in qis
 
 The public entry points are:

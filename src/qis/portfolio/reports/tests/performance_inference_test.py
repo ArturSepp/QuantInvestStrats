@@ -188,7 +188,7 @@ def test_integration_default_order_and_identical_first_page(prices, prewhitened)
             portfolio, add_performance_inference_sheet=False, **options
         )
         new = qis.generate_strategy_factsheet(portfolio, **options)
-    assert len(old) == 2 and len(new) == 3
+    assert len(old) == 3 and len(new) == 4
     assert new[1].axes[0].get_title() == "Monthly Returns - Full History"
     assert "Performance confidence and stability" in new[2].get_suptitle()
     primary = "PW" if prewhitened else "B"
@@ -214,7 +214,7 @@ def test_integration_default_order_and_identical_first_page(prices, prewhitened)
             time_period=qis.TimePeriod("2021-01-01", "2025-12-31"),
             **settings,
         )
-    assert len(recent) == 2 and "Performance confidence" in recent[1].get_suptitle()
+    assert len(recent) == 3 and "Performance confidence" in recent[1].get_suptitle()
 
 
 def test_documentation_footnotes_are_linked_and_fit_page(prices):

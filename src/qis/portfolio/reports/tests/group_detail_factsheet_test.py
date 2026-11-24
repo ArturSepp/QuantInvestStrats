@@ -81,9 +81,9 @@ def test_seven_group_strategy_appendices(grouped_portfolio, tmp_path):
         add_current_signal_report=True, add_weight_change_report=True,
         add_grouped_exposures=True, add_grouped_cum_pnl=True, fontsize=4,
     )
-    assert len(figures) == 7
-    weights, signals, changes, exposures, pnl = figures[2:]
-    for page in figures[2:]:
+    assert len(figures) == 8
+    weights, signals, changes, exposures, pnl = figures[2:-1]
+    for page in figures[2:-1]:
         assert not any('All instruments' in axis.get_title() for axis in page.axes)
         _draw_and_check(page)
     assert [axis.get_title().splitlines()[0] for axis in weights.axes[2:]] == [

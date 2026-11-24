@@ -216,9 +216,10 @@ does not change the analytics sample cutoff.
 Page count depends on the report type, selected appendices and available history.
 Strategy factsheets include a separate **Performance confidence and stability** page by
 default. The order is summary, full-history monthly-return
-appendix when needed, inference, then other requested appendices. Set
-`add_performance_inference_sheet=False` to retain the previous page set; page one and its
-calculations are unchanged. The inference page has two columns:
+appendix when needed, inference, other requested appendices, then **Drawdown analysis**.
+Use `add_performance_inference_sheet` and `add_drawdown_analysis_sheet` to select the
+two default pages independently. The [drawdown example](drawdowns.md#strategy-returns-during-benchmark-drawdowns)
+explains the dates, return bars and missing observations. The inference page has two columns:
 
 | Panel | Sharpe diagnosis | Holdings-weighted alpha diagnosis |
 |---|---|---|
@@ -635,7 +636,8 @@ generate figures, supporting tables and provenance together.
 - [Factsheet gallery and regeneration](gallery.md)
 - [Frequency and annualisation](frequency_convention_note.md)
 - [Portfolio backtesting](portfolio_backtesting.md)
-- [Brinson attribution](brinson_attribution.md)
+- [Brinson attribution and the single-period reconciliation](brinson_attribution.md#why-the-factsheet-shows-positive-selection)
+- [One-year tail-risk Appendix for the weights and tracking-error report](gaussian_var.md#one-year-tail-risk-for-the-strategy-and-benchmark)
 - [Documentation and figure standard](documentation_standard.md)
 
 ## References

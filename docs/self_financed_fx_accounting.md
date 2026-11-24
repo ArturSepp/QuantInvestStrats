@@ -173,6 +173,92 @@ value 110. The excess is 4.7671 bp of initial capital, even with constant rates.
 cash-flow tests also cover signed equity books, full and partial principal hedges, delayed
 payment, capital resizing, negative capital, stale observations and non-USD reference accounts.
 
+### Cash available at a hedge payment cutoff
+
+Use `compute_fx_liquidity` from `qis.portfolio.fx_liquidity` to ask whether the
+hedge can pay in the required currency at the required time. Start with the
+marked `FxAccountData` and supply the operational schedule. The output has one
+row per cutoff, currency and netting agreement. A negative closing free-cash
+balance gives the funding needed to meet the obligations due at that cutoff.
+
+| USD illustration | Opening resources | At the cutoff | Subsequent cash |
+|---|---|---|---|
+| Initial margin | USD 50,000 cash against USD 50,000 forward notional | Posting 5% moves USD 2,500 into restricted cash. Free cash is USD 47,500 and marked NAV is USD 50,000. | Release restores free cash to USD 50,000. Trading P&L is zero throughout the flat-market example. |
+| EUR equity with a short EUR forward | USD 8m invested at EURUSD 1.00 and USD 750,000 free cash | EURUSD rises to 1.15. USD 1.20m of settled variation margin is due at 10:00 on 4 February. The USD funding gap is **450,000**. | The equity sale on 4 February delivers USD 1.20m at 15:00 on 6 February. The 7 February forward maturity has zero remaining payment. |
+
+The second illustration keeps daily marked NAV at USD 8.75m. The USD 1.20m
+equity gain offsets the hedge loss in NAV, but the sale receivable cannot pay
+the call before its value date. Comparing the exact cutoff with the subsequent
+value date makes that distinction observable.
+
+```python
+from examples.fx.fx_collateral_liquidity import run_example
+
+cases = run_example(verbose=False)
+daily_im, initial = cases['initial_margin']
+daily_fx, hedge = cases['hedge_cash_call']
+np.testing.assert_allclose(daily_im.restricted_cash, [0, 2500, 2500, 2500, 0])
+np.testing.assert_allclose(daily_im.closing_free_cash, [50000, 47500, 47500, 47500, 50000])
+np.testing.assert_allclose(daily_im.nav, 50000)
+np.testing.assert_allclose(daily_fx.closing_free_cash, [750000, -450000, -450000, 750000, 750000])
+np.testing.assert_allclose(daily_fx.pending_ledger_cash, [0, 1200000, 1200000, 0, 0])
+np.testing.assert_allclose(daily_fx.net_settlement, 0, atol=1e-8)
+np.testing.assert_allclose(daily_fx.nav, 8750000)
+assert hedge.summary.loc[('USD', 'Treasury'), 'binding_cutoff'] == pd.Timestamp('2025-02-04 10:00')
+```
+
+Run `python -m examples.fx.fx_collateral_liquidity` to display the daily cash
+reconciliation beside the original forward mark and NAV. The optional
+`--output-dir <directory>` writes the daily, cutoff and agreement-summary tables.
+[Runnable example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/fx/fx_collateral_liquidity.py).
+
+#### Supplying operational terms
+
+`compute_fx_liquidity(account, flows, ...)` takes a long table of movements with
+`at`, `currency`, `agreement`, `kind` and `amount`. Use the same timezone-naive
+clock for all payment locations. A flow becomes usable at its timestamp.
+Simultaneous amounts net within their currency and agreement. Use
+`payment_cutoffs` to inspect additional times with no movement.
+
+| Flow kind | Sign and treatment |
+|---|---|
+| `initial_margin`, `collateralised_vm` | Positive posts, negative releases. Each balance must cover its own releases. Posting increases pledged securities or restricted cash. The derivative still pays its full contractual settlement. |
+| `settled_vm` | Positive is cash received, negative is paid. Supply the ledger `contract_id`. The gross maturity payoff less the signed VM already settled is the remaining payment for that contract. |
+| `received_vm` | Positive is cash collateral received from the counterparty, negative returns it. The receipt stays segregated and unavailable for outgoing cash payments. |
+| `funding`, `cash_flow` | Signed external cash, including funding actually drawn and repayments. Enter only movements additional to those already imported from the ledger. |
+
+`opening_cash` allocates starting balances by currency and agreement. Its
+reference-currency balances must sum to ledger initial capital. Other currency
+balances supplement the liquidity analysis. `contract_terms` assigns each
+executed contract to an agreement and optionally gives its `settlement_at`
+time on the contractual settlement date. By default reference cash and forward
+receipts belong to `Treasury`, and ledger cash movements arrive at day-end.
+`ledger_flow_times` can supply usable timestamps for the ledger's daily equity
+trades, local settlements and cash interest, including a later value date.
+A positive `pending_ledger_cash` is booked in ledger cash and still unavailable
+operationally. Contract marks appear only at valuation closes.
+
+Supply `collateral` as dedicated inventory snapshots with time, currency,
+agreement, market `value` expressed in the payment currency, `haircut` and
+boolean `eligible`. Each snapshot replaces the full inventory for that bucket.
+Credit equals the sum of eligible values times one minus their haircuts.
+The model applies available credit to posted collateral first and takes the
+remainder from free cash. A change of capacity assumes substitution at the
+specified cutoff. Supply a zero-value snapshot to withdraw the inventory.
+Unused credit can meet margin but cannot pay a cash settlement. Assign each lot
+to one bucket and exclude collateral already pledged elsewhere.
+
+Read `reconciliation` for opening and closing free cash, signed margin movements,
+restricted cash, pledged credit, the gross and net forward payments and shortfall.
+`summary` reports minimum free cash, peak shortfall and its first binding cutoff
+by currency and agreement. `currency_summary` sums simultaneous agreement
+deficits before finding each currency's peak. Surplus in a separate agreement
+does not offset another agreement's call. `valuation` carries the underlying
+ledger cash, forward mark and NAV in reference units. The overlay preserves the
+ledger's interest basis. Supply incremental funding costs or collateral
+remuneration as dated cash flows under the actual agreement.
+[Calculation and input contract](https://github.com/ArturSepp/QuantInvestStrats/blob/main/src/qis/portfolio/fx_liquidity.py).
+
 ## Implementation in qis
 
 [Account API](api/generated/qis.backtest_fx_account.rst), [account policy](api/generated/qis.FxAccountSpec.rst) and [account result](api/generated/qis.FxAccountData.rst).
@@ -203,11 +289,11 @@ The valuation grid also controls cash compounding. Daily accrual and one monthly
 accrual can differ even under the same annual quotes. Separate reporting frequency from the
 account's reset calendar; do not demand equality between different contracts.
 
-Current-NAV sizing may use marked receivables while cash remains negative: this model permits
-borrowing. It is not a liquidity-constrained or segregated-collateral simulator. Exact internal
-cash reconciliation does not verify instrument tradability, synthetic forward pricing against
-market quotes or the predictive merit of any allocation. Trading costs and an account-specific
-margin/credit contract require additional, explicitly validated capabilities.
+Current-NAV sizing may use marked receivables while cash remains negative because
+the valuation account permits borrowing. The cutoff analysis measures the resulting
+funding need. Execution constraints, credit approval and trading decisions remain
+with the caller. The caller supplies margin terms, eligible assets and cash availability
+under the actual agreement.
 
 ## See also
 

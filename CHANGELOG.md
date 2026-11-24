@@ -5,6 +5,47 @@ All notable changes to qis are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `to_finite_np` avoids JIT startup for ordinary one- and two-dimensional float64
+  arrays with Python float fill values, including converted pandas inputs.
+  First grouped long/short exposure reads can use that Python path; direct compiled
+  mapping and other input paths retain native behavior.
+
+### Fixed
+
+- `compute_fx_liquidity` avoids a pandas 2.2 concatenation warning when a cash event
+  schedule or ledger payment table is empty.
+- Instrument periodic returns retain the opening price baseline on unique increasing dates.
+  When that baseline lies on the reporting grid, realised instrument attribution and
+  `MultiPortfolioData.compute_tracking_error_table` now include the first period's contribution.
+  Native frequency sampling, gap handling, target-weight attribution and irregular-date
+  behavior are preserved.
+
+## [6.1.2] - 2026-11-20
+
+### Added
+
+- `qis.portfolio.fx_liquidity.compute_fx_liquidity` measures cash needed at FX payment cutoffs
+  from an existing account and supplied margin, collateral and funding schedules. It reports
+  shortfalls by currency and agreement and reconciles early settled VM to its own contract.
+- The weights and tracking-error report can append a one-year 99% tail-risk comparison
+  for the strategy and benchmark. Pass `add_one_year_tail_risk=True` and the reference
+  currency to obtain the figure and its full-precision table under `one_year_tail_risk`.
+- Strategy factsheets append a Drawdown analysis page by default. Pass
+  `add_drawdown_analysis_sheet=False` to omit it. The page uses observed NAVs for
+  strategy episodes and for paired returns over benchmark peak, trough and recovery dates.
+  `compute_benchmark_drawdown_events` returns the same comparison for automatic or named events.
+
+### Fixed
+
+- The strategy–benchmark Brinson factsheet now renders a single return interval. It plots
+  the observed effects as points and shows opening active weights, including asset classes
+  held by only one of the two portfolios. Regime shading applies to multi-period charts.
+  [Worked attribution reconciliation](docs/brinson_attribution.md#why-the-factsheet-shows-positive-selection).
+
 ## [6.1.1] - 2026-11-19
 
 ### Added

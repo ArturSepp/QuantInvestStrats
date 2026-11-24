@@ -129,7 +129,7 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 | `long_short.py` | Long IEF / short LQD pair (Treasury duration vs IG credit). |
 | `ex_anti_tracking_error_and_risk.py` | Offline ex-ante TE, benchmark beta, and Euler marginal TE through `RiskModel`. |
 | `ex_post_tracking_error_and_risk.py` | Offline realised EWMA TE, whole-sample TE/IR, and EWMA beta/annualised alpha. |
-| [gaussian_var_monitoring.py](portfolios/gaussian_var_monitoring.py) | Offline supplied-covariance Gaussian VaR monitoring for two allocations, with a benchmark and closed-form control. See the [Gaussian VaR guide](../docs/gaussian_var.md). |
+| [gaussian_var_monitoring.py](portfolios/gaussian_var_monitoring.py) | Offline Gaussian VaR monitoring for two allocations, with a benchmark and closed-form control. Call `save_tail_appendix(directory)` to export the strategy–benchmark one-year 99% VaR and expected shortfall comparison as a PDF and full-precision CSV. [Worked example](../docs/gaussian_var.md#one-year-tail-risk-for-the-strategy-and-benchmark). |
 | `model_layer_attribution_simulated.py` | Offline, seeded layer and two-feature simulation for `compute_model_layer_alpha_beta_attribution` and `compute_model_feature_alpha_beta_attribution`: HAC(3) intervals, exact identities, return bridge, additive cumulative alpha and grouped Shapley sensitivity. Source of the figures in `docs/model_layer_attribution.md`. |
 | `vol_target_and_trend.py` | Vol-target + trend-following sweep via `examples.portfolios.strats.qis_delta1`. |
 | `seasonality_backtest.py` | Point-in-time calendar-month seasonality with annual trailing-window refits. |
@@ -154,7 +154,7 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 | File | What it shows |
 |---|---|
 | [holdings_alpha_coverage.py](factsheets/holdings_alpha_coverage.py) | Offline strict/proxy-assisted quarterly factsheets with bounded dust, explicit proxy mapping, coverage audit and unchanged NAV/units/weights. Six-year rolling inference. |
-| `strategy.py` | `generate_strategy_factsheet` on a volparity portfolio. |
+| [strategy.py](factsheets/strategy.py) | Generates a volatility-parity strategy factsheet, including the default [Drawdown analysis page](../docs/drawdowns.md#strategy-returns-during-benchmark-drawdowns) comparing strategy and benchmark returns over benchmark loss episodes. |
 | `strategy_benchmark.py` | Strategy vs benchmark; `Locals.PAIRED_INFERENCE` produces the default-on paired Sharpe / marginal holdings-alpha page before Brinson. VolParity minus EqualWeight, common market reference SPY, monthly sampling and explicit zero cash. |
 | `multi_assets.py` | `generate_multi_asset_factsheet` on an asset-class universe. |
 | `multi_strategy.py` | VolParity span sweep; `Locals.PERFORMANCE_INFERENCE` shows the default-on three-by-two overview against `base_portfolio_id=0` (span 5): paired Sharpe differences, marginal holdings alpha vs SPY, pointwise HAC CIs and a single complete Holm family across all comparisons/windows. Monthly, zero cash. |
@@ -199,6 +199,7 @@ the PNG, supporting CSVs and metadata through `qis.local_path`; explicit `output
 
 | File | What it shows |
 |---|---|
+| [fx_collateral_liquidity.py](fx/fx_collateral_liquidity.py) | Offline initial-margin and EUR hedge cash-call examples. Use `--output-dir <directory>` to export daily cash, payment-cutoff and agreement-summary tables for each case. [Cash and NAV reconciliation](../docs/self_financed_fx_accounting.md#cash-available-at-a-hedge-payment-cutoff). |
 | `fx_returns_and_accounting_example.py` | Offline EUR/CHF daily/monthly simple/log return coordinates, exact notional payoffs, monthly cash measurement across daily/monthly/quarterly grids, zero/nonzero-net local financing, and explicit hedge reset/fixing/payment accounting. Uses the QIS 6 namespace; root object imports are retained. |
 | `fx_rates_data_yahoo_example.py` | Build `FxRatesData` from free `yfinance` FX spots; cross rates, CIP premia, explicitly normalized exact FX-forward payoff indices, cash NAVs and typed reference-currency returns. USD rate from `^IRX`, others stylised. |
 | `fx_rates_data_bloomberg_example.py` | The same, built from Bloomberg via `bbg_fetch` — supplied term rates and overnight CAD/SGD benchmarks; forward-filled observations without opening-rate backfill. **Bloomberg.** |
