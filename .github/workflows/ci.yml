@@ -1,6 +1,6 @@
 # SHARED CI CORE v1.0 — T2 — synced 2026-08-22
 name: CI
-run-name: ${{ github.event_name == 'schedule' && 'Dependency compatibility (live resolution)' || 'CI' }}
+run-name: ${{ (github.event_name == 'schedule' || inputs.live_dependencies) && 'Dependency compatibility (live resolution)' || 'CI' }}
 
 # Every job only checks out and reads the repository.  Declare the minimum token scope rather
 # than inheriting repository defaults, especially for pull requests that execute changed code.
@@ -12,8 +12,15 @@ on:
   schedule:
     - cron: "37 3 * * *"
   workflow_dispatch:
+    inputs:
+      live_dependencies:
+        description: Resolve current dependencies as in scheduled CI
+        type: boolean
+        default: false
 
 env:
+  # FontTools 4.69.0 shipped only a few CPython 3.11 wheels and no source archive.
+  LIVE_UPGRADE_ARGS: --upgrade --upgrade-package fonttools!=4.69.0
   UV_HTTP_RETRIES: "5"
   UV_HTTP_TIMEOUT: "60"
   PIP_RETRIES: "5"
@@ -108,7 +115,7 @@ jobs:
     - name: Sync the core test environment
       # The primary cell fails if pyproject.toml and uv.lock disagree.  Floating cells upgrade the
       # resolution so compatibility with what a new installer receives remains covered.
-      run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
+      run: uv sync --group test ${{ (github.event_name == 'schedule' || inputs.live_dependencies) && env.LIVE_UPGRADE_ARGS || '--locked' }}
 
     - name: Run numerical and mixed-contract tests
       run: >-
@@ -180,7 +187,7 @@ jobs:
       with:
         python-version: "3.12"
     - name: Sync the core rendering environment
-      run: uv sync --group test ${{ github.event_name == 'schedule' && '--upgrade' || '--locked' }}
+      run: uv sync --group test ${{ (github.event_name == 'schedule' || inputs.live_dependencies) && env.LIVE_UPGRADE_ARGS || '--locked' }}
     - name: Run rendering shard with coverage
       env:
         COVERAGE_FILE: ${{ runner.temp }}/coverage-data/.coverage.${{ matrix.suite }}-${{ matrix.shard }}
@@ -458,7 +465,7 @@ jobs:
         run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/lowest-dependencies" >> "$GITHUB_ENV"
       - name: Resolve a fresh lowest-direct test environment
         # Upgrade ignores lockfile preference; this job never commits its experimental lock.
-        run: uv sync --python 3.11 --resolution lowest-direct --upgrade --group test
+        run: uv sync --python 3.11 --resolution lowest-direct ${{ env.LIVE_UPGRADE_ARGS }} --group test
       - name: Record installed versions
         run: uv pip freeze --python "$UV_PROJECT_ENVIRONMENT/bin/python"
       - name: Check optional dependencies stay outside package-root import
