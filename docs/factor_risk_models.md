@@ -843,6 +843,7 @@ enum and optional time slice. `from_sql(...)` is an unimplemented hook that rais
 | Object | Layout | Residual variances |
 |---|---|---|
 | `RiskModel.factor_loadings[date]` | Assets by factors, $B$ | `residual_vars[date]`: Series by asset |
+| `ForwardReturnAdjustment.loadings_by_date[date]` | Assets by factors, $B$. Supply `model.get_loadings_at_date(date).T` with realised benchmark increments. [Two-benchmark example](signal_diagnostics.md#raw-and-factor-adjusted-forward-returns) | Not required |
 | Stress-testing `betas` | Assets by factors, $B$ | Series by asset |
 | `EwmLinearModel.loadings[factor]` | Dates by assets, one frame per factor | Not estimated |
 | `LinearModel.get_loadings_at_date` | Factors by assets, $B^{\top}$ | `LinearModel.residual_vars`: dates by assets |

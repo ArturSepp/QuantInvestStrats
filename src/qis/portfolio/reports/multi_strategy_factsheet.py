@@ -352,6 +352,7 @@ def generate_multi_portfolio_factsheet(
             factor_beta_span=kwargs.get('factor_beta_span', 260),
             alpha_inference=alpha_inference,
             alpha_coverage=alpha_coverage,
+            include_paths=add_pairwise_inference_sheets,
         )
         if add_performance_inference_sheet:
             figs.extend(plot_multi_performance_inference(inference, figsize=figsize))

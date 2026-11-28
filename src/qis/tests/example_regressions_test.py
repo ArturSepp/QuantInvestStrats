@@ -54,6 +54,34 @@ def yahoo_panel(monkeypatch, tmp_path):
     plt.close('all')
 
 
+def test_etf_ic_uses_formation_betas_and_skips_latest_momentum_month(yahoo_panel, monkeypatch):
+    """Rebuild both one-year rank ICs from a direct fit ending at the formation close."""
+    example = importlib.import_module('examples.perfstats.yahoo_etf_signal_ic')
+    monkeypatch.setattr(example, 'FIRST_DECISION', '2024-12-31')
+    prices = yahoo_panel.loc['2007-12':].copy()
+    prices.columns = example.BENCHMARKS + example.ASSETS
+    table, members = example.compare_signals(prices)
+
+    log_prices = np.log(prices.resample('ME').last())
+    history = log_prices.diff().dropna().loc[:'2024-12-31']
+    weights = np.sqrt((35 / 37) ** np.arange(len(history) - 1, -1, -1))[:, None]
+    betas = np.linalg.lstsq(history[example.BENCHMARKS].to_numpy() * weights,
+                            history[example.ASSETS].to_numpy() * weights, rcond=None)[0]
+    forward = log_prices.loc['2025-12-31'] - log_prices.loc['2024-12-31']
+    raw = forward[example.ASSETS]
+    residual = raw - forward[example.BENCHMARKS].to_numpy() @ betas
+    momentum = log_prices.loc['2024-11-30', example.ASSETS] - log_prices.loc[
+        '2023-12-31', example.ASSETS]
+    for signal, score in [('low_beta', pd.Series(-betas[0], index=raw.index)),
+                          ('momentum', momentum)]:
+        row = table.loc[(signal, 12)]
+        np.testing.assert_allclose([row.raw_ic, row.residual_ic],
+                                   [score.corr(raw, method='spearman'),
+                                    score.corr(residual, method='spearman')])
+        assert row.n_valid == 1 and row.mean_n_assets == len(example.ASSETS)
+    assert list(members.index) == example.ASSETS and members[12].eq(1).all()
+
+
 @pytest.mark.parametrize('module', [
     'case_studies.vix_beta_to_equities_bonds',
     'models.bootstrap_analysis',
@@ -228,3 +256,15 @@ def test_factsheet_output_directory(module, explicit, yahoo_panel, monkeypatch, 
         runpy.run_module(f'examples.factsheets.{module}', run_name='__main__')
     pdfs = list(output.glob('*.pdf'))
     assert pdfs and all(path.stat().st_size > 100 for path in pdfs)
+    if module.endswith('_reporting_frequencies'):
+        # The default batch puts every frequency and both time windows into the combined PDF.
+        assert len(pdfs) == 9
+        pages = 0
+        for freq in qis.ReportingFrequency:
+            for window in ('long', 'short'):
+                report, = output.glob(f'*_{freq.name.lower()}_{window}_*.pdf')
+                count = len(re.findall(rb'/Type\s*/Page\b', report.read_bytes()))
+                assert count == (1 if module.startswith('multi_assets') else 2)
+                pages += count
+        combined, = output.glob('*_all_reporting_frequencies_*.pdf')
+        assert len(re.findall(rb'/Type\s*/Page\b', combined.read_bytes())) == pages

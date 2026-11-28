@@ -17,7 +17,7 @@ from qis.portfolio.reports.config import validate_reporting_frequency
 def compute_paired_performance_inference(
     strategy, comparison, benchmark_prices, time_period, freq, rates_data=None,
     *, freq_beta="B", factor_beta_span=260, alpha_inference=InterceptInference.BARTLETT_HAC,
-    alpha_coverage=None,
+    alpha_coverage=None, include_paths=True,
 ):
     """Compare two actual portfolios on paired dates, against the first market reference.
 
@@ -32,6 +32,8 @@ def compute_paired_performance_inference(
         factor_beta_span: Shared EWM span and per-instrument warm-up in beta-grid observations.
         alpha_inference: Primary marginal-alpha method; alternate is same-sample sensitivity.
         alpha_coverage: Optional shared coverage policy with explicit instrument mappings.
+        include_paths: Compute monthly expanding and rolling estimates for the paired charts.
+            False returns empty path tables and retains all fixed-window estimates.
 
     Returns:
         Paired inference data with marginal unsmoothed alpha and both holdings-beta diagnostics.
@@ -55,7 +57,7 @@ def compute_paired_performance_inference(
         issues.append(f"Paired Sharpe: sampling grid unavailable ({error}); no substitute fit.")
     end = sampled.index[-1] if len(sampled) else pd.Timestamp(time_period.end or navs.index[-1])
     windows, expanding, rolling, metadata = _inference_views(
-        sampled, freq, end, issues, paired=True)
+        sampled, freq, end, issues, paired=True, include_paths=include_paths)
 
     alpha_grid_valid = True
     try:
@@ -112,8 +114,9 @@ def compute_paired_performance_inference(
                                        - diagnostics.Comparison_strict_alpha)
     alpha_meta["proxy_assisted"] = any(
         settings.get("proxy_assisted", False) for settings in alpha_meta["portfolios"].values())
-    aw, ae, ar, am = _inference_views(marginal, freq_beta, alpha_end, issues,
-                                     alpha=True, paired=True, alpha_inference=alpha_inference)
+    aw, ae, ar, am = _inference_views(marginal, freq_beta, alpha_end, issues, alpha=True,
+                                     paired=True, alpha_inference=alpha_inference,
+                                     include_paths=include_paths)
     alpha_meta.update(am)
     metadata.update(
         paired=True, strategy=str(strategy.ticker), comparison=str(comparison.ticker),

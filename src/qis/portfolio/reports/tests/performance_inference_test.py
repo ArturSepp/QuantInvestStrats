@@ -368,6 +368,25 @@ def test_latest_alpha_block_counts_exclusions_and_matches_dense_reference(prices
     pd.testing.assert_series_equal(sample, original)
 
 
+@pytest.mark.parametrize("freq,years", [("B", 5), ("W-WED", 5), ("ME", 5), ("QE", 6)])
+def test_rolling_endpoints_require_the_complete_calendar(freq, years):
+    from qis.portfolio.reports._performance_inference import _inference_views
+
+    index = pd.date_range("2013-01-01", "2023-12-31", freq=freq)
+    sample = pd.Series(np.sin(np.arange(len(index))), index=index).drop(index[len(index) // 4])
+    _, _, rolling, meta = _inference_views(sample, freq, sample.index[-1], [])
+    assert meta["rolling_years"] == years
+    expected_dates = []
+    for date in sample.groupby(sample.index.to_period("M")).tail(1).index:
+        cutoff = date - pd.DateOffset(years=years)
+        expected = pd.date_range(cutoff, date, freq=freq, inclusive="right")
+        observed = sample.index[(sample.index > cutoff) & (sample.index <= date)]
+        if len(observed) >= meta["minimum_observations"] and observed.equals(expected):
+            expected_dates.append(date)
+    assert expected_dates
+    assert rolling.date.tolist() == expected_dates
+
+
 def test_recent_gaps_keep_true_counts_and_short_latest_block_is_not_replaced(prices):
     from qis.portfolio.reports._performance_inference import _inference_views
 

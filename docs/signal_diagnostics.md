@@ -30,8 +30,9 @@ together with a pooled predictive regression, from point-in-time and non-overlap
 | How dispersed is the predictive slope across assets? | `qis.compute_per_asset_betas` | One time-series $\beta$ per (horizon, asset) |
 | Is the IC stable from date to date? | `qis.compute_ic_timeseries`, `qis.estimate_ic_ir` | Per-date IC series; mean, standard deviation, IC ratio, t-statistic and hit rate |
 | What does it look like? | `qis.plot_signal_diagnostics` and four related plots | Conditional-return and $\beta$ boxplots |
+| Does the score predict raw or factor-adjusted returns over the same holding period? | `compute_forward_return_targets`, `compute_matched_signal_ic`, `compute_signal_ic_summary` | Matched ICs, their paired changes and pointwise intervals by horizon. See [Raw and factor-adjusted forward returns](#raw-and-factor-adjusted-forward-returns). |
 
-The computation has three layers. **Pairing** builds, for each asset and horizon, pairs of the
+The native-cadence computation in `estimate_signal_diagnostics` has three layers. **Pairing** builds, for each asset and horizon, pairs of the
 signal known at $t-1$ and the return that follows, on the asset's own sampling grid and without
 overlapping windows. **Normalisation** demeans the forward returns across names at each date and
 divides them by their cross-sectional standard deviation. **Estimation** summarises the pairs in
@@ -48,7 +49,7 @@ credible when both agree.
 | Convention | This article |
 |---|---|
 | Return basis | Log returns by default (`is_log_returns=True`): $h$ native log returns are summed; with `False`, simple returns are compounded. Returns are used as supplied, total or excess |
-| Sampling grid | Each asset's native grid, the pandas frequency key of `asset_returns_dict`; integer $h$ counts native periods and pairs are taken every $h$-th date; a string horizon resamples all NAVs to that frequency |
+| Sampling grid | For `estimate_signal_diagnostics`, each asset's native grid is the pandas frequency key of `asset_returns_dict`; integer $h$ counts native periods and pairs are taken every $h$-th date; a string horizon resamples all NAVs to that frequency |
 | Annualisation | None for $\hat\beta$, the ICs and the pooled t-statistic; `IC_IR_an` multiplies the IC ratio by $\sqrt{\mathrm{af}_h}$, the IC periods per year: $\mathrm{af}/h$ for integer $h$, with $\mathrm{af}$ from `qis.get_annualization_factor` of the finest native key (or `periods_per_year`), and `get_annualization_factor(label)` for a string horizon |
 | Mean adjustment | Forward returns are demeaned across names at each date and divided by their cross-sectional $s_t$ (`ddof=1`); signals are not transformed; the pooled regression has no intercept, and its residual variance charges one degree of freedom per date for the demeaning; $s(\mathrm{IC})$ uses `ddof=1` |
 | Timing | The signal last observed in the native period ending at $t-1$ is paired with the return over $(t-1,t-1+h]$; qis applies exactly one native-period lag |
@@ -122,7 +123,8 @@ The horizon is counted in each asset's own periods: $h=1$ is one month for an as
 `'ME'` and one quarter for an asset stored under `'QE'`. A quarterly asset is never forced onto a
 monthly grid, which would create zero-then-jump returns. At a quarter-end, the quarterly
 asset's one-quarter return and the monthly assets' one-month returns enter the same
-cross-section.
+cross-section. The [monthly and quarterly worked example](#worked-example-with-monthly-and-quarterly-assets)
+traces the same opening scores under native and decision-calendar horizons.
 
 #### Non-overlapping sampling
 
@@ -721,6 +723,476 @@ mean rank IC is exactly 1, every month is a hit, and the ratio is undefined. Pas
 is already lagged makes qis lag it a second time; the mean IC falls to 0.026 with a t-statistic
 of 0.81, and the genuine signal is lost.
 
+### Worked example with monthly and quarterly assets
+
+On 31 March 2025 the momentum scores are $+0.8$ for monthly asset M and $-0.4$ for quarterly
+asset Q. The frames in `asset_returns_dict` contain **end-labelled log returns**. The April,
+May and June rows of `asset_returns_dict['ME']['M']` are $+2\%, -1\%, +3\%$. The June,
+September and December rows of `asset_returns_dict['QE']['Q']` are $+6\%, -2\%, +1\%$.
+The June row for Q therefore measures the entire return from 31 March to 30 June.
+
+**Native horizons.** For the opening scores on 31 March, `estimate_signal_diagnostics`
+produces the following pairs. The pair's `date` is $t$ in $(z_{i,t-1},y_{i,t})$, the date
+of the first return row used. The last column shows when the full outcome is known.
+
+| Asset | Native $h$ | Score `z` | Return rows | Forward log return `r` | Pair `date` | Outcome known |
+|---|---:|---:|---|---:|---|---|
+| M | 1 month | +0.8 | Apr | +2% | 30 Apr | 30 Apr |
+| Q | 1 quarter | −0.4 | Jun | +6% | 30 Jun | 30 Jun |
+| M | 3 months | +0.8 | Apr, May, Jun | +4% | 30 Apr | 30 Jun |
+| Q | 3 quarters | −0.4 | Jun, Sep, Dec | +5% | 30 Jun | 31 Dec |
+
+The history starts in July 2024, so the every-third-date sample includes April 2025 on the
+monthly grid and June 2025 on the quarterly grid. The example retains single-asset dates to
+inspect the raw pairs. An IC requires a cross-section of assets.
+
+```python
+import numpy as np
+import pandas as pd
+import qis
+from qis.perfstats.forward_return_targets import compute_forward_return_targets
+
+months = pd.date_range('2024-07-31', '2025-12-31', freq='ME')
+quarters = months[months.is_quarter_end]
+decisions = pd.date_range('2025-03-31', periods=4, freq='ME')
+mar, apr, may, jun = decisions
+asset_returns_dict = {'ME': pd.DataFrame(np.nan, index=months, columns=['M']),
+                      'QE': pd.DataFrame(np.nan, index=quarters, columns=['Q'])}
+asset_returns_dict['ME'].loc[apr:jun, 'M'] = [0.02, -0.01, 0.03]
+asset_returns_dict['QE'].loc[jun:, 'Q'] = [0.06, -0.02, 0.01]
+score = pd.DataFrame(np.nan, index=months, columns=['M', 'Q'])
+score.loc[mar] = [0.8, -0.4]
+score.loc[may, 'M'] = 0.1
+
+native = qis.estimate_signal_diagnostics(asset_returns_dict=asset_returns_dict, signal=score,
+                                         horizons=(1, 3), is_log_returns=True,
+                                         min_obs_per_date=1, is_vol_normalised=False)
+for h, expected in [('1', [0.02, 0.06]), ('3', [0.04, 0.05])]:
+    pairs = native.pairs[h].set_index(['date', 'asset'])
+    march_scores = pairs.loc[[(apr, 'M'), (jun, 'Q')]]
+    np.testing.assert_allclose(march_scores['z'], [0.8, -0.4])
+    np.testing.assert_allclose(march_scores['r'], expected)
+```
+
+The native one-period cross-section on 30 June also contains M. Its pair is the **31 May**
+score $+0.1$ and June return $+3\%$, alongside Q's **31 March** score and quarter return.
+
+**Decision-calendar horizons.** With monthly decisions starting on 31 March, $h$ counts
+months for both assets. `compute_forward_return_targets` sums the native increments over
+`(formation_date, realisation_date]`. Join the score available at formation by date and asset.
+
+| Decision $h$ | Formation | Realisation | M (score +0.8) | Q (score −0.4) |
+|---|---|---|---|---|
+| 1 month | 31 Mar | 30 Apr | +2% (Apr) | Missing (`native_endpoints`), since 30 Apr is off Q's grid |
+| 3 months | 31 Mar | 30 Jun | +4% (Apr, May, Jun) | +6% (Jun) |
+
+```python
+targets = compute_forward_return_targets(decisions, asset_returns_dict, horizons=(1, 3))
+opening_scores = score.rename_axis(index='formation_date', columns='asset').stack().rename('z')
+paired = targets.join(opening_scores, on=['formation_date', 'asset'])
+march = paired.loc[paired['formation_date'].eq(mar)].set_index(['horizon', 'asset'])
+np.testing.assert_allclose(march.loc[3, 'z'], [0.8, -0.4])
+np.testing.assert_allclose(march.loc[3, 'raw'], [0.04, 0.06])
+assert march.loc[3, 'realisation_date'].eq(jun).all()
+assert np.isclose(march.at[(1, 'M'), 'raw'], 0.02)
+assert pd.isna(march.at[(1, 'Q'), 'raw'])
+assert march.at[(1, 'Q'), 'raw_status'] == 'native_endpoints'
+```
+
+The one-month call warns that Q has no aligned window. At three decision steps, both
+assets have observed quarter-end marks and enter the same March-to-June return comparison.
+
+Run the [asset membership example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/signal_ic_asset_membership.py)
+with `python -m examples.perfstats.signal_ic_asset_membership` from the repository root.
+It prints the matched names and rank IC for each cross-section, using a minimum of two assets
+to illustrate the calculation. Both APIs default to five.
+
+### Raw and factor-adjusted forward returns
+
+For a low-beta score, a positive raw rank IC can arise when low-beta assets lose less in a
+falling market. To measure how well the score ranks the part of return left after a specified
+hedge, form the raw and adjusted ICs on the same assets at each decision. The adjusted IC
+measures residual predictability conditional on the supplied factor model. The paired change
+measures how much the hedge changes the ranking relationship.
+
+| Timing choice | Native-cadence `estimate_signal_diagnostics` | Decision-calendar `compute_forward_return_targets` and `compute_matched_signal_ic` |
+|---|---|---|
+| Score | QIS lags the supplied signal one native period | Supply scores and eligibility known at formation $t$. QIS uses them at $t$. |
+| Integer horizon $h$ | Counts native periods per asset | Counts common decision steps. The first decision anchors non-overlapping windows $(t_j,t_{j+h}]$, with $j=0,h,2h,\ldots$. |
+| IC date | The integer-horizon label is the first return increment | Each row records both `formation_date` and the actual `realisation_date`. The latter determines inclusion at `as_of`. |
+
+At $h=1$ the native increment label is also its endpoint. At $h>1$ an as-of analysis needs
+the actual end of each holding window. Rebuild windows first if an archived native IC combines
+assets with different end dates under one label.
+
+#### Build the forward targets
+
+Supply a sorted, unique decision index and one frame of end-labelled **additive** increments
+per native frequency. Log returns can be summed. For simple returns on a NAV, convert to log
+returns with `np.log1p` and use factor increments and loadings fitted on that basis. Each asset
+belongs to one frequency. Both endpoints must be native marks and every increment inside the
+window must be finite. On a monthly decision calendar a quarterly asset contributes only to
+aligned windows. A warning identifies a frequency and horizon with no aligned windows.
+
+For an adjustment named `market_adjusted`, QIS sums factor increments over the same window,
+takes the latest supplied loading matrix available by formation, and holds the signed exposures
+fixed. The explained return is the dot product of those exposures and factor returns. Subtract
+it from raw return to get the realised residual, including any intercept. For example, a 3.0%
+log return with beta 1.25 and a 2.0% market log return leaves a 0.5% residual.
+
+```python
+import numpy as np
+import pandas as pd
+from qis.perfstats.forward_return_targets import ForwardReturnAdjustment, compute_forward_return_targets
+from qis.perfstats.signal_ic import compute_matched_signal_ic, compute_signal_ic_summary
+
+dates = pd.date_range('2024-01-31', periods=2, freq='ME')
+betas = pd.DataFrame({'market': [1.25, 0.8, 0.3, 0.0, -0.4]}, index=list('ABCDE'))
+assets = pd.DataFrame([[np.nan] * 5, [0.030, 0.020, 0.012, 0.009, 0.003]],
+                      index=dates, columns=betas.index)
+market = pd.DataFrame({'market': [np.nan, 0.020]}, index=dates)
+hedge = ForwardReturnAdjustment(factor_increments_by_freq={'ME': market},
+                                loadings_by_date={dates[0]: betas})
+targets = compute_forward_return_targets(dates, {'ME': assets}, horizons=(1,),
+                                         adjustments={'market_adjusted': hedge})
+assert np.isclose(targets.set_index('asset').at['A', 'market_adjusted'], 0.005)
+```
+
+Each row identifies the asset, cadence and window. The output includes `raw`, `raw_status`,
+and, for each adjustment, its residual, explained return, snapshot date and status. A failed
+raw target carries `native_endpoints` or `missing_return`. An aligned adjustment can additionally
+report `missing_snapshot`, `missing_factor_return` or `missing_loading`. This distinguishes an
+unavailable residual from a realised zero. Model a multifactor hedge by supplying more factor
+columns and matching asset-by-factor matrices under a second adjustment name.
+
+#### Two benchmarks with EWMA betas
+
+`compute_forward_return_targets` accepts pre-estimated exposures from any model. For
+$D$ decisions, $N_c$ assets at cadence $c$, and $K$ benchmark factors, supply the following.
+
+| Input | Layout | Meaning |
+|---|---|---|
+| `decision_dates` | Sorted, unique `DatetimeIndex` of length $D$ | An integer horizon counts decision steps. |
+| `asset_increments_by_freq[c]` | End dates × $N_c$ asset columns | Additive asset returns on the native grid. Each asset belongs to one cadence. |
+| `adjustments[name].factor_increments_by_freq[c]` | End dates × $K$ benchmark columns | Realised benchmark increments on the same native grid and in the units used to fit the exposures. |
+| `adjustments[name].loadings_by_date[t]` | Asset rows × $K$ benchmark columns | Matrix of signed exposures available at timestamp $t$. Asset and benchmark labels identify the matching rows and columns. |
+
+For the window $(t,u]$, QIS selects the latest snapshot available by $t$ and freezes
+it. It sums the benchmark increments strictly after $t$ through $u$ to obtain the
+$K$-vector $f_{t,u}$. For asset $i$, the output row contains `raw`,
+`<name>_explained` $= B_{i,t}f_{t,u}$, and `<name>` $= r_{i,t,u}-B_{i,t}f_{t,u}$,
+along with the snapshot date and status. A missing required benchmark increment or
+asset loading makes the adjusted target unavailable. The signal is joined later by
+formation date and asset.
+
+The runnable example uses the fixed-seed QIS synthetic universe with clean price paths.
+Both benchmarks and all eight test assets use monthly log price returns with no cash
+subtraction or annualisation.
+
+| Role | Synthetic tickers |
+|---|---|
+| Benchmarks | `SEQ_US` (US equity), `SBD_TSY` (Treasuries) |
+| Equity assets | `SEQ_EU` (European equity), `SEQ_EM` (emerging-market equity) |
+| Credit assets | `SBD_IG` (investment-grade bonds), `SBD_HY` (high-yield bonds) |
+| Commodity assets | `SCM_GLD` (gold), `SCM_BCOM` (broad commodities) |
+| Alternative assets | `SAL_HF` (hedge fund), `SAL_PE` (private equity) |
+
+There are 120 month-end returns from January 2015 through December 2024. The joint
+through-origin fit uses a 36-month EWMA span and the full 2 × 2 benchmark cross-moment matrix.
+`warmup_period=11` masks positions 0 through 11. The first reporting decision is
+31 December 2018. The span weights past returns in the **beta estimation**. A
+three-month **forward payoff** sums the next three increments with the opening betas.
+
+```python
+import numpy as np
+
+from examples.perfstats.ewma_benchmark_residuals import monthly_inputs
+from qis import EwmLinearModel, MeanAdjType
+from qis.perfstats.forward_return_targets import (
+    ForwardReturnAdjustment, compute_forward_return_targets,
+)
+
+asset_log, bench_log = monthly_inputs()               # (120, 8), (120, 2)
+month_ends = asset_log.loc['2018-12-31':].index
+beta_model = EwmLinearModel(x=bench_log, y=asset_log)
+ewma_span = 36
+beta_model.fit(span=ewma_span, is_x_correlated=True, mean_adj_type=MeanAdjType.NONE,
+               warmup_period=11)
+# get_loadings_at_date returns benchmarks by assets. The adjustment takes assets by benchmarks.
+beta_snapshots = {t: beta_model.get_loadings_at_date(t).T for t in month_ends[:-1]}
+joint_hedge = ForwardReturnAdjustment(factor_increments_by_freq={'ME': bench_log},
+                                      loadings_by_date=beta_snapshots)
+two_factor_targets = compute_forward_return_targets(
+    decision_dates=month_ends, asset_increments_by_freq={'ME': asset_log}, horizons=(1, 3),
+    adjustments={'two_benchmark': joint_hedge},
+)
+opening, closing = month_ends[-4], month_ends[-1]
+gold = two_factor_targets.query(
+    "asset == 'SCM_GLD' and horizon == 3 and formation_date == @opening"
+).iloc[0]
+moves = bench_log.loc[(bench_log.index > opening) & (bench_log.index <= closing)].sum()
+explained = beta_snapshots[opening].loc['SCM_GLD'].dot(moves)
+assert gold.two_benchmark_snapshot_date == opening and gold.realisation_date == closing
+np.testing.assert_allclose(gold.two_benchmark, gold.raw - explained)
+np.testing.assert_allclose([gold.raw, explained, gold.two_benchmark],
+                           [-0.05859, -0.02908, -0.02951], rtol=0, atol=0.000005)
+```
+
+At the 30 September 2024 close, synthetic gold’s equity beta was 0.12234 and its
+Treasury beta was −0.34220. Through 31 December, the benchmarks returned −19.27%
+and +1.61% in log units. Equity contributed −2.357 percentage points and Treasuries
+contributed −0.551 points. Gold’s raw log return of −5.859% therefore splits into
+−2.908% explained and **−2.951% residual** (rounded).
+
+Run `python -m examples.perfstats.ewma_benchmark_residuals` for the two opening betas,
+separate benchmark payoffs and final residual for every asset in the September–December
+2024 window. [Runnable example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/ewma_benchmark_residuals.py)
+· [EWMA loading estimation](factor_risk_models.md#estimating-loadings-with-ewm-regressions)
+
+#### Compare the same assets
+
+```python
+scores = pd.DataFrame({'formation_date': dates[0], 'asset': betas.index,
+                       'eligible': True, 'low_beta': -betas.market.to_numpy()})
+panel = targets.merge(scores, on=['formation_date', 'asset'], validate='many_to_one')
+dated_ic = compute_matched_signal_ic(panel, signals=['low_beta'],
+                                     targets=['raw', 'market_adjusted'], reference_target='raw')
+common = dated_ic.loc[dated_ic['sample'].eq('common')].set_index('target')
+assert common.n_assets.eq(5).all()
+assert common.at['market_adjusted', 'ic_minus_reference'] > 0
+```
+
+Supply one observation per group, horizon, formation date, realisation date and asset. Pass
+`group_by=['fund']` at both IC stages for separate fund cross-sections. Each sample requires
+eligibility and finite values for **every requested score**. The `common` sample also requires
+all targets. Each `raw_vs_<target>` sample requires only that pair of targets, while
+`available_raw` gives coverage for the reference alone. All sample labels are present even when
+memberships coincide. Spearman correlation uses average ranks for ties. Set `method='pearson'`
+for linear correlation. The default minimum is five assets. Inspect `n_assets` and `status`
+to distinguish `insufficient_assets`, `constant_score` and `constant_target` from a measured
+IC of zero. The paired difference requires both same-date ICs to be defined.
+
+#### Weight dated ICs and interpret the intervals
+
+`compute_signal_ic_summary` also accepts saved ICs. Its required columns are `horizon`,
+`sample`, `signal`, `target`, `realisation_date` and `ic`. Include `ic_minus_reference` for
+paired inference and `n_assets` for breadth. Optional `method` and `reference_target` identify
+the correlation and comparison. The cutoff includes windows realised on or before `as_of`.
+
+| Time-weighting policy | Arguments | Selected dates within each group |
+|---|---|---|
+| Full history (default) | `ewma_span=None, rolling_span=None` | Equal weights on every finite observation through the cutoff |
+| Rolling | `rolling_span=K` | Equal weights on the last $K$ valid observations, with $K\ge2$. Estimates start once the window fills. |
+| EWMA | `ewma_span=S` | Weights proportional to $\lambda^{\mathrm{age}}$, with $\lambda=(S-1)/(S+1)$ and $S>1$. Age counts valid observations. |
+
+Choose one policy per call. For dated ICs $[0.25,-0.50,0.75]$, the full-history mean is $1/6$,
+the rolling-two mean is $1/8$, and EWMA span three gives weights $[1,2,4]/7$ and mean $9/28$.
+
+```python
+saved = pd.DataFrame({'realisation_date': pd.date_range('2024-02-29', periods=3, freq='ME'),
+                      'horizon': 1, 'sample': 'common', 'signal': 'momentum',
+                      'target': 'raw', 'ic': [0.25, -0.50, 0.75]})
+report = compute_signal_ic_summary(saved, ewma_span=3, warmup_periods=12)
+np.testing.assert_allclose(report.dated.weight, np.array([1, 2, 4]) / 7)
+np.testing.assert_allclose(report.summary[['mean_ic', 'effective_n']].iloc[0], [9/28, 7/3])
+assert report.summary.inference.iat[0] == 'insufficient_dates'
+```
+
+`SignalICReport.dated` contains normalized `weight` and `paired_weight`. Each series selects
+its own finite dates. In `summary`, `effective_n` and `paired_effective_n` are the respective
+Kish counts $1/\sum_t w_t^2$. The IC-IR is the weighted mean IC divided by its weighted sample
+standard deviation, using the correction $1-\sum_t w_t^2$. The ratio is in the observed
+horizon's units. The hit rate weights positive ICs. The reported breadth, `mean_n_assets`, is
+the arithmetic mean number of assets across selected IC dates.
+
+`warmup_periods=12` requires 12 effective dates for pointwise HAC inference. Means remain
+available during warm-up under full-history and EWMA weighting. Setting it to zero still
+requires two observations, effective count above one and variation. A rolling window shorter
+than the warm-up, or an EWMA span at or below it, cannot qualify. Inspect `inference` and
+`paired_inference` separately. `hac_lags=3` uses up to three Bartlett lags, capped by the
+number of selected dates minus one. `confidence_level=0.95` gives two-sided pointwise bounds.
+
+The same EWMA span implies a longer calendar memory at longer non-overlapping horizons. With
+monthly decisions, span 24 has a half-life of about 8.3 valid observations, or roughly 50 months
+at $h=6$. For a common calendar decay on regular, complete windows, use $\lambda_h=\lambda_1^h$
+and $S_h=(1+\lambda_h)/(1-\lambda_h)$ in separate horizon summaries.
+
+#### Real ETF comparison with SPY and TLT
+
+Run the Yahoo Finance example from the QIS checkout with the `qis[data]` extra installed.
+
+```bash
+python -m examples.perfstats.yahoo_etf_signal_ic
+python -m examples.perfstats.yahoo_etf_signal_factsheet
+```
+
+The second command writes the eleven-page validation PDF and a ZIP of the underlying
+CSV tables to the configured QIS output directory. To replay a saved snapshot or
+choose an output directory, call the examples from Python:
+
+<!-- docs-test: skip -->
+
+```python
+from examples.perfstats.yahoo_etf_signal_ic import run_example as print_comparison
+from examples.perfstats.yahoo_etf_signal_factsheet import run_example as write_factsheet
+
+print_comparison(prices_csv='adjusted_closes.csv')
+write_factsheet(output_dir='reports', prices_csv='adjusted_closes.csv')
+```
+
+The example downloads daily distribution- and split-adjusted closes via `yfinance` and
+takes the last observed trading session of each month from December 2007 through December
+2025. A replay CSV has trading dates in the
+first column and the ten ticker symbols below as column headers. The script reports the
+first missing or invalid month-end price before fitting the model. [Runnable ETF example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/yahoo_etf_signal_ic.py)
+
+| Role in comparison | ETFs |
+|---|---|
+| Benchmarks used to estimate exposures | SPY (US large-cap equity), TLT (long US Treasuries) |
+| Ranked equity ETFs | IWM (US small caps), EFA (developed markets outside the US and Canada), EEM (emerging markets) |
+| Ranked credit ETFs | LQD (US dollar investment-grade corporate bonds), HYG (US dollar high-yield corporate bonds) |
+| Other ranked ETFs | GLD (gold), DBC (broad commodity futures), VNQ (US real estate) |
+
+At each formation close $t$, QIS fits both benchmark betas jointly through the origin
+on monthly log returns with `ewma_span=36`. The **low-beta** score is the negative signed
+SPY coefficient, conditional on TLT. Lower equity exposure receives a higher score.
+**12–1 momentum** is $\log(P_{t-1}/P_{t-12})$ on adjusted closes, omitting the latest
+month. The first decision is 31 December 2010, after 36 monthly returns. Each horizon
+uses non-overlapping windows from that decision through 31 December 2025.
+
+**Raw** is the ETF’s forward log total return. **Residual** deducts the realised SPY
+and TLT log returns multiplied by the respective betas frozen at formation. For each
+signal, the two Spearman ICs use the same eligible ETFs and the same valid dates.
+The comparison pools the eight ranked ETFs across asset classes. The mean IC uses
+`ewma_span=36`, `rolling_span=None`, with one decay step per **valid IC observation**.
+Thus the three-month series decays once per realised quarter and the twelve-month
+series once per realised year.
+
+| Horizon (months) | Valid dates | Matched ETFs per date | Low-beta raw IC | Low-beta residual IC | Momentum raw IC | Momentum residual IC |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 180 | 8 | 0.0224 | 0.2960 | 0.0287 | 0.1282 |
+| 3 | 60 | 8 | −0.0009 | 0.3611 | 0.0584 | 0.0792 |
+| 6 | 30 | 8 | 0.0007 | 0.4044 | −0.0311 | −0.0016 |
+| 12 | 15 | 8 | −0.1020 | 0.4531 | 0.0582 | 0.0346 |
+
+All eight ETFs entered every window in this Yahoo price history. The script prints
+matched-window counts for each ticker and horizon so readers can check coverage on
+their own download. In this basket, adjustment increased low-beta IC at every horizon.
+Momentum had its largest residual IC at one month. The twelve-month mean uses only 15
+cross-sections.
+
+#### Beta reuse and rank attribution
+
+Pages 3 and 4 use the same 1-, 3-, 6- and 12-month holding windows as the headline table.
+
+**Does sharing a fitted beta change the low-beta IC?** At each formation close, fit two
+joint through-origin SPY/TLT regressions, one on alternate historical months (A) and one
+on the complementary months (B). With monthly span $s=36$, the monthly decay is
+$\lambda=(s-1)/(s+1)$. Each fold advances two months per observation and uses
+$\lambda^2$. Only returns available through formation enter a fit. Freeze the loadings
+over the forward window and use the realised SPY and TLT log returns over that window.
+
+For orientation A, the score is the negative SPY loading from A. The same-fit residual
+subtracts A’s SPY loading times the SPY return. The disjoint-fit residual substitutes
+B’s SPY loading. Both residuals also subtract the full-history TLT loading times the
+TLT return. Repeat with the A and B roles reversed. The joint-hedge control also
+switches the TLT coefficient between the same and opposite folds. All ICs are Spearman
+correlations on the common eligible ETFs. Average the two orientations **within each
+date**, requiring both complete pairs, then take the EWMA mean over valid dates.
+The reuse effect is same-fit minus disjoint-fit. Its pointwise 95% interval uses the
+dated paired differences, Bartlett HAC with up to three lags and `warmup_periods=12`.
+The two folds use disjoint historical observations and track the same economic exposures.
+They also use fewer observations per fit than the headline model.
+
+**How much IC comes from persistent ranks?** For each signal and target, use the
+headline common-sample dates and their exact QIS summary weights $w_t$ (summing to one).
+At each date rank the score and outcome across the same ETFs, centre each rank vector
+on its cross-sectional mean and divide by its Euclidean norm. Call the resulting
+vectors $u_t$ and $v_t$. Their dot product is the dated Spearman IC. The weighted
+mean has the exact decomposition
+
+$$
+\sum_t w_t u_t^\top v_t
+= \bar u^\top \bar v
++ \sum_t w_t (u_t-\bar u)^\top(v_t-\bar v),
+\qquad \bar u=\sum_t w_t u_t,\quad \bar v=\sum_t w_t v_t.
+$$
+
+The first term measures alignment of persistent ETF score and outcome ranks. The
+second measures co-movement of each ETF’s ranks around its own weighted means. The
+asset-level tables sum to the two terms. With eight ETFs and no ties, each centred
+rank vector has squared norm 42. Average ranks and date-specific norms handle ties.
+The default uses a fixed, complete basket. For changing universes pass
+`varying_membership=True`. Rank only finite score/return pairs at each date.
+For asset $i$, let $p_i$ be the sum of selected date weights when it is present.
+Compute its mean unit ranks conditional on those dates. Its persistent contribution
+is $p_i$ times the product of those means. Its within contribution is the sum of
+the products of deviations from those means, weighted by the original date weights.
+Both terms together recover the original IC on the changing universe. These historical
+components describe the realised IC. The within-ETF contribution is in IC units and
+does not measure the return of a timing strategy.
+
+Use `compute_beta_reuse_ic` and `decompose_rank_ic` from
+`qis.perfstats.signal_ic_attribution`. The former accepts aligned native asset/factor
+returns, decision dates, the score factor, horizons, a beta span and the IC weighting
+settings. It returns a `SignalICReport` and the directional pairs. The latter accepts
+two date-by-asset panels and the dated IC weights from that report or another
+`compute_signal_ic_summary` result. It returns each asset’s mean ranks and its persistent
+and within-asset contributions. For the ETF export, `beta_reuse_folds.csv`,
+`beta_reuse_dated.csv` and `beta_reuse_summary.csv` trace the test from each orientation
+to its interval. `rank_attribution.csv` and `rank_attribution_by_etf.csv` contain the
+two components for both low beta and momentum against both targets.
+
+#### Synthetic low-beta and momentum report
+
+The offline example uses quarterly decisions, eight monthly and two quarterly assets, and
+fixed, signed market and bond loadings. The negative market drift favours low beta in raw
+returns. Each quarter's residual contains a component proportional to the preceding quarter's
+return rank. With `ewma_span=24`, the one-quarter common sample gives the following results.
+
+| Formation score | Raw mean IC | Two-factor mean IC (95% interval) | Adjusted minus raw (95% paired interval) |
+|---|---:|---:|---:|
+| Low beta | 0.340 | 0.193 [0.011, 0.374] | −0.148 [−0.243, −0.052] |
+| Prior-quarter momentum | 0.432 | 0.465 [0.342, 0.589] | 0.033 [−0.072, 0.139] |
+
+```python
+from examples.perfstats.forward_signal_report import synthetic_inputs, report_for_lookback
+
+decisions, observed, adjustments, quarterly, low_beta = synthetic_inputs()
+forward = compute_forward_return_targets(decisions, observed, adjustments=adjustments)
+summary = report_for_lookback(forward, quarterly, low_beta, lookback=1)
+one = summary.query("horizon == 1 and sample == 'common'").set_index(['signal', 'target'])
+for signal, raw, adjusted in [
+    ('low_beta', 0.340, [0.193, 0.011, 0.374, -0.148, -0.243, -0.052]),
+    ('momentum', 0.432, [0.465, 0.342, 0.589, 0.033, -0.072, 0.139]),
+]:
+    fields = ['mean_ic', 'ic_lower', 'ic_upper', 'mean_ic_minus_reference',
+              'difference_lower', 'difference_upper']
+    np.testing.assert_allclose(one.loc[(signal, 'raw'), 'mean_ic'], raw, atol=0.0005)
+    np.testing.assert_allclose(one.loc[(signal, 'factor_adjusted'), fields].astype(float),
+                               adjusted, atol=0.0005)
+```
+
+Removing the two realised factor contributions weakens the low-beta ranking. Momentum still
+ranks the residual returns, but its paired interval includes zero, so the evidence for a change
+in IC is inconclusive. A missing bond loading reduces average common breadth from 10 to 9.79
+assets. At six quarters the effective count drops to 11.10 and the default warm-up withholds
+both intervals. Searching the example's lookbacks or horizons and then reporting the strongest
+cell introduces selection bias. Pointwise bounds describe each prespecified cell. Validate a
+selected specification on a subsequent, held-out period.
+
+Run the [saved-IC weighting example](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/signal_ic_summary.py)
+and the [forward signal report](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/perfstats/forward_signal_report.py)
+from the repository root with `python -m examples.perfstats.signal_ic_summary` and
+`python -m examples.perfstats.forward_signal_report`.
+
+Run `python -m examples.perfstats.signal_validation_reports` to display the matched IC
+reports and native regression diagnostics. Its `Locals.EXPORT` case saves a PDF and a CSV
+archive containing the underlying targets, dated ICs, weights, regression pairs and
+endpoint estimates. The
+[examples index](https://github.com/ArturSepp/QuantInvestStrats/blob/main/examples/README.md#perfstats--performance-metrics)
+lists the reports by question and page.
+
 ## Implementation in qis
 
 | Quantity | Formula | qis entry point |
@@ -809,7 +1281,7 @@ not the estimator's `(1, 3, 6)`, and they use the estimator's defaults for `fit_
 
 ### Pitfalls
 
-> **Pitfall.** qis lags the signal by exactly one native period and trusts its date stamps. A
+> **Pitfall.** `estimate_signal_diagnostics` lags the signal by exactly one native period and trusts its date stamps. A
 > signal computed with data published after its date, standardised with full-sample moments, or
 > stamped at the start rather than the end of its period leaks future returns, as the look-ahead
 > check above shows with a mean IC of 1. Conversely, a caller who lags the signal before passing

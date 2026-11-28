@@ -90,9 +90,18 @@ def _is_offline(path: Path) -> bool:
 
 
 EXAMPLE_FILES = _example_files()
-OFFLINE_EXAMPLE_FILES = [path for path in EXAMPLE_FILES if _is_offline(path)]
 EXAMPLE_IDS = [str(path.relative_to(EXAMPLES_DIR)) for path in EXAMPLE_FILES]
-OFFLINE_IDS = [str(path.relative_to(EXAMPLES_DIR)) for path in OFFLINE_EXAMPLE_FILES]
+
+
+def _offline_cases():
+    """Give each factsheet reporting frequency its own subprocess and deadline."""
+    for path in EXAMPLE_FILES:
+        label = str(path.relative_to(EXAMPLES_DIR))
+        if path in SYNTHETIC_FACTSHEETS:
+            for frequency in qis.ReportingFrequency:
+                yield pytest.param(path, frequency.name, id=f'{label}-{frequency.name.lower()}')
+        elif _is_offline(path):
+            yield pytest.param(path, None, id=label)
 
 
 def test_examples_are_found() -> None:
@@ -262,14 +271,15 @@ def _missing_optional_dependency(stderr: str) -> Optional[str]:
     return None
 
 
-def _run_synthetic_factsheet(module: str, output_path: str) -> None:
-    """Run a complete report in the child process without attempting a vendor download."""
+def _run_synthetic_factsheet(module: str, output_path: str, frequency: str) -> None:
+    """Render both report spans at one frequency without attempting a vendor download."""
     provider = importlib.import_module('examples.factsheets.strategy_reporting_frequencies')
     with patch.object(
             provider, 'fetch_universe_data',
             side_effect=AssertionError('factsheet tests must not download prices')) as fetch:
         example = importlib.import_module(module)
-        example.run_local(local=example.Locals.SYNTHETIC, output_path=output_path)
+        with patch.object(example, 'REPORTING_FREQUENCIES', (qis.ReportingFrequency[frequency],)):
+            example.run_local(local=example.Locals.SYNTHETIC, output_path=output_path)
     # The loader catches download errors and falls back to synthetic data. Raising alone
     # would therefore let an attempted download pass; check the recorded call afterwards.
     fetch.assert_not_called()
@@ -281,10 +291,12 @@ def test_run_synthetic_factsheet_detects_caught_download(attempt_download, monke
     module = 'examples.factsheets.strategy_benchmark_reporting_frequencies'
     example = importlib.import_module(module)
     provider = importlib.import_module('examples.factsheets.strategy_reporting_frequencies')
+    frequency = qis.ReportingFrequency.MONTHLY
 
     def run_local(local, output_path):
         assert local is example.Locals.SYNTHETIC
         assert output_path == str(tmp_path)
+        assert example.REPORTING_FREQUENCIES == (frequency,)
         if attempt_download:
             try:
                 provider.fetch_universe_data()
@@ -294,13 +306,14 @@ def test_run_synthetic_factsheet_detects_caught_download(attempt_download, monke
     monkeypatch.setattr(example, 'run_local', run_local)
     if attempt_download:
         with pytest.raises(AssertionError, match='fetch_universe_data'):
-            _run_synthetic_factsheet(module, str(tmp_path))
+            _run_synthetic_factsheet(module, str(tmp_path), frequency.name)
     else:
-        _run_synthetic_factsheet(module, str(tmp_path))
+        _run_synthetic_factsheet(module, str(tmp_path), frequency.name)
 
 
-@pytest.mark.parametrize('path', OFFLINE_EXAMPLE_FILES, ids=OFFLINE_IDS)
+@pytest.mark.parametrize(('path', 'frequency'), tuple(_offline_cases()))
 def test_offline_example_runs(path: Path,
+                              frequency: Optional[str],
                               tmp_path: Path,
                               ) -> None:
     """
@@ -316,12 +329,12 @@ def test_offline_example_runs(path: Path,
                                  else os.pathsep.join((str(REPO_ROOT), python_path)))
     module = '.'.join(('examples', *path.relative_to(EXAMPLES_DIR).with_suffix('').parts))
     command = [sys.executable, '-m', module]
-    if path in SYNTHETIC_FACTSHEETS:
+    if frequency is not None:
         command = [
             sys.executable, '-c',
             'import sys; from qis.tests.test_examples import _run_synthetic_factsheet; '
-            '_run_synthetic_factsheet(sys.argv[1], sys.argv[2])',
-            module, str(tmp_path),
+            '_run_synthetic_factsheet(sys.argv[1], sys.argv[2], sys.argv[3])',
+            module, str(tmp_path), frequency,
         ]
     # The all-weather article builder writes post.html beside its script, so changing cwd
     # does not redirect it. Consequently, its test can pass while modifying the tracked
@@ -348,8 +361,15 @@ def test_offline_example_runs(path: Path,
     if is_article_builder:
         assert output.read_bytes(), "Temporary article HTML is empty"
         assert article.read_bytes() == article_before, "Tracked article HTML was modified"
-    if path in SYNTHETIC_FACTSHEETS:
+    if frequency is not None:
         pdfs = list(tmp_path.glob('*.pdf'))
-        # Four reporting frequencies, each over long and short spans, plus the combined PDF.
-        assert len(pdfs) == 9
+        assert len(pdfs) == 3
         assert all(pdf.stat().st_size > 0 for pdf in pdfs)
+        pages = 0
+        for window in ('long', 'short'):
+            report, = tmp_path.glob(f'*_{frequency.lower()}_{window}_*.pdf')
+            count = len(re.findall(rb'/Type\s*/Page\b', report.read_bytes()))
+            assert count > 0, report.name
+            pages += count
+        combined, = tmp_path.glob('*_all_reporting_frequencies_*.pdf')
+        assert len(re.findall(rb'/Type\s*/Page\b', combined.read_bytes())) == pages

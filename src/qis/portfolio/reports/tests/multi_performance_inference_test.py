@@ -71,6 +71,19 @@ def test_actual_pairs_first_market_and_independent_holm(panel):
             assert result.pairs[i].metadata["alpha"]["benchmark"] == "SEQ_US"
 
 
+def test_overview_only_preserves_windows_and_coverage_without_chart_paths(panel):
+    data = multi(panel, count=2)
+    detailed = calculate(data)
+    overview = calculate(data, include_paths=False)
+    pd.testing.assert_frame_equal(overview.summary, detailed.summary)
+    full_pair, summary_pair = detailed.pairs[1], overview.pairs[1]
+    for field in ("windows", "alpha_windows", "alpha_diagnostics"):
+        pd.testing.assert_frame_equal(getattr(full_pair, field), getattr(summary_pair, field))
+    for field in ("expanding", "rolling", "alpha_expanding", "alpha_rolling"):
+        assert not getattr(full_pair, field).empty
+        assert getattr(summary_pair, field).empty
+
+
 def test_nondefault_base_and_identity_by_position(panel):
     data = multi(panel)
     # Duplicate labels cannot erase or merge hypotheses.
@@ -243,6 +256,13 @@ def test_default_order_unchanged_first_page_details_and_forwarding(monkeypatch, 
     options = dict(time_period=qis.TimePeriod("2008", "2014-12-31"),
                    alpha_inference=alpha_inference,
                    perf_params=qis.PerfParams(freq="ME"), freq_beta="ME", factor_beta_span=12)
+    path_requests = []
+
+    def capture_inference(*args, **kwargs):
+        path_requests.append(kwargs.get("include_paths", True))
+        return inference.compute_multi_performance_inference(*args, **kwargs)
+
+    monkeypatch.setattr(report, "compute_multi_performance_inference", capture_inference)
     figures = report.generate_multi_portfolio_factsheet(data, **options)
     forwarded = []
 
@@ -261,6 +281,7 @@ def test_default_order_unchanged_first_page_details_and_forwarding(monkeypatch, 
         data, add_pairwise_inference_sheets=True, add_group_exposures_and_pnl=True, **options)
     try:
         assert len(figures) == 2 and len(legacy) == 1 and len(details) == 4
+        assert path_requests == [False, True]
         assert forwarded == [False, False]
         assert "Incremental performance vs base" in figures[1].get_suptitle()
         assert "Alternative vs Base" in details[2].get_suptitle()

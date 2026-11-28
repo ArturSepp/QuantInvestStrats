@@ -7,8 +7,22 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- `qis.perfstats.forward_return_targets` provides `compute_forward_return_targets` and
+  `ForwardReturnAdjustment` for raw and factor-adjusted holding-period returns with signed
+  exposures frozen at formation. `ForwardTargetStatus` records availability by asset and window.
+- `qis.perfstats.signal_ic` provides `compute_matched_signal_ic` for comparing scores on
+  matched assets and `compute_signal_ic_summary` for full-history, rolling and EWMA estimates
+  through a realisation cutoff. `SignalICReport` includes dated weights and pointwise HAC
+  intervals for both the IC and its paired change. `ICStatus` and `ICInferenceStatus`
+  distinguish coverage, dispersion and warm-up outcomes.
+
 ### Changed
 
+- Multi-strategy factsheets compute monthly expanding and rolling inference paths when the
+  pairwise charts are requested. The overview still reports all fixed-window estimates and
+  Holm-adjusted p-values. Paired charts reuse their reporting calendar across rolling windows.
 - `to_finite_np` avoids JIT startup for ordinary one- and two-dimensional float64
   arrays with Python float fill values, including converted pandas inputs.
   First grouped long/short exposure reads can use that Python path; direct compiled

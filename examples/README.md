@@ -66,6 +66,13 @@ setup and the targeted test command (the default suite excludes the `examples/` 
 | `quickstart.py` | Yahoo-data plotting walkthrough: prices, drawdowns and risk-adjusted tables. Uses YAML `OUTPUT_PATH`; the package README starts with offline data. |
 | `full_performance_report.py` | Five-figure summary on a yfinance universe (ETFs, crypto, vol ETFs…). Uses `_helpers.reporting_helpers`. |
 | `sharpe_vs_sortino.py` | Sharpe vs Sortino across return frequencies. |
+| [signal_ic_asset_membership.py](perfstats/signal_ic_asset_membership.py) | Print monthly and quarterly asset names, score dates, forward log returns and rank ICs for one- and three-period native and decision-calendar horizons. Runs offline. |
+| [signal_ic_summary.py](perfstats/signal_ic_summary.py) | Read dated ICs from CSV and compare full-history, rolling and EWMA means, effective counts and HAC warm-up. Runs offline. |
+| [yahoo_etf_signal_factsheet.py](perfstats/yahoo_etf_signal_factsheet.py) | Export the Yahoo ETF validation PDF and CSVs, including the same/disjoint beta test and persistent/within-ETF rank IC attribution. Call `run_example(output_dir='reports', prices_csv='adjusted_closes.csv')` to choose a destination and replay saved prices. |
+| [yahoo_etf_signal_ic.py](perfstats/yahoo_etf_signal_ic.py) | Compare 36-span EWMA raw and SPY/TLT-residual rank ICs for low beta and 12–1 momentum on eight real ETFs at 1, 3, 6 and 12 months. Prints per-ETF coverage. Uses Yahoo Finance or saved adjusted closes. |
+| [ewma_benchmark_residuals.py](perfstats/ewma_benchmark_residuals.py) | Fit joint 36-month EWMA equity and Treasury betas for eight synthetic assets. Print both benchmark contributions and the forward residual with loadings frozen at formation. Runs offline. |
+| [forward_signal_report.py](perfstats/forward_signal_report.py) | Compare low beta and momentum across four holding horizons using raw, market-adjusted and two-factor returns, matched assets and paired IC intervals. Includes a momentum lookback sweep on synthetic data. |
+| [signal_validation_reports.py](perfstats/signal_validation_reports.py) | Generate the complete low-beta and momentum validation example as a PDF with the underlying CSV tables. Runs offline on ten synthetic assets. |
 | [sharpe_confidence_intervals.py](perfstats/sharpe_confidence_intervals.py) | Offline single-strategy arithmetic Sharpe CIs: IID-normal track-length chart holding observed Sharpe at 2, and a same-sample HAC comparison. New source-module interface; existing paired defaults unchanged. |
 | `factor_and_backtest_significance.py` | Offline mean, alpha and paired-Sharpe families on the nine full-history instruments of the frozen synthetic panel: Bartlett and AR(1)-prewhitened intercept inference side by side, Holm/BHY through the family functions and directly through `adjust_pvalues`, four stationary-bootstrap families on one shared index matrix, and a two-panel figure. Source-only interfaces, not in `qis.__all__`; finite-sample size and coverage are not established. |
 | `risk_return_frontier.py` | Bond-ETF risk/return scatter using `compute_ra_perf_table`. |
@@ -76,6 +83,36 @@ setup and the targeted test command (the default suite excludes the `examples/` 
 | `timeseries_backfill.py` | Extend a newer provider history backwards with `bfill_timeseries`, preserving its recent price path. |
 | `turnover_conventions.py` | Yahoo SPY/TLT comparison of all four turnover conventions for a 100% funded tactical portfolio and the same portfolio at 2x leverage. |
 | `unsmoothing_and_delevering.py` | End-to-end walkthrough of `delever_returns`, `implied_leverage`, `unsmooth_returns_ar1_ewma` and `unsmooth_returns_glm` on a bundled OCSL/GCF dataset. |
+
+Run `python -m examples.perfstats.signal_validation_reports` from the repository root to
+display the figures. To save the PDF and CSV archive, select the export case in Python.
+
+```python
+from examples.perfstats.signal_validation_reports import Locals, run_local
+
+run_local(Locals.EXPORT, output_path='reports', ewma_span=24, rolling_span=24, warmup_periods=12)
+```
+
+| PDF pages | Question | Report |
+|---|---|---|
+| 1 | Does the score predict returns after factor adjustment? | Mean rank IC for raw, market-adjusted and market-plus-bond residual returns over 1, 2, 3 and 6 quarters. The paired panel shows the change from raw on identical assets, with pointwise 95% HAC intervals. |
+| 2 | How sensitive is the result to the chosen history? | Full-history, rolling and EWMA means for both scores and a 1-, 2- and 4-quarter lookback sweep for momentum. |
+| 3 | When does the signal work and how broad is the comparison? | Realised one-quarter IC over time and counts of eligible assets with raw and complete adjusted returns. |
+| 4 | How consistently does the score predict raw returns? | Rank and Pearson IC by horizon, with date counts, IC-IR, annualised IC-IR, t-statistic and positive hit rate. |
+| 5–8 | How do returns and predictive slopes vary across scores and assets? | Native QIS plots for both signals show returns by score quintile, pooled regression statistics, and the distribution of per-asset slopes by market-exposure group and horizon. |
+
+`signal_validation_tables.zip` includes forward targets and factor snapshot dates, all common,
+pairwise and available-raw IC series, observation weights, effective counts, interval statuses,
+regression pairs, and pooled, group and asset estimates. The default spans are 24 valid
+observations in each horizon's own series. Use `ewma_span`, `rolling_span` and
+`warmup_periods` to change the matched IC estimates. The default HAC warm-up is 12 effective
+dates. At six quarters this example has too few dates for either a 24-date rolling estimate
+or an EWMA interval. The EWMA point estimate remains available.
+
+Native regressions and IC-IR tables use the full history on a quarterly return grid, with the
+score lagged inside QIS. Each regression uses a through-origin slope and cross-sectionally
+standardised scores and forward returns. The low-beta score is fixed for each asset in this
+example, so its per-asset slope reflects that asset's average relative return.
 
 Run the significance walkthrough with
 `python -m examples.perfstats.factor_and_backtest_significance`. Its default `Locals.ANALYTIC`

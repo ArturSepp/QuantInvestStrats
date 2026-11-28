@@ -58,7 +58,7 @@ def validate_inference_base(portfolios, base_portfolio_id):
 def compute_multi_performance_inference(
     multi_portfolio_data, base_portfolio_id=0, time_period=None, freq="ME", rates_data=None,
     *, freq_beta="B", factor_beta_span=260, alpha_inference=InterceptInference.BARTLETT_HAC,
-    alpha_coverage=None,
+    alpha_coverage=None, include_paths=True,
 ):
     """Prepare portfolio-minus-base estimates without changing any legacy estimator defaults.
 
@@ -73,6 +73,8 @@ def compute_multi_performance_inference(
         alpha_inference: Primary alpha method in the unchanged 6K-test Holm family; the alternate
             method is same-sample sensitivity only, with raw unadjusted p-values.
         alpha_coverage: Optional universe-wide coverage policy, restricted to each paired report.
+        include_paths: Compute the expanding and rolling series for each paired appendix.
+            The overview uses the fixed windows and holdings diagnostics.
 
     Returns:
         All six tests per non-base portfolio, pair-level diagnostics and predeclared family.
@@ -113,6 +115,7 @@ def compute_multi_performance_inference(
                 time_period=time_period, freq=freq, rates_data=rates_data,
                 freq_beta=freq_beta, factor_beta_span=factor_beta_span,
                 alpha_inference=alpha_inference,
+                include_paths=include_paths,
                 alpha_coverage=(alpha_coverage.for_instruments({
                     column for portfolio in (portfolios[position], base)
                     if portfolio.weights is not None for column in portfolio.weights})

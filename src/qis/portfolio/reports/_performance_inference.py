@@ -151,7 +151,7 @@ def _latest_alpha_sample(sampled, issue):
 
 
 def _inference_views(sampled, freq, end, issues, *, alpha=False, paired=False,
-                     alpha_inference=InterceptInference.BARTLETT_HAC):
+                     alpha_inference=InterceptInference.BARTLETT_HAC, include_paths=True):
     """Select complete samples; single alpha uses the latest continuous history block.
 
     Recent fixed windows retain their original boundaries and reject interior gaps. Only the
@@ -248,24 +248,36 @@ def _inference_views(sampled, freq, end, issues, *, alpha=False, paired=False,
     if minimum <= len(sampled) < normal_warmup:
         issue("Expanding chart: 3-year warm-up unavailable; using eligible 2-year minimum.")
 
+    # Five quarterly years have only 20 observations, below the minimum of 24.
+    rolling_candidates = (6,) if af == 4 else (5, 3, 2)
+    # These four reporting grids have the same date labels whichever window starts them.
+    # Slice one grid at each endpoint. Other offsets can depend on the phase of the cutoff.
+    calendar = None
+    if (include_paths and len(sampled) >= minimum and freq in ("B", "W-WED", "ME", "QE")
+            and sampled.index.is_normalized and end == pd.Timestamp(end).normalize()):
+        first_cutoff = min(sampled.index[0], end) - pd.DateOffset(years=rolling_candidates[0])
+        calendar = pd.date_range(first_cutoff, max(sampled.index[-1], end), freq=freq)
+
     def calendar_window(history, date, years):
         cutoff = date - pd.DateOffset(years=years)
         window = history.loc[history.index > cutoff]
-        expected = pd.date_range(cutoff, date, freq=freq)
-        expected = expected[expected > cutoff]
-        complete = len(window) >= minimum and window.index.equals(expected)
-        return window, complete
+        if len(window) < minimum:
+            return window, False
+        if calendar is None:
+            expected = pd.date_range(cutoff, date, freq=freq)
+            expected = expected[expected > cutoff]
+        else:
+            expected = calendar[calendar.searchsorted(cutoff, side="right"):
+                                calendar.searchsorted(date, side="right")]
+        return window, window.index.equals(expected)
 
-    # Five quarterly years have only 20 observations, below the unchanged minimum of 24.
-    # Select by this column's sampling grid, not by the report's other inference column.
-    rolling_candidates = (6,) if af == 4 else (5, 3, 2)
     rolling_years = next((y for y in rolling_candidates
                           if calendar_window(sampled, end, y)[1]), None)
     if rolling_years != rolling_candidates[0]:
         issue(f"Rolling chart: {rolling_candidates[0]}-year history unavailable; "
               f"{str(rolling_years) + '-year fallback' if rolling_years else 'panel unavailable'}.")
     expanding, rolling = [], []
-    endpoints = sampled.groupby(sampled.index.to_period("M")).tail(1).index
+    endpoints = sampled.groupby(sampled.index.to_period("M")).tail(1).index if include_paths else ()
     for date in endpoints:
         history = sampled.loc[:date]
         candidates = [(expanding, history, len(history) >= warmup, "Expanding chart")]
