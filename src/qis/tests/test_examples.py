@@ -42,6 +42,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
+from unittest.mock import patch
 import pytest
 # qis / project
 import qis
@@ -58,6 +59,16 @@ pytestmark = pytest.mark.skipif(
 # integration tests exercise those workflows separately with replaced download boundaries.
 NETWORK_MARKERS = ('yfinance', 'yf.', 'bbg_fetch', 'pandas_datareader', 'blpapi')
 
+# These reports import their Yahoo loader, so scanning their own source misses the download.
+# Keep their full rendering coverage by explicitly selecting their existing synthetic modes.
+SYNTHETIC_FACTSHEETS = {
+    EXAMPLES_DIR / 'factsheets' / name for name in (
+        'multi_assets_reporting_frequencies.py',
+        'multi_strategy_reporting_frequencies.py',
+        'strategy_benchmark_reporting_frequencies.py',
+    )
+}
+
 # aliases an example may bind the top-level package to; only the plain one is checked, since
 # the others alias submodules whose contents are internal and free to change
 QIS_ALIAS = 'qis'
@@ -72,6 +83,8 @@ def _example_files() -> List[Path]:
 
 def _is_offline(path: Path) -> bool:
     """True when the example reaches no data vendor and can be executed here."""
+    if path in SYNTHETIC_FACTSHEETS:
+        return True
     source = path.read_text(encoding='utf-8', errors='ignore')
     return not any(marker in source for marker in NETWORK_MARKERS)
 
@@ -249,6 +262,43 @@ def _missing_optional_dependency(stderr: str) -> Optional[str]:
     return None
 
 
+def _run_synthetic_factsheet(module: str, output_path: str) -> None:
+    """Run a complete report in the child process without attempting a vendor download."""
+    provider = importlib.import_module('examples.factsheets.strategy_reporting_frequencies')
+    with patch.object(
+            provider, 'fetch_universe_data',
+            side_effect=AssertionError('factsheet tests must not download prices')) as fetch:
+        example = importlib.import_module(module)
+        example.run_local(local=example.Locals.SYNTHETIC, output_path=output_path)
+    # The loader catches download errors and falls back to synthetic data. Raising alone
+    # would therefore let an attempted download pass; check the recorded call afterwards.
+    fetch.assert_not_called()
+
+
+@pytest.mark.parametrize('attempt_download', [False, True])
+def test_run_synthetic_factsheet_detects_caught_download(attempt_download, monkeypatch, tmp_path):
+    """A caught download error must not make the offline guard silently succeed."""
+    module = 'examples.factsheets.strategy_benchmark_reporting_frequencies'
+    example = importlib.import_module(module)
+    provider = importlib.import_module('examples.factsheets.strategy_reporting_frequencies')
+
+    def run_local(local, output_path):
+        assert local is example.Locals.SYNTHETIC
+        assert output_path == str(tmp_path)
+        if attempt_download:
+            try:
+                provider.fetch_universe_data()
+            except AssertionError:
+                pass
+
+    monkeypatch.setattr(example, 'run_local', run_local)
+    if attempt_download:
+        with pytest.raises(AssertionError, match='fetch_universe_data'):
+            _run_synthetic_factsheet(module, str(tmp_path))
+    else:
+        _run_synthetic_factsheet(module, str(tmp_path))
+
+
 @pytest.mark.parametrize('path', OFFLINE_EXAMPLE_FILES, ids=OFFLINE_IDS)
 def test_offline_example_runs(path: Path,
                               tmp_path: Path,
@@ -266,6 +316,13 @@ def test_offline_example_runs(path: Path,
                                  else os.pathsep.join((str(REPO_ROOT), python_path)))
     module = '.'.join(('examples', *path.relative_to(EXAMPLES_DIR).with_suffix('').parts))
     command = [sys.executable, '-m', module]
+    if path in SYNTHETIC_FACTSHEETS:
+        command = [
+            sys.executable, '-c',
+            'import sys; from qis.tests.test_examples import _run_synthetic_factsheet; '
+            '_run_synthetic_factsheet(sys.argv[1], sys.argv[2])',
+            module, str(tmp_path),
+        ]
     # The all-weather article builder writes post.html beside its script, so changing cwd
     # does not redirect it. Consequently, its test can pass while modifying the tracked
     # article, and that unrelated change could accidentally enter a later commit.
@@ -291,3 +348,8 @@ def test_offline_example_runs(path: Path,
     if is_article_builder:
         assert output.read_bytes(), "Temporary article HTML is empty"
         assert article.read_bytes() == article_before, "Tracked article HTML was modified"
+    if path in SYNTHETIC_FACTSHEETS:
+        pdfs = list(tmp_path.glob('*.pdf'))
+        # Four reporting frequencies, each over long and short spans, plus the combined PDF.
+        assert len(pdfs) == 9
+        assert all(pdf.stat().st_size > 0 for pdf in pdfs)
